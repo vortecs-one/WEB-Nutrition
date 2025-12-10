@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
 
 export default function LoginPage() {
-  const callbackUrl = "http://localhost:3000/dashboard";
+  const callbackUrl = "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
