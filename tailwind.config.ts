@@ -8,7 +8,7 @@ const config = {
   theme: {
     extend: {},
   },
-  plugins: {},
+  plugins: [], // <- here: empty array instead of {}
 } satisfies Config;
 
 export default config;
