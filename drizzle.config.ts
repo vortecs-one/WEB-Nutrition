@@ -1,10 +1,12 @@
-import { defineConfig } from "drizzle-kit";
+import type { Config } from "drizzle-kit";
 
-export default defineConfig({
+const config: Config = {
+  schema: "./drizzle/schema.ts",   // adjust if your schema path is different
+  out: "./drizzle",               // adjust if your migrations folder is different
   dialect: "postgresql",
-  schema: "./drizzle/schema.ts",
-  out: "./drizzle/migrations",
   dbCredentials: {
-    url: process.env.POSTGRES_URL!,
+    url: process.env.POSTGRES_URL || "",
   },
-});
+};
+
+export default config;
