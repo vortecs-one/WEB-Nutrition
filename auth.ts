@@ -16,30 +16,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
 
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+  if (!credentials?.email || !credentials?.password) return null;
 
-        // Find user in DB
-        const result = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, credentials.email))
-          .limit(1);
+  // Explicitly type credentials so TS knows these are strings
+  const { email, password } = credentials as {
+    email: string;
+    password: string;
+  };
 
-        const user = result[0];
-        if (!user) return null;
+  // Find user in DB
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email)) // use typed `email`
+    .limit(1);
 
-        // Compare password hash
-        const valid = await bcrypt.compare(credentials.password, user.password);
-        if (!valid) return null;
+  const user = result[0];
+  if (!user) return null;
 
-        // Return user object for session
-        return {
-          id: user.id,
-          email: user.email,
-        };
-      },
-    }),
-  ],
+  // Compare password hash
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return null;
+
+  // Return user object for session
+  return {
+    id: user.id,
+    email: user.email,
+  };
+},
+
 
   session: {
     strategy: "jwt",
