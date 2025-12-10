@@ -58,9 +58,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
-        // If you extended Session user type, this is fine; otherwise silence TS:
-        // @ts-expect-error - custom user.id on session
-        session.user.id = token.sub;
+        // Safely assign custom id to the session user
+        (session.user as any).id = token.sub;
       }
       return session;
     },
