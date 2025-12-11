@@ -1,28 +1,13 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { LogoutButton } from "@/components/logout-button";
-
-export default async function DashboardPage() {
-  const session = await auth();
-
-  if (!session) {
-    redirect("/login");
-  }
-
+// app/dashboard/page.tsx
+export default function DashboardHomePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
-      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-sm p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-
-          {/* Client logout button */}
-          <LogoutButton />
-        </div>
-
-        <p className="text-lg text-muted-foreground">
-          Logged in as <span className="font-medium">{session.user?.email}</span>
-        </p>
-      </div>
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Dashboard nutricional
+      </h1>
+      <p className="text-sm text-muted-foreground">
+        Selecciona una opción en el menú de la izquierda para comenzar.
+      </p>
     </div>
   );
 }
