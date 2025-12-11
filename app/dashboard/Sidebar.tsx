@@ -14,11 +14,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    label: "Puntos de corte",
-    href: "/dashboard/cutoffs",
-    icon: "📍",
-  },
-  {
     label: "Grupos de trabajo",
     href: "/dashboard/groups",
     icon: "👥",
@@ -27,6 +22,11 @@ const navItems: NavItem[] = [
     label: "Ficha paciente",
     href: "/dashboard/patients",
     icon: "👨‍👩‍👧‍👦",
+  },
+  {
+    label: "Puntos de corte",
+    href: "/dashboard/cutoffs",
+    icon: "📍",
   },
   {
     label: "Antropometría",
