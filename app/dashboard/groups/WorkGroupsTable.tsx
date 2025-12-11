@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createWorkGroup, updateWorkGroup, deleteWorkGroup } from "./actions";
+import ImageDropzone from "@/components/ImageDropzone";
+
 
 type WorkGroup = {
   id: number;
@@ -77,14 +79,22 @@ export default function WorkGroupsTable({ groups }: Props) {
               >
                 {/* Logo */}
                 <td className="px-4 py-2">
-                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
-                    {group.name
-                      .split(" ")
-                      .map((w) => w[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </div>
+                  {group.logoUrl ? (
+                    <img
+                      src={group.logoUrl}
+                      alt={group.name}
+                      className="h-8 w-8 rounded-full object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
+                      {group.name
+                        .split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                  )}
                 </td>
 
                 {/* Nombre */}
@@ -242,17 +252,20 @@ export default function WorkGroupsTable({ groups }: Props) {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-slate-600">
-                  Logo (URL opcional)
-                </label>
+              {/* Logo / icono del grupo */}
+              {modal.mode === "edit" && currentGroup && (
                 <input
-                  name="logoUrl"
-                  defaultValue={currentGroup?.logoUrl ?? ""}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="https://..."
+                  type="hidden"
+                  name="existingLogoUrl"
+                  value={currentGroup.logoUrl ?? ""}
                 />
-              </div>
+              )}
+
+              <ImageDropzone
+                name="logoFile"
+                label="Icono (imagen)"
+                initialUrl={currentGroup?.logoUrl ?? null}
+              />
 
               <div className="pt-2 flex justify-end gap-2">
                 <button

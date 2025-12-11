@@ -14,12 +14,12 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    label: "Grupos de trabajo",
+    label: "Grupos",
     href: "/dashboard/groups",
     icon: "👥",
   },
   {
-    label: "Ficha paciente",
+    label: "Pacientes",
     href: "/dashboard/patients",
     icon: "👨‍👩‍👧‍👦",
   },
@@ -32,26 +32,20 @@ const navItems: NavItem[] = [
     label: "Antropometría",
     icon: "📏",
     children: [
-      { label: "Mediciones", href: "/dashboard/antropometria/mediciones" },
-      { label: "Evolución", href: "/dashboard/antropometria/evolucion" },
+      { label: "Bicompartimental", href: "/dashboard/antropometria/bicompartimental" },
+      { label: "Tetracompartimental", href: "/dashboard/antropometria/tetracompartimental" },
+      { label: "Pentacompartimental", href: "/dashboard/antropometria/pentacompartimental" },
     ],
   },
   {
-    label: "Alimentación",
-    icon: "🍽️",
+    label: "Nutrición",
+    icon: "🍽️ ",
     children: [
-      { label: "Planes", href: "/dashboard/alimentacion/planes" },
-      { label: "Registros", href: "/dashboard/alimentacion/registros" },
+      { label: "Alimentación", href: "/dashboard/alimentacion/alimentacion" },
+      { label: "Hidratación", href: "/dashboard/alimentacion/hidratacion" },
     ],
   },
-  {
-    label: "Hidratación",
-    icon: "💧",
-    children: [
-      { label: "Registros", href: "/dashboard/hidratacion/registros" },
-      { label: "Resumen", href: "/dashboard/hidratacion/resumen" },
-    ],
-  },
+
 ];
 
 export default function Sidebar() {
