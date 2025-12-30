@@ -27,10 +27,10 @@ export default function Topbar() {
       {/* Left: logo */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-xs font-bold">
-          5C
+          TP
         </div>
         <div className="leading-tight">
-          <div className="font-semibold text-sm">NutritionAI</div>
+          <div className="font-semibold text-sm">Team Peñalolén</div>
           <div className="text-[11px] text-slate-300">Estandar</div>
         </div>
       </div>
