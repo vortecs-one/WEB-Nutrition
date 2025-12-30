@@ -12,6 +12,7 @@ export default async function PatientsPage() {
     db.select().from(sports),
     db
       .select({
+        // fields required by EditPatientModal
         id: patients.id,
         document: patients.document,
         firstName: patients.firstName,
@@ -22,6 +23,8 @@ export default async function PatientsPage() {
         workGroupId: patients.workGroupId,
         sportId: patients.sportId,
         birthDate: patients.birthDate,
+
+        // display fields
         genderName: genders.name,
         groupName: workGroups.name,
         sportName: sports.name,
@@ -47,17 +50,15 @@ export default async function PatientsPage() {
         <AddPatientModal workGroups={groups} genders={genderList} sports={sportsList} />
       </div>
 
-      {/* Table container like work groups */}
+      {/* Table */}
       <div className="rounded-lg border overflow-hidden bg-white">
-        {/* Dark header row */}
+        {/* Header row (12 cols) */}
         <div className="grid grid-cols-12 gap-2 bg-slate-900 text-white px-4 py-3 text-sm font-medium">
           <div className="col-span-2">Documento</div>
-	  <div className="col-span-3">Nombre</div>
-          <div className="col-span-2">Género</div>
-          <div className="col-span-2">Grupo</div>
+          <div className="col-span-2">Nombre</div>
+          <div className="col-span-2">Email</div>
+          <div className="col-span-2">Teléfono</div>      
           <div className="col-span-2">Actividad</div>
-          <div className="col-span-3">Email</div>
-          <div className="col-span-2">Teléfono</div>
           <div className="col-span-2 text-right">Acciones</div>
         </div>
 
@@ -67,35 +68,57 @@ export default async function PatientsPage() {
           rows.map((p) => (
             <div
               key={p.id}
-              className="grid grid-cols-12 gap-2 px-4 py-3 text-sm border-b last:border-b-0"
+              className="border-b last:border-b-0 hover:bg-slate-50"
             >
-              <div className="col-span-2">{p.document}</div>
-              <div className="col-span-3">{p.firstName} {p.lastName}</div>
-	      <div className="col-span-2">Género</div>
-              <div className="col-span-2">Grupo</div>
-              <div className="col-span-2">Actividad</div>
-              <div className="col-span-3">{p.email}</div>
-              <div className="col-span-2">{p.phone ?? "—"}</div>
+              {/* Row line 1 (main columns) */}
+              <div className="grid grid-cols-12 gap-2 px-4 pt-3 text-sm">
+                <div className="col-span-2">{p.document}</div>
 
-              <div className="col-span-2 flex justify-end gap-2">
-                <EditPatientModal
-                  patient={p}
-                  workGroups={groups}
-                  genders={genderList}
-                  sports={sportsList}
-                />
+                <div className="col-span-2">
+                  {p.firstName} {p.lastName}
+                </div>
 
-                <form
-                  action={async () => {
-                    "use server";
-                    await deletePatient(p.id);
-                  }}
-                >
-                  <button className="bg-red-600 text-white px-3 py-1 rounded text-sm">
-                    Eliminar
-                  </button>
-                </form>
-              </div>
+                <div className="col-span-2">
+                  <span className="break-all">{p.email}</span>
+                </div>
+
+                <div className="col-span-2">
+                  <span>{p.phone ?? "—"}</span>
+                </div>                
+
+                <div className="col-span-2">
+                  {p.sportName ? (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                      {p.sportName}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </div>
+
+                <div className="col-span-2 flex items-center justify-end gap-2">
+                  <EditPatientModal
+                    patient={p}
+                    workGroups={groups}
+                    genders={genderList}
+                    sports={sportsList}
+                  />
+
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deletePatient(p.id);
+                    }}
+                  >
+                  
+                    <button className="bg-red-600 text-white px-3 py-1 rounded text-sm">
+                      Eliminar
+                    </button>
+                  
+                  </form>
+                </div>
+              
+              </div>             
             </div>
           ))
         )}
