@@ -53,8 +53,7 @@ export default function Sidebar() {
 
   const [open, setOpen] = useState<Record<string, boolean>>({
     Antropometría: true,
-    Alimentación: true,
-    Hidratación: true,
+    Nutrición: true,
   });
 
   const toggle = (label: string) => {
