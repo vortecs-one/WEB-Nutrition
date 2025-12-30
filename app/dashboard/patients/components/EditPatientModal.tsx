@@ -43,7 +43,7 @@ export default function EditPatientModal({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="bg-yellow-500 text-black px-3 py-1 rounded text-sm"
+        className="px-2 py-1 text-xs rounded bg-yellow-500 text-white hover:bg-yellow-600"
       >
         Editar
       </button>

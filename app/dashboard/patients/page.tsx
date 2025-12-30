@@ -71,11 +71,11 @@ export default async function PatientsPage() {
               <th className="px-4 py-2 text-left">Documento</th>
               <th className="px-4 py-2 text-left">Paciente</th>
               <th className="px-4 py-2 text-left">Género</th>
-              <th className="px-4 py-2 text-left">Grupo</th>
-              <th className="px-4 py-2 text-left">Actividad</th>
               <th className="px-4 py-2 text-left">Nacimiento</th>
               <th className="px-4 py-2 text-left">Email</th>
               <th className="px-4 py-2 text-left">Teléfono</th>
+              <th className="px-4 py-2 text-left">Grupo</th>
+              <th className="px-4 py-2 text-left">Actividad</th>
               <th className="px-4 py-2 text-right w-40">Acciones</th>
             </tr>
           </thead>
@@ -102,6 +102,13 @@ export default async function PatientsPage() {
                   </span>
                 </td>
 
+                <td className="px-4 py-2 text-gray-600">
+                  {formatDate(p.birthDate)}
+                </td>
+
+                <td className="px-4 py-2 text-gray-700">{p.email}</td>
+                <td className="px-4 py-2 text-gray-700">{p.phone ?? "—"}</td>
+
                 <td className="px-4 py-2">
                   <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700 border border-slate-200">
                     {p.groupName}
@@ -118,12 +125,6 @@ export default async function PatientsPage() {
                   )}
                 </td>
 
-                <td className="px-4 py-2 text-gray-600">
-                  {formatDate(p.birthDate)}
-                </td>
-
-                <td className="px-4 py-2 text-gray-700">{p.email}</td>
-                <td className="px-4 py-2 text-gray-700">{p.phone ?? "—"}</td>
 
                 <td className="px-4 py-2">
                   <div className="flex justify-end gap-2">

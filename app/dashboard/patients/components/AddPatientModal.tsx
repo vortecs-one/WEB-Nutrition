@@ -23,7 +23,7 @@ export default function AddPatientModal({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="bg-purple-700 text-white px-4 py-2 rounded"
+        className="px-3 py-1.5 text-sm rounded bg-green-700 text-white hover:bg-green-800 transition"
       >
         + Agregar
       </button>

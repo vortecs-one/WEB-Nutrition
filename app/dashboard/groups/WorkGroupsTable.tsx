@@ -51,7 +51,7 @@ export default function WorkGroupsTable({ groups }: Props) {
           <h2 className="font-medium text-sm">Listado de grupos</h2>
           <button
             onClick={() => setModal({ mode: "create" })}
-            className="px-3 py-1.5 text-sm rounded bg-purple-700 text-white hover:bg-purple-800 transition"
+            className="px-3 py-1.5 text-sm rounded bg-green-700 text-white hover:bg-green-800 transition"
           >
             + Agregar
           </button>
