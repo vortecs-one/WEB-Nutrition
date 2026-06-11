@@ -5,19 +5,22 @@
 //   1. POST /api/humans/auth/system-login  -> returns a system JWT bearer token
 //   2. POST /api/humans/user/login         -> requires the bearer token from step 1
 //
+// The system bearer token is required on EVERY endpoint, so token acquisition,
+// caching, and refresh live in `./thruxion-token` (server-only). Use the
+// `thruxionFetch` helper below for any new authenticated endpoint — it injects
+// the bearer token and transparently refreshes + retries once on a 401.
+//
 // Config via env vars (with sensible test defaults):
-//   THRUXION_API_BASE_URL   default: https://thruxion.com
+//   THRUXION_API_BASE_URL    default: https://thruxion.com
 //   THRUXION_SYSTEM_USER     default: admin   (test only)
 //   THRUXION_SYSTEM_PASSWORD default: admin   (test only)
 
-const BASE_URL = process.env.THRUXION_API_BASE_URL ?? "https://thruxion.com";
-const SYSTEM_USER = process.env.THRUXION_SYSTEM_USER ?? "admin";
-const SYSTEM_PASSWORD = process.env.THRUXION_SYSTEM_PASSWORD ?? "admin";
-
-export type SystemLoginResponse = {
-  token: string;
-  role?: string;
-};
+import "server-only";
+import {
+  getSystemToken,
+  invalidateSystemToken,
+  BASE_URL,
+} from "./thruxion-token";
 
 export type ThruxionUser = {
   id?: string | number;
@@ -28,64 +31,65 @@ export type ThruxionUser = {
 };
 
 /**
- * Step 1 — Authenticate the *system* to obtain a JWT bearer token.
+ * Authenticated fetch against the Thruxion API.
+ *
+ * - Prepends BASE_URL to a path (e.g. "/api/humans/user/login").
+ * - Injects `Authorization: Bearer <system token>`.
+ * - On a 401, invalidates the cached token, refreshes once, and retries.
+ *
+ * Use this for ALL new authenticated endpoints so they share the same key
+ * and refresh logic.
  */
-export async function getSystemToken(): Promise<string> {
-  const res = await fetch(`${BASE_URL}/api/humans/auth/system-login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: SYSTEM_USER,
-      password: SYSTEM_PASSWORD,
-    }),
-    // Never cache auth requests.
+export async function thruxionFetch(
+  path: string,
+  init: RequestInit = {},
+  _retried = false,
+): Promise<Response> {
+  const token = await getSystemToken();
+
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    headers,
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const detail = await safeText(res);
-    throw new Error(
-      `system-login failed (${res.status} ${res.statusText}): ${detail}`,
-    );
+  // The system token was rejected (expired early / rotated remotely).
+  // Refresh once and retry a single time.
+  if (res.status === 401 && !_retried) {
+    invalidateSystemToken();
+    return thruxionFetch(path, init, true);
   }
 
-  const data = (await res.json()) as SystemLoginResponse;
-  if (!data?.token) {
-    throw new Error("system-login succeeded but no token was returned");
-  }
-
-  return data.token;
+  return res;
 }
 
 /**
- * Step 2 — Log a user in using their email/password.
- * Requires the system bearer token in the Authorization header.
- *
+ * Log a user in using their email/password.
  * Returns the user payload on success, or `null` on invalid credentials.
  */
 export async function userLogin(
   email: string,
   password: string,
 ): Promise<ThruxionUser | null> {
-  const token = await getSystemToken();
-
-  const res = await fetch(`${BASE_URL}/api/humans/user/login`, {
+  const res = await thruxionFetch("/api/humans/user/login", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify({ email, password }),
-    cache: "no-store",
   });
 
-  // Invalid user credentials -> treat as a failed login, not an error.
+  // Invalid USER credentials -> failed login (distinct from a system 401,
+  // which thruxionFetch already retried). 403 = forbidden user.
   if (res.status === 401 || res.status === 403) {
     return null;
   }
 
   if (!res.ok) {
-    const detail = await safeText(res);
+    const detail = await res.text().catch(() => "<no body>");
     throw new Error(
       `user/login failed (${res.status} ${res.statusText}): ${detail}`,
     );
@@ -96,14 +100,10 @@ export async function userLogin(
     | { user?: ThruxionUser };
 
   // The API may return the user directly or nested under `user`.
-  const user = (data as { user?: ThruxionUser })?.user ?? (data as ThruxionUser);
+  const user =
+    (data as { user?: ThruxionUser })?.user ?? (data as ThruxionUser);
   return user ?? {};
 }
 
-async function safeText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return "<no body>";
-  }
-}
+// Re-export the token accessor for callers that need the raw bearer token.
+export { getSystemToken } from "./thruxion-token";
