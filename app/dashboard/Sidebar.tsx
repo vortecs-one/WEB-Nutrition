@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { useRole } from "@/lib/role/provider";
+import type { Role } from "@/lib/role/config";
 
 // "key" is used for stable open/close state across languages.
 type NavItem = {
@@ -16,21 +18,12 @@ type NavItem = {
   children?: { label: string; href: string }[];
 };
 
-function buildNavItems(dict: Dictionary): NavItem[] {
+// Builds the nav for the professional (nutritionist) experience.
+function buildNutritionistNav(dict: Dictionary): NavItem[] {
   const t = dict.nav;
   return [
-    {
-      key: "groups",
-      label: t.groups,
-      href: "/dashboard/groups",
-      icon: "👥",
-    },
-    {
-      key: "patients",
-      label: t.patients,
-      href: "/dashboard/patients",
-      icon: "👨‍👩‍👧‍👦",
-    },
+    { key: "groups", label: t.groups, href: "/dashboard/groups", icon: "👥" },
+    { key: "patients", label: t.patients, href: "/dashboard/patients", icon: "👨‍👩‍👧‍👦" },
     {
       key: "anthropometry",
       label: t.anthropometry,
@@ -45,7 +38,7 @@ function buildNavItems(dict: Dictionary): NavItem[] {
     {
       key: "nutrition",
       label: t.nutrition,
-      icon: "🍽️ ",
+      icon: "🍽️",
       children: [
         { label: t.food, href: "/dashboard/alimentacion/alimentacion" },
         { label: t.hydration, href: "/dashboard/alimentacion/hidratacion" },
@@ -54,10 +47,30 @@ function buildNavItems(dict: Dictionary): NavItem[] {
   ];
 }
 
-export default function Sidebar() {
+// Builds the nav for the normal-user experience:
+// only Nutrition + a personal information view.
+function buildUserNav(dict: Dictionary): NavItem[] {
+  const t = dict.nav;
+  return [
+    { key: "myProfile", label: t.myProfile, href: "/dashboard/profile", icon: "🙋" },
+    { key: "myNutrition", label: t.myNutrition, href: "/dashboard/nutrition", icon: "🍽️" },
+  ];
+}
+
+function buildNavItems(role: Role, dict: Dictionary): NavItem[] {
+  return role === "user" ? buildUserNav(dict) : buildNutritionistNav(dict);
+}
+
+export default function Sidebar({
+  onNavigate,
+}: {
+  /** Called when a link is clicked — used to close the mobile drawer. */
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const { dict } = useI18n();
-  const navItems = buildNavItems(dict);
+  const role = useRole();
+  const navItems = buildNavItems(role, dict);
 
   const [open, setOpen] = useState<Record<string, boolean>>({
     anthropometry: true,
@@ -72,9 +85,9 @@ export default function Sidebar() {
     href && (pathname === href || pathname.startsWith(href + "/"));
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-50 border-r border-slate-800 flex flex-col">
+    <aside className="w-64 h-full bg-slate-900 text-slate-50 flex flex-col">
       {/* top logo / title */}
-      <div className="h-14 px-4 flex items-center border-b border-slate-800">
+      <div className="h-14 px-4 flex items-center border-b border-slate-800 shrink-0">
         <span className="font-bold tracking-wide text-sm">
           {dict.common.appName} · {dict.common.panel}
         </span>
@@ -96,6 +109,7 @@ export default function Sidebar() {
                 <li key={item.key}>
                   <Link
                     href={item.href ?? "#"}
+                    onClick={onNavigate}
                     className={[
                       "flex items-center gap-3 px-4 py-2 rounded-md transition-colors",
                       active
@@ -137,6 +151,7 @@ export default function Sidebar() {
                         <li key={child.href}>
                           <Link
                             href={child.href}
+                            onClick={onNavigate}
                             className={[
                               "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs",
                               childActive

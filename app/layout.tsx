@@ -4,6 +4,8 @@ import "./globals.css";
 import AuthSessionProvider from "./SessionProvider"; // ⬅️ add this
 import { I18nProvider } from "@/lib/i18n/provider";
 import { getCurrentLocale } from "@/lib/i18n/server";
+import { RoleProvider } from "@/lib/role/provider";
+import { getCurrentRole } from "@/lib/role/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,6 +28,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
+  const role = await getCurrentRole();
 
   return (
     <html lang={locale} className="bg-background">
@@ -33,9 +36,11 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <I18nProvider locale={locale}>
-          <AuthSessionProvider>
-            {children}
-          </AuthSessionProvider>
+          <RoleProvider role={role}>
+            <AuthSessionProvider>
+              {children}
+            </AuthSessionProvider>
+          </RoleProvider>
         </I18nProvider>
       </body>
     </html>
