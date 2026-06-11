@@ -47,6 +47,12 @@ const es = {
 
 export default es;
 
+// Recursively widen string literal leaves (from `as const`) to `string`,
+// while preserving the nested key structure.
+type Widen<T> = {
+  [K in keyof T]: T[K] extends string ? string : Widen<T[K]>;
+};
+
 // The shape of every dictionary is derived from the Spanish one,
 // guaranteeing all languages stay in sync at compile time.
-export type Dictionary = typeof es;
+export type Dictionary = Widen<typeof es>;
