@@ -1,9 +1,6 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { db } from "@/lib/db";
-import { users } from "@/drizzle/schema";
-import { eq } from "drizzle-orm";
-import bcrypt from "bcrypt"; // or "bcryptjs" if you switch later
+import { userLogin } from "@/lib/thruxion-api";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -24,25 +21,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           password: string;
         };
 
-        // Find user in DB
-        const result = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
+        // Authenticate against the external Thruxion "humans" API.
+        // This performs the two-step flow: system-login -> user/login.
+        try {
+          const user = await userLogin(email, password);
+          if (!user) return null;
 
-        const user = result[0];
-        if (!user) return null;
-
-        // Compare password hash
-        const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) return null;
-
-        // Return user object for session
-        return {
-          id: String(user.id),
-          email: user.email,
-        };
+          // Return user object for the session.
+          return {
+            id: String(user.id ?? user.email ?? email),
+            email: user.email ?? email,
+            name: user.name ?? null,
+            role: user.role ?? null,
+          };
+        } catch (err) {
+          console.log("[v0] Thruxion login error:", (err as Error).message);
+          // Surface as a failed login rather than crashing the route.
+          return null;
+        }
       },
     }),
   ],
@@ -56,10 +52,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   callbacks: {
+    async jwt({ token, user }) {
+      // Persist custom fields onto the JWT at sign-in time.
+      if (user) {
+        (token as any).role = (user as any).role ?? null;
+      }
+      return token;
+    },
     async session({ session, token }) {
       if (session.user && token.sub) {
-        // Safely assign custom id to the session user
+        // Safely assign custom id + role to the session user
         (session.user as any).id = token.sub;
+        (session.user as any).role = (token as any).role ?? null;
       }
       return session;
     },
