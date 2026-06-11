@@ -2,9 +2,12 @@
 
 import { signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "@/lib/i18n/provider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function LoginPage() {
   const callbackUrl = "/dashboard";
+  const t = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +34,7 @@ export default function LoginPage() {
     });
 
     if (res?.error) {
-      setError("Invalid credentials.");
+      setError(t.auth.invalidCredentials);
       return;
     }
 
@@ -48,12 +51,15 @@ export default function LoginPage() {
       </form>
 
       <div className="w-full max-w-sm bg-card rounded-xl shadow-sm border border-border p-6">
-        <h1 className="text-xl font-semibold mb-4">Login</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">{t.auth.loginTitle}</h1>
+          <LanguageSwitcher variant="light" />
+        </div>
 
         <form onSubmit={submit} className="space-y-4" autoComplete="off">
 
           <div className="flex flex-col">
-            <label className="text-sm mb-1">Email</label>
+            <label className="text-sm mb-1">{t.auth.email}</label>
             <input
               type="email"
               autoComplete="off"       // ⬅ prevent browser stored email autofill
@@ -66,7 +72,7 @@ export default function LoginPage() {
           </div>
 
           <div className="flex flex-col">
-            <label className="text-sm mb-1">Password</label>
+            <label className="text-sm mb-1">{t.auth.password}</label>
             <input
               type="password"
               autoComplete="new-password"   // ⬅ strongest option to block autofill
@@ -84,7 +90,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition"
           >
-            Login
+            {t.auth.login}
           </button>
         </form>
       </div>

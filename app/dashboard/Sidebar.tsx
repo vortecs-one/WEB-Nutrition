@@ -4,56 +4,68 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n/provider";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
+// "key" is used for stable open/close state across languages.
 type NavItem = {
+  key: string;
   label: string;
   href?: string;
   icon?: React.ReactNode;
   children?: { label: string; href: string }[];
 };
 
-const navItems: NavItem[] = [
-  {
-    label: "Grupos",
-    href: "/dashboard/groups",
-    icon: "👥",
-  },
-  {
-    label: "Pacientes",
-    href: "/dashboard/patients",
-    icon: "👨‍👩‍👧‍👦",
-  },
-  {
-    label: "Antropometría",
-    icon: "📏",
-    children: [
-      { label: "Puntos de corte", href: "/dashboard/antropometria/puntosdecorte" },
-      { label: "Bicompartimental", href: "/dashboard/antropometria/bicompartimental" },
-      { label: "Tetracompartimental", href: "/dashboard/antropometria/tetracompartimental" },
-      { label: "Pentacompartimental", href: "/dashboard/antropometria/pentacompartimental" },
-    ],
-  },
-  {
-    label: "Nutrición",
-    icon: "🍽️ ",
-    children: [
-      { label: "Alimentación", href: "/dashboard/alimentacion/alimentacion" },
-      { label: "Hidratación", href: "/dashboard/alimentacion/hidratacion" },
-    ],
-  },
-
-];
+function buildNavItems(dict: Dictionary): NavItem[] {
+  const t = dict.nav;
+  return [
+    {
+      key: "groups",
+      label: t.groups,
+      href: "/dashboard/groups",
+      icon: "👥",
+    },
+    {
+      key: "patients",
+      label: t.patients,
+      href: "/dashboard/patients",
+      icon: "👨‍👩‍👧‍👦",
+    },
+    {
+      key: "anthropometry",
+      label: t.anthropometry,
+      icon: "📏",
+      children: [
+        { label: t.cutoffPoints, href: "/dashboard/antropometria/puntosdecorte" },
+        { label: t.bicompartmental, href: "/dashboard/antropometria/bicompartimental" },
+        { label: t.tetracompartmental, href: "/dashboard/antropometria/tetracompartimental" },
+        { label: t.pentacompartmental, href: "/dashboard/antropometria/pentacompartimental" },
+      ],
+    },
+    {
+      key: "nutrition",
+      label: t.nutrition,
+      icon: "🍽️ ",
+      children: [
+        { label: t.food, href: "/dashboard/alimentacion/alimentacion" },
+        { label: t.hydration, href: "/dashboard/alimentacion/hidratacion" },
+      ],
+    },
+  ];
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { dict } = useI18n();
+  const navItems = buildNavItems(dict);
 
   const [open, setOpen] = useState<Record<string, boolean>>({
-    Antropometría: true,
-    Nutrición: true,
+    anthropometry: true,
+    nutrition: true,
   });
 
-  const toggle = (label: string) => {
-    setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
+  const toggle = (key: string) => {
+    setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const isActive = (href?: string) =>
@@ -64,14 +76,14 @@ export default function Sidebar() {
       {/* top logo / title */}
       <div className="h-14 px-4 flex items-center border-b border-slate-800">
         <span className="font-bold tracking-wide text-sm">
-          NutritionAI · Panel
+          {dict.common.appName} · {dict.common.panel}
         </span>
       </div>
 
       {/* menu */}
       <nav className="flex-1 overflow-y-auto py-3">
         <p className="px-4 mb-2 text-xs uppercase text-slate-400 tracking-wide">
-          Dashboard
+          {dict.nav.sectionTitle}
         </p>
 
         <ul className="space-y-1 text-sm">
@@ -81,7 +93,7 @@ export default function Sidebar() {
             // simple link (no children)
             if (!item.children) {
               return (
-                <li key={item.label}>
+                <li key={item.key}>
                   <Link
                     href={item.href ?? "#"}
                     className={[
@@ -99,13 +111,13 @@ export default function Sidebar() {
             }
 
             // item with submenu
-            const opened = open[item.label] ?? false;
+            const opened = open[item.key] ?? false;
 
             return (
-              <li key={item.label}>
+              <li key={item.key}>
                 <button
                   type="button"
-                  onClick={() => toggle(item.label)}
+                  onClick={() => toggle(item.key)}
                   className="w-full flex items-center justify-between gap-3 px-4 py-2 rounded-md text-slate-200 hover:bg-slate-800/70"
                 >
                   <span className="flex items-center gap-3">

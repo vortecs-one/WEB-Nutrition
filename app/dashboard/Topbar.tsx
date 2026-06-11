@@ -2,10 +2,14 @@
 
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
+import { useI18n } from "@/lib/i18n/provider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-function formatSpanishDate() {
+function formatLocaleDate(locale: string) {
   const now = new Date();
-  const formatted = now.toLocaleDateString("es-CL", {
+  // Use a region-aware tag (es-CL keeps the original Chilean formatting).
+  const tag = locale === "es" ? "es-CL" : locale;
+  const formatted = now.toLocaleDateString(tag, {
     weekday: "long",
     day: "2-digit",
     month: "long",
@@ -17,8 +21,10 @@ function formatSpanishDate() {
 
 export default function Topbar() {
   const { data: session } = useSession();
+  const { locale, dict } = useI18n();
   const userEmail = session?.user?.email ?? "";
-  const userName = session?.user?.name ?? userEmail.split("@")[0] ?? "Usuario";
+  const userName =
+    session?.user?.name ?? userEmail.split("@")[0] ?? dict.topbar.defaultUser;
   const initial = (userName[0] ?? "U").toUpperCase();
 
   return (
@@ -31,17 +37,19 @@ export default function Topbar() {
         </div>
         <div className="leading-tight">
           <div className="font-semibold text-sm">Team Peñalolén</div>
-          <div className="text-[11px] text-slate-300">Estandar</div>
+          <div className="text-[11px] text-slate-300">{dict.topbar.plan}</div>
         </div>
       </div>
 
       {/* Center: date */}
       <div className="hidden md:block text-xs text-slate-300">
-        {formatSpanishDate()}
+        {formatLocaleDate(locale)}
       </div>
 
-      {/* Right: user + logout */}
+      {/* Right: language + user + logout */}
       <div className="flex items-center gap-3">
+
+        <LanguageSwitcher variant="dark" />
 
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold">
@@ -59,7 +67,7 @@ export default function Topbar() {
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="bg-red-600/90 hover:bg-red-700 text-xs px-3 py-1 rounded-full flex items-center gap-1 transition"
         >
-          ⏻ Cerrar sesión
+          ⏻ {dict.topbar.logout}
         </button>
       </div>
 

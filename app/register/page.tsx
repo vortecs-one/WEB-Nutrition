@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/i18n/provider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const t = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,11 +28,11 @@ export default function RegisterPage() {
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error || "Registration failed.");
+      setError(data.error || t.auth.registrationFailed);
       return;
     }
 
-    setSuccess("Account created successfully! Redirecting...");
+    setSuccess(t.auth.accountCreated);
 
     setTimeout(() => router.push("/login"), 1200);
   };
@@ -37,12 +40,15 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-4">
       <div className="w-full max-w-sm bg-card rounded-xl shadow-sm border border-border p-6">
-        <h1 className="text-xl font-semibold mb-4">Create Account</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-semibold">{t.auth.registerTitle}</h1>
+          <LanguageSwitcher variant="light" />
+        </div>
 
         <form onSubmit={registerUser} className="space-y-4">
           {/* Email */}
           <div className="flex flex-col">
-            <label className="text-sm mb-1">Email</label>
+            <label className="text-sm mb-1">{t.auth.email}</label>
             <input
               type="email"
               placeholder="you@example.com"
@@ -55,7 +61,7 @@ export default function RegisterPage() {
 
           {/* Password */}
           <div className="flex flex-col">
-            <label className="text-sm mb-1">Password</label>
+            <label className="text-sm mb-1">{t.auth.password}</label>
             <input
               type="password"
               placeholder="••••••"
@@ -77,17 +83,17 @@ export default function RegisterPage() {
             type="submit"
             className="w-full py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition"
           >
-            Register
+            {t.auth.register}
           </button>
         </form>
 
         <p className="text-sm text-muted-foreground mt-4 text-center">
-          Already have an account?{" "}
+          {t.auth.haveAccount}{" "}
           <a
             href="/login"
             className="text-primary font-medium hover:underline"
           >
-            Login
+            {t.auth.login}
           </a>
         </p>
       </div>
