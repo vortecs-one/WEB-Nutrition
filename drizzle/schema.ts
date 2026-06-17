@@ -8,6 +8,7 @@ import {
   varchar,
   date,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 // === Usuarios ===
@@ -21,6 +22,28 @@ export const users = pgTable("users", {
     .notNull()
     .default("app-thruxion"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// === Tokens de traspaso (handoff app móvil -> WebView) ===
+// Single-use, short-lived tokens used to hand a native-app session into the
+// web app without re-entering credentials. The raw token is NEVER stored;
+// only its SHA-256 hash is kept, so a DB leak can't be replayed.
+export const handoffTokens = pgTable("handoff_tokens", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tokenHash: text("token_hash").notNull().unique(),
+  // Resolved identity (validated against Thruxion at issue time).
+  email: text("email").notNull(),
+  userId: text("user_id"),
+  humanId: text("human_id"),
+  name: text("name"),
+  role: text("role"),
+  platform: varchar("platform", { length: 100 }),
+  // Single-use + short expiry.
+  used: boolean("used").notNull().default(false),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 // === Grupos de trabajo ===

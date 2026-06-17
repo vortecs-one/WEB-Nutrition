@@ -105,6 +105,12 @@ const en: Dictionary = {
     accountCreated: "Account created successfully! Redirecting...",
     haveAccount: "Already have an account?",
   },
+  handoff: {
+    failedTitle: "Couldn't sign you in",
+    failedBody:
+      "This access link is invalid or has expired. Please try again from the app.",
+    goToLogin: "Go to login",
+  },
 };
 
 export default en;

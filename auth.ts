@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { userLogin } from "@/lib/thruxion-api";
+import { consumeHandoffToken } from "@/lib/handoff";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -38,6 +39,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } catch (err) {
           console.log("[v0] Thruxion login error:", (err as Error).message);
           // Surface as a failed login rather than crashing the route.
+          return null;
+        }
+      },
+    }),
+
+    // Native-app handoff: signs a user in from a single-use token issued by
+    // /api/auth/app-handoff/issue. No password is involved here — the token
+    // already represents a credential check performed at issue time.
+    CredentialsProvider({
+      id: "app-handoff",
+      name: "App Handoff",
+      credentials: {
+        handoffToken: { label: "Handoff Token", type: "text" },
+      },
+      async authorize(credentials) {
+        const handoffToken = (credentials as { handoffToken?: string })
+          ?.handoffToken;
+        if (!handoffToken) return null;
+
+        try {
+          // Atomically consumes the token (single-use, expiry-checked).
+          const identity = await consumeHandoffToken(handoffToken);
+          if (!identity) return null;
+
+          return {
+            id: String(identity.userId ?? identity.email),
+            email: identity.email,
+            name: identity.name ?? null,
+            role: identity.role ?? null,
+            platform: identity.platform ?? null,
+          };
+        } catch (err) {
+          console.log("[v0] handoff authorize error:", (err as Error).message);
           return null;
         }
       },

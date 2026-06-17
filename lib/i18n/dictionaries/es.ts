@@ -104,6 +104,12 @@ const es = {
     accountCreated: "¡Cuenta creada con éxito! Redirigiendo...",
     haveAccount: "¿Ya tienes una cuenta?",
   },
+  handoff: {
+    failedTitle: "No se pudo iniciar sesión",
+    failedBody:
+      "El enlace de acceso no es válido o ya expiró. Vuelve a intentarlo desde la aplicación.",
+    goToLogin: "Ir a iniciar sesión",
+  },
 } as const;
 
 export default es;
