@@ -3,10 +3,11 @@ import { db } from "@/lib/db";
 import { users } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
+import { PLATFORM } from "@/lib/platform";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
+    const { email, password, platform } = await req.json();
 
     // Basic validation
     if (!email || !password) {
@@ -41,10 +42,12 @@ export async function POST(req: Request) {
     // Hash password
     const hashed = await bcrypt.hash(password, 10);
 
-    // Insert user into DB
+    // Insert user into DB. Store the platform (defaults to the system
+    // platform constant) so it can be required again at login.
     await db.insert(users).values({
       email,
       password: hashed,
+      platform: platform ?? PLATFORM,
     });
 
     return NextResponse.json({ success: true });

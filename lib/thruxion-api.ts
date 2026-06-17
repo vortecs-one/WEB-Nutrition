@@ -21,12 +21,15 @@ import {
   invalidateSystemToken,
   BASE_URL,
 } from "./thruxion-token";
+import { PLATFORM } from "./platform";
 
 export type ThruxionUser = {
   id?: string | number;
+  human_id?: string | number;
   email?: string;
   name?: string;
   role?: string;
+  platform?: string;
   [key: string]: unknown;
 };
 
@@ -79,7 +82,9 @@ export async function userLogin(
 ): Promise<ThruxionUser | null> {
   const res = await thruxionFetch("/api/humans/user/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    // `platform` is required by the API and must match the value stored at
+    // registration ("app-thruxion" for this system).
+    body: JSON.stringify({ email, password, platform: PLATFORM }),
   });
 
   // Invalid USER credentials -> failed login (distinct from a system 401,

@@ -33,6 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: user.email ?? email,
             name: user.name ?? null,
             role: user.role ?? null,
+            platform: user.platform ?? null,
           };
         } catch (err) {
           console.log("[v0] Thruxion login error:", (err as Error).message);
@@ -56,14 +57,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Persist custom fields onto the JWT at sign-in time.
       if (user) {
         (token as any).role = (user as any).role ?? null;
+        (token as any).platform = (user as any).platform ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
-        // Safely assign custom id + role to the session user
+        // Safely assign custom id + role + platform to the session user
         (session.user as any).id = token.sub;
         (session.user as any).role = (token as any).role ?? null;
+        (session.user as any).platform = (token as any).platform ?? null;
       }
       return session;
     },

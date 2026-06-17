@@ -15,6 +15,11 @@ export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  // Platform the user registered from (e.g. "app-thruxion").
+  // Stored at registration and required again at login.
+  platform: varchar("platform", { length: 100 })
+    .notNull()
+    .default("app-thruxion"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

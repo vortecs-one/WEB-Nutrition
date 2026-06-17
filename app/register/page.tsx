@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/provider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { PLATFORM } from "@/lib/platform";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function RegisterPage() {
 
     const res = await fetch("/api/register", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, platform: PLATFORM }),
       headers: { "Content-Type": "application/json" },
     });
 
