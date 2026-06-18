@@ -37,7 +37,8 @@ export default function NutritionTracker() {
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
 
-  // Supplement form state.
+  // Add-supplement modal state.
+  const [suppModalOpen, setSuppModalOpen] = useState(false);
   const [suppName, setSuppName] = useState("");
   const [suppDose, setSuppDose] = useState("");
   const [suppType, setSuppType] = useState<SupplementType>("protein");
@@ -70,6 +71,13 @@ export default function NutritionTracker() {
     setCalories("");
   };
 
+  const openSupplementAdd = () => {
+    setSuppName("");
+    setSuppDose("");
+    setSuppType("protein");
+    setSuppModalOpen(true);
+  };
+
   const submitMeal = (e: React.FormEvent) => {
     e.preventDefault();
     const kcal = parseInt(calories, 10);
@@ -86,8 +94,7 @@ export default function NutritionTracker() {
       dose: suppDose.trim(),
       type: suppType,
     });
-    setSuppName("");
-    setSuppDose("");
+    setSuppModalOpen(false);
   };
 
   const inputClass =
@@ -107,7 +114,7 @@ export default function NutritionTracker() {
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
         <h2 className="text-lg font-semibold mb-4">{t.dietLog}</h2>
 
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {mealTypes.map(({ type, label, icon: Icon }) => {
             const total = caloriesFor(type);
             return (
@@ -120,7 +127,7 @@ export default function NutritionTracker() {
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
                   <Icon className="h-7 w-7" aria-hidden="true" />
                 </span>
-                <span className="text-xs font-medium text-center leading-tight">
+                <span className="flex min-h-8 items-center text-xs font-medium text-center leading-tight">
                   {label}
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
@@ -130,6 +137,24 @@ export default function NutritionTracker() {
               </button>
             );
           })}
+
+          {/* Supplements: fifth category, same design as meals */}
+          <button
+            type="button"
+            onClick={openSupplementAdd}
+            className="flex flex-col items-center gap-2 rounded-2xl p-2 hover:bg-accent active:scale-[0.97] transition"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
+              <Pill className="h-7 w-7" aria-hidden="true" />
+            </span>
+            <span className="flex min-h-8 items-center text-xs font-medium text-center leading-tight">
+              {t.supplements}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {supplements.length > 0 ? `${supplements.length}` : ""}
+            </span>
+          </button>
         </div>
 
         {/* Logged meals */}
@@ -163,75 +188,10 @@ export default function NutritionTracker() {
             ))}
           </ul>
         )}
-      </section>
-
-      {/* Supplements */}
-      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground shrink-0">
-            <Pill className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <h2 className="text-lg font-semibold">{t.supplements}</h2>
-        </div>
-
-        <form
-          onSubmit={submitSupplement}
-          className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:items-end"
-        >
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t.supplementName}
-            </span>
-            <input
-              className={inputClass}
-              value={suppName}
-              onChange={(e) => setSuppName(e.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t.supplementDose}
-            </span>
-            <input
-              className={`${inputClass} sm:w-32`}
-              value={suppDose}
-              onChange={(e) => setSuppDose(e.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t.supplementType}
-            </span>
-            <select
-              className={`${inputClass} sm:w-36`}
-              value={suppType}
-              onChange={(e) => setSuppType(e.target.value as SupplementType)}
-            >
-              <option value="protein">{t.suppProtein}</option>
-              <option value="vitamin">{t.suppVitamin}</option>
-              <option value="creatine">{t.suppCreatine}</option>
-              <option value="omega3">{t.suppOmega}</option>
-              <option value="other">{t.suppOther}</option>
-            </select>
-          </label>
-
-          <button
-            type="submit"
-            className="rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition w-full sm:w-auto"
-          >
-            {t.add}
-          </button>
-        </form>
 
         {/* Logged supplements */}
-        {supplements.length === 0 ? (
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            {t.noSupplements}
-          </p>
-        ) : (
-          <ul className="mt-4 divide-y divide-border border-t border-border">
+        {supplements.length > 0 && (
+          <ul className="mt-2 divide-y divide-border border-t border-border">
             {supplements.map((s) => (
               <li
                 key={s.id}
@@ -239,7 +199,8 @@ export default function NutritionTracker() {
               >
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{s.name}</div>
-                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
+                    <Pill className="h-3 w-3" aria-hidden="true" />
                     {supplementTypeLabel(s.type)}
                   </span>
                 </div>
@@ -315,6 +276,83 @@ export default function NutritionTracker() {
                   value={calories}
                   onChange={(e) => setCalories(e.target.value)}
                 />
+              </label>
+
+              <button
+                type="submit"
+                className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition"
+              >
+                {t.add}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add-supplement modal (same design as add-meal) */}
+      {suppModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+          onClick={() => setSuppModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="w-full sm:max-w-md bg-card text-card-foreground rounded-t-3xl sm:rounded-3xl shadow-lg p-5 pb-safe"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.addSupplement}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold">{t.addSupplement}</h3>
+              <button
+                type="button"
+                onClick={() => setSuppModalOpen(false)}
+                aria-label={dict.common.close}
+                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <form onSubmit={submitSupplement} className="space-y-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t.supplementName}
+                </span>
+                <input
+                  className={inputClass}
+                  value={suppName}
+                  onChange={(e) => setSuppName(e.target.value)}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t.supplementDose}
+                </span>
+                <input
+                  className={inputClass}
+                  value={suppDose}
+                  onChange={(e) => setSuppDose(e.target.value)}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t.supplementType}
+                </span>
+                <select
+                  className={inputClass}
+                  value={suppType}
+                  onChange={(e) => setSuppType(e.target.value as SupplementType)}
+                >
+                  <option value="protein">{t.suppProtein}</option>
+                  <option value="vitamin">{t.suppVitamin}</option>
+                  <option value="creatine">{t.suppCreatine}</option>
+                  <option value="omega3">{t.suppOmega}</option>
+                  <option value="other">{t.suppOther}</option>
+                </select>
               </label>
 
               <button
