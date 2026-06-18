@@ -12,6 +12,7 @@ import {
   Layers,
   Boxes,
   UserCircle,
+  Flame,
   type LucideProps,
 } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -86,6 +87,12 @@ function userNav(dict: Dictionary): NavItem[] {
       label: t.myNutrition,
       href: "/dashboard/nutrition",
       icon: Salad,
+    },
+    {
+      key: "myCalories",
+      label: t.myCalories,
+      href: "/dashboard/calories",
+      icon: Flame,
     },
     {
       key: "myProfile",
