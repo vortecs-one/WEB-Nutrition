@@ -1,26 +1,23 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import { Leaf, LogOut } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import RoleSwitcher from "@/components/RoleSwitcher";
 
 function formatLocaleDate(locale: string) {
   const now = new Date();
-  // Use a region-aware tag (es-CL keeps the original Chilean formatting).
   const tag = locale === "es" ? "es-CL" : locale;
   const formatted = now.toLocaleDateString(tag, {
     weekday: "long",
     day: "2-digit",
     month: "long",
-    year: "numeric",
   });
-
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-export default function Topbar({ onOpenMenu }: { onOpenMenu?: () => void }) {
+export default function Topbar() {
   const { data: session } = useSession();
   const { locale, dict } = useI18n();
   const userEmail = session?.user?.email ?? "";
@@ -29,72 +26,46 @@ export default function Topbar({ onOpenMenu }: { onOpenMenu?: () => void }) {
   const initial = (userName[0] ?? "U").toUpperCase();
 
   return (
-    <header className="h-14 flex items-center justify-between gap-2 px-3 lg:px-6 border-b border-slate-200 bg-slate-900 text-slate-50">
-      {/* Left: menu button (mobile) + logo */}
-      <div className="flex items-center gap-2 min-w-0">
-        <button
-          type="button"
-          onClick={onOpenMenu}
-          aria-label={dict.common.openMenu}
-          className="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-md hover:bg-slate-800 transition shrink-0"
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
-
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-xs font-bold shrink-0">
-            TP
-          </div>
-          <div className="leading-tight min-w-0 hidden sm:block">
-            <div className="font-semibold text-sm truncate">Team Peñalolén</div>
-            <div className="text-[11px] text-slate-300">{dict.topbar.plan}</div>
-          </div>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border bg-card/90 px-4 backdrop-blur lg:px-8">
+      {/* Left: brand on mobile, date on desktop */}
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground lg:hidden">
+          <Leaf className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="hidden min-w-0 leading-tight sm:block">
+          <p className="truncate text-sm font-semibold lg:text-base">
+            {dict.common.appName}
+          </p>
+          <p className="hidden text-xs text-muted-foreground lg:block">
+            {formatLocaleDate(locale)}
+          </p>
         </div>
       </div>
 
-      {/* Center: date (desktop only) */}
-      <div className="hidden xl:block text-xs text-slate-300 whitespace-nowrap">
-        {formatLocaleDate(locale)}
-      </div>
-
-      {/* Right: role + language + user + logout */}
-      <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+      {/* Right: controls */}
+      <div className="flex shrink-0 items-center gap-2">
         {/* TEST control to preview each experience */}
-        <RoleSwitcher variant="dark" />
+        <RoleSwitcher variant="light" />
+        <LanguageSwitcher variant="light" className="hidden sm:inline-flex" />
 
-        <LanguageSwitcher variant="dark" className="hidden sm:inline-flex" />
-
-        <div className="hidden md:flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold">
+        <div className="hidden items-center gap-2 sm:flex">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
             {initial}
-          </div>
-          <div className="hidden lg:flex flex-col text-right leading-tight">
+          </span>
+          <span className="hidden flex-col text-right leading-tight lg:flex">
             <span className="text-xs font-medium">{userName}</span>
-            <span className="text-[11px] text-slate-300 truncate max-w-[160px]">
+            <span className="max-w-[160px] truncate text-[11px] text-muted-foreground">
               {userEmail}
             </span>
-          </div>
+          </span>
         </div>
 
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           aria-label={dict.topbar.logout}
-          className="bg-red-600/90 hover:bg-red-700 text-xs px-2.5 lg:px-3 py-1 rounded-full flex items-center gap-1 transition shrink-0"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-secondary px-3 text-xs font-medium text-secondary-foreground transition hover:bg-accent"
         >
-          <span aria-hidden="true">⏻</span>
+          <LogOut className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">{dict.topbar.logout}</span>
         </button>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -55,18 +56,18 @@ export default function NutritionTracker() {
     setMeals((prev) => prev.filter((m) => m.id !== id));
 
   const inputClass =
-    "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+    "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-5">
       {/* Section header */}
-      <div className="bg-purple-800 text-white px-5 py-4 rounded-xl shadow-sm">
-        <h1 className="text-lg font-semibold text-balance">{t.title}</h1>
-        <p className="text-sm text-purple-100">{t.subtitle}</p>
+      <div className="bg-primary text-primary-foreground px-5 py-5 rounded-2xl shadow-sm">
+        <h1 className="text-xl font-semibold text-balance">{t.title}</h1>
+        <p className="text-sm text-primary-foreground/80 mt-0.5">{t.subtitle}</p>
       </div>
 
       {/* Calorie summary */}
-      <section className="bg-card text-card-foreground rounded-xl border border-border shadow-sm p-5">
+      <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-sm">{t.summary}</h2>
           <span className="text-xs text-muted-foreground">{t.today}</span>
@@ -118,7 +119,7 @@ export default function NutritionTracker() {
       </section>
 
       {/* Add meal form */}
-      <section className="bg-card text-card-foreground rounded-xl border border-border shadow-sm p-5">
+      <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm p-5">
         <h2 className="font-medium text-sm mb-4">{t.addMeal}</h2>
         <form
           onSubmit={addMeal}
@@ -166,7 +167,7 @@ export default function NutritionTracker() {
 
           <button
             type="submit"
-            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition"
+            className="rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition w-full sm:w-auto"
           >
             {t.add}
           </button>
@@ -174,9 +175,9 @@ export default function NutritionTracker() {
       </section>
 
       {/* Meal list */}
-      <section className="bg-card text-card-foreground rounded-xl border border-border shadow-sm overflow-hidden">
+      <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm overflow-hidden">
         {meals.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
             {t.noMeals}
           </p>
         ) : (
@@ -184,7 +185,7 @@ export default function NutritionTracker() {
             {meals.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between gap-3 px-5 py-3"
+                className="flex items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{m.name}</div>
@@ -192,7 +193,7 @@ export default function NutritionTracker() {
                     {mealTypeLabel(m.type)}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="text-sm font-semibold tabular-nums">
                     {m.calories} kcal
                   </span>
@@ -200,9 +201,9 @@ export default function NutritionTracker() {
                     type="button"
                     onClick={() => removeMeal(m.id)}
                     aria-label={dict.common.delete}
-                    className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600 transition"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition"
                   >
-                    {dict.common.delete}
+                    <Trash2 className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </li>

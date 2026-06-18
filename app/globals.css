@@ -44,38 +44,43 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  /* Slightly larger radius for a soft, app-like feel */
+  --radius: 0.875rem;
+
+  /* Health-oriented palette: green primary, clean neutrals, red destructive */
+  --background: oklch(0.985 0.006 150);
+  --foreground: oklch(0.23 0.02 160);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.23 0.02 160);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --popover-foreground: oklch(0.23 0.02 160);
+  --primary: oklch(0.62 0.14 156);
+  --primary-foreground: oklch(0.99 0.01 150);
+  --secondary: oklch(0.95 0.02 155);
+  --secondary-foreground: oklch(0.3 0.04 158);
+  --muted: oklch(0.96 0.01 150);
+  --muted-foreground: oklch(0.52 0.02 155);
+  --accent: oklch(0.93 0.04 156);
+  --accent-foreground: oklch(0.32 0.06 158);
+  --destructive: oklch(0.585 0.22 27.2);
+  --border: oklch(0.9 0.012 150);
+  --input: oklch(0.9 0.012 150);
+  --ring: oklch(0.62 0.14 156);
+  --chart-1: oklch(0.62 0.14 156);
+  --chart-2: oklch(0.7 0.12 190);
+  --chart-3: oklch(0.75 0.15 85);
+  --chart-4: oklch(0.65 0.18 45);
+  --chart-5: oklch(0.55 0.12 250);
+
+  /* Deep green sidebar for a premium, focused navigation surface */
+  --sidebar: oklch(0.27 0.04 162);
+  --sidebar-foreground: oklch(0.95 0.01 150);
+  --sidebar-primary: oklch(0.7 0.15 156);
+  --sidebar-primary-foreground: oklch(0.2 0.03 160);
+  --sidebar-accent: oklch(0.34 0.05 162);
+  --sidebar-accent-foreground: oklch(0.97 0.01 150);
+  --sidebar-border: oklch(0.36 0.04 162);
+  --sidebar-ring: oklch(0.7 0.15 156);
 }
 
 .dark {
@@ -115,8 +120,26 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* Remove the blue tap flash for a native app feel */
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent pull-to-refresh / rubber-banding inside the webview */
+    overscroll-behavior-y: contain;
   }
+  /* Comfortable default tap target for interactive controls on touch */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility h-safe-bottom {
+  height: env(safe-area-inset-bottom, 0px);
 }

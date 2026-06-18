@@ -29,7 +29,7 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
 
 export default function ProfileForm({ human }: { human: HumanData | null }) {
   const { data: session } = useSession();
@@ -67,16 +67,16 @@ export default function ProfileForm({ human }: { human: HumanData | null }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-5">
       {/* Section header */}
-      <div className="bg-purple-800 text-white px-5 py-4 rounded-xl shadow-sm">
-        <h1 className="text-lg font-semibold text-balance">{t.title}</h1>
-        <p className="text-sm text-purple-100">{t.subtitle}</p>
+      <div className="bg-primary text-primary-foreground px-5 py-5 rounded-2xl shadow-sm">
+        <h1 className="text-xl font-semibold text-balance">{t.title}</h1>
+        <p className="text-sm text-primary-foreground/80 mt-0.5">{t.subtitle}</p>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form onSubmit={onSubmit} className="space-y-5">
         {/* Personal data card */}
-        <section className="bg-card text-card-foreground rounded-xl border border-border shadow-sm p-5">
+        <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm p-5">
           <h2 className="font-medium text-sm mb-4">{t.personalData}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t.firstName}>
@@ -127,7 +127,7 @@ export default function ProfileForm({ human }: { human: HumanData | null }) {
         </section>
 
         {/* Measurements & goals card */}
-        <section className="bg-card text-card-foreground rounded-xl border border-border shadow-sm p-5">
+        <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm p-5">
           <h2 className="font-medium text-sm mb-4">{t.measurements}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t.height}>
@@ -184,15 +184,15 @@ export default function ProfileForm({ human }: { human: HumanData | null }) {
           </div>
         </section>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center">
           <button
             type="submit"
-            className="rounded-lg bg-primary text-primary-foreground px-5 py-2 text-sm font-medium hover:bg-primary/90 transition"
+            className="rounded-xl bg-primary text-primary-foreground px-6 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition w-full sm:w-auto"
           >
             {dict.common.save}
           </button>
           {saved && (
-            <span className="text-sm text-green-600" role="status">
+            <span className="text-sm text-primary text-center sm:text-left" role="status">
               {t.saved}
             </span>
           )}

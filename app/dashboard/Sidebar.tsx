@@ -4,106 +4,57 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { ChevronDown, Leaf } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
-import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { useRole } from "@/lib/role/provider";
-import type { Role } from "@/lib/role/config";
-
-// "key" is used for stable open/close state across languages.
-type NavItem = {
-  key: string;
-  label: string;
-  href?: string;
-  icon?: React.ReactNode;
-  children?: { label: string; href: string }[];
-};
-
-// Builds the nav for the professional (nutritionist) experience.
-function buildNutritionistNav(dict: Dictionary): NavItem[] {
-  const t = dict.nav;
-  return [
-    { key: "groups", label: t.groups, href: "/dashboard/groups", icon: "👥" },
-    { key: "patients", label: t.patients, href: "/dashboard/patients", icon: "👨‍👩‍👧‍👦" },
-    {
-      key: "anthropometry",
-      label: t.anthropometry,
-      icon: "📏",
-      children: [
-        { label: t.cutoffPoints, href: "/dashboard/antropometria/puntosdecorte" },
-        { label: t.bicompartmental, href: "/dashboard/antropometria/bicompartimental" },
-        { label: t.tetracompartmental, href: "/dashboard/antropometria/tetracompartimental" },
-        { label: t.pentacompartmental, href: "/dashboard/antropometria/pentacompartimental" },
-      ],
-    },
-    {
-      key: "nutrition",
-      label: t.nutrition,
-      icon: "🍽️",
-      children: [
-        { label: t.food, href: "/dashboard/alimentacion/alimentacion" },
-        { label: t.hydration, href: "/dashboard/alimentacion/hidratacion" },
-      ],
-    },
-  ];
-}
-
-// Builds the nav for the normal-user experience:
-// only Nutrition + a personal information view.
-function buildUserNav(dict: Dictionary): NavItem[] {
-  const t = dict.nav;
-  return [
-    { key: "myProfile", label: t.myProfile, href: "/dashboard/profile", icon: "🙋" },
-    { key: "myNutrition", label: t.myNutrition, href: "/dashboard/nutrition", icon: "🍽️" },
-  ];
-}
-
-function buildNavItems(role: Role, dict: Dictionary): NavItem[] {
-  return role === "user" ? buildUserNav(dict) : buildNutritionistNav(dict);
-}
+import { getNavItems } from "./nav";
 
 export default function Sidebar({
   onNavigate,
 }: {
-  /** Called when a link is clicked — used to close the mobile drawer. */
+  /** Called when a link is clicked — used to close any mobile drawer. */
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const { dict } = useI18n();
   const role = useRole();
-  const navItems = buildNavItems(role, dict);
+  const navItems = getNavItems(role, dict);
 
   const [open, setOpen] = useState<Record<string, boolean>>({
     anthropometry: true,
     nutrition: true,
   });
 
-  const toggle = (key: string) => {
+  const toggle = (key: string) =>
     setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
 
   const isActive = (href?: string) =>
-    href && (pathname === href || pathname.startsWith(href + "/"));
+    !!href && (pathname === href || pathname.startsWith(href + "/"));
 
   return (
-    <aside className="w-64 h-full bg-slate-900 text-slate-50 flex flex-col">
-      {/* top logo / title */}
-      <div className="h-14 px-4 flex items-center border-b border-slate-800 shrink-0">
-        <span className="font-bold tracking-wide text-sm">
-          {dict.common.appName} · {dict.common.panel}
+    <aside className="w-64 h-full bg-sidebar text-sidebar-foreground flex flex-col">
+      {/* Brand */}
+      <div className="h-16 px-5 flex items-center gap-2.5 border-b border-sidebar-border shrink-0">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+          <Leaf className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <span className="font-semibold tracking-tight text-base">
+          {dict.common.appName}
         </span>
       </div>
 
-      {/* menu */}
-      <nav className="flex-1 overflow-y-auto py-3">
-        <p className="px-4 mb-2 text-xs uppercase text-slate-400 tracking-wide">
+      {/* Menu */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <p className="px-2 mb-3 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/50">
           {dict.nav.sectionTitle}
         </p>
 
-        <ul className="space-y-1 text-sm">
+        <ul className="space-y-1.5">
           {navItems.map((item) => {
             const active = isActive(item.href);
+            const Icon = item.icon;
 
-            // simple link (no children)
+            // Simple link (no children)
             if (!item.children) {
               return (
                 <li key={item.key}>
@@ -111,40 +62,50 @@ export default function Sidebar({
                     href={item.href ?? "#"}
                     onClick={onNavigate}
                     className={[
-                      "flex items-center gap-3 px-4 py-2 rounded-md transition-colors",
+                      "flex items-center gap-3 px-3 min-h-12 rounded-xl text-sm font-medium transition-colors",
                       active
-                        ? "bg-slate-800 text-white"
-                        : "text-slate-200 hover:bg-slate-800/70",
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent",
                     ].join(" ")}
                   >
-                    <span className="w-5 text-center">{item.icon}</span>
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                     <span>{item.label}</span>
                   </Link>
                 </li>
               );
             }
 
-            // item with submenu
+            // Item with submenu
             const opened = open[item.key] ?? false;
+            const groupActive = isActive(item.tabHref);
 
             return (
               <li key={item.key}>
                 <button
                   type="button"
                   onClick={() => toggle(item.key)}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-2 rounded-md text-slate-200 hover:bg-slate-800/70"
+                  aria-expanded={opened}
+                  className={[
+                    "w-full flex items-center justify-between gap-3 px-3 min-h-12 rounded-xl text-sm font-medium transition-colors",
+                    groupActive && !opened
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent",
+                  ].join(" ")}
                 >
                   <span className="flex items-center gap-3">
-                    <span className="w-5 text-center">{item.icon}</span>
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                     <span>{item.label}</span>
                   </span>
-                  <span className="text-xs text-slate-400">
-                    {opened ? "▾" : "▸"}
-                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      opened ? "rotate-180" : ""
+                    }`}
+                    aria-hidden="true"
+                  />
                 </button>
 
                 {opened && (
-                  <ul className="mt-1 space-y-1 pl-9">
+                  <ul className="mt-1 space-y-1 pl-4">
                     {item.children.map((child) => {
                       const childActive = isActive(child.href);
                       return (
@@ -153,13 +114,16 @@ export default function Sidebar({
                             href={child.href}
                             onClick={onNavigate}
                             className={[
-                              "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs",
+                              "flex items-center gap-2.5 px-3 min-h-10 rounded-lg text-[13px] transition-colors",
                               childActive
-                                ? "bg-slate-800 text-white"
-                                : "text-slate-300 hover:bg-slate-800/70",
+                                ? "bg-sidebar-primary/90 text-sidebar-primary-foreground"
+                                : "text-sidebar-foreground/65 hover:bg-sidebar-accent",
                             ].join(" ")}
                           >
-                            <span>•</span>
+                            <span
+                              className="h-1.5 w-1.5 rounded-full bg-current opacity-60"
+                              aria-hidden="true"
+                            />
                             <span>{child.label}</span>
                           </Link>
                         </li>
