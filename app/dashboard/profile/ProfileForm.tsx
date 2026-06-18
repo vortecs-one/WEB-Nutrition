@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useI18n } from "@/lib/i18n/provider";
+import type { HumanData } from "@/lib/thruxion-api";
+
+// Normalize an ISO timestamp (e.g. "1996-09-26T00:00:00.000Z") to the
+// yyyy-mm-dd format expected by <input type="date">.
+function toDateInput(value?: string): string {
+  if (!value) return "";
+  return value.slice(0, 10);
+}
 
 // Reusable field label + input wrapper for consistent mobile-first styling.
 function Field({
@@ -23,20 +31,23 @@ function Field({
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 
-export default function ProfileForm() {
+export default function ProfileForm({ human }: { human: HumanData | null }) {
   const { data: session } = useSession();
   const { dict } = useI18n();
   const t = dict.profile;
 
-  // Local-only state for now (no persistence wired yet).
+  // Prefer the email from the human's linked account, falling back to session.
+  const humanEmail = human?.users?.[0]?.email;
+
+  // Local-only state, seeded from the human record fetched on the server.
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: session?.user?.email ?? "",
+    firstName: human?.name ?? "",
+    lastName: human?.lastname ?? "",
+    email: humanEmail ?? session?.user?.email ?? "",
     phone: "",
-    birthDate: "",
-    gender: "",
+    birthDate: toDateInput(human?.birthdate),
+    gender: human?.gender ?? "",
     height: "",
     weight: "",
     activityLevel: "moderate",

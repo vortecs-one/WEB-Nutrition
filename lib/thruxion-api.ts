@@ -33,6 +33,37 @@ export type ThruxionUser = {
   [key: string]: unknown;
 };
 
+// A "user account" linked to a human (from the `users` array on the record).
+export type HumanUserAccount = {
+  id?: number;
+  email?: string;
+  role?: string;
+  status?: string;
+  platform?: string;
+  last_login?: string;
+  created_at?: string;
+};
+
+// Full human record returned by GET /api/humans/human/<id>.
+// Mirrors the `data` object from the API response.
+export type HumanData = {
+  id: number;
+  unique_id?: string;
+  legal_id?: string;
+  name?: string;
+  lastname?: string;
+  birthdate?: string;
+  gender?: string;
+  created_at?: string;
+  updated_at?: string;
+  users?: HumanUserAccount[];
+  skills?: unknown[];
+  certificates?: unknown[];
+  facial_recognitions?: unknown[];
+  cards?: unknown[];
+  space_time?: unknown[];
+};
+
 /**
  * Authenticated fetch against the Thruxion API.
  *
@@ -108,6 +139,39 @@ export async function userLogin(
   const user =
     (data as { user?: ThruxionUser })?.user ?? (data as ThruxionUser);
   return user ?? {};
+}
+
+/**
+ * Fetch a full human record by id (the `human_id` returned at login).
+ *
+ * GET /api/humans/human/<humanId>
+ * Returns the `data` object on success, or `null` if not found.
+ */
+export async function getHuman(
+  humanId: string | number,
+): Promise<HumanData | null> {
+  const res = await thruxionFetch(
+    `/api/humans/human/${encodeURIComponent(String(humanId))}`,
+    { method: "GET" },
+  );
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "<no body>");
+    throw new Error(
+      `human/${humanId} failed (${res.status} ${res.statusText}): ${detail}`,
+    );
+  }
+
+  const json = (await res.json().catch(() => ({}))) as {
+    success?: boolean;
+    data?: HumanData;
+  };
+
+  return json?.data ?? null;
 }
 
 // Re-export the token accessor for callers that need the raw bearer token.

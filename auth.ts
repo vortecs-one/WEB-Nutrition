@@ -35,6 +35,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.name ?? null,
             role: user.role ?? null,
             platform: user.platform ?? null,
+            // The API returns human_id on login; we use it to fetch the
+            // full human record from /api/humans/human/<humanId>.
+            humanId: user.human_id != null ? String(user.human_id) : null,
           };
         } catch (err) {
           console.log("[v0] Thruxion login error:", (err as Error).message);
@@ -69,6 +72,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: identity.name ?? null,
             role: identity.role ?? null,
             platform: identity.platform ?? null,
+            humanId: identity.humanId ?? null,
           };
         } catch (err) {
           console.log("[v0] handoff authorize error:", (err as Error).message);
@@ -92,15 +96,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         (token as any).role = (user as any).role ?? null;
         (token as any).platform = (user as any).platform ?? null;
+        (token as any).humanId = (user as any).humanId ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
-        // Safely assign custom id + role + platform to the session user
+        // Safely assign custom id + role + platform + humanId to the session
         (session.user as any).id = token.sub;
         (session.user as any).role = (token as any).role ?? null;
         (session.user as any).platform = (token as any).platform ?? null;
+        (session.user as any).humanId = (token as any).humanId ?? null;
       }
       return session;
     },
