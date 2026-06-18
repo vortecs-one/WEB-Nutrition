@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Egg,
   Soup,
@@ -18,20 +18,26 @@ import {
   type MealType,
   type SupplementType,
 } from "@/lib/day-log/provider";
-import NutritionChart from "./NutritionChart";
+
+function toDateKey(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
 
 export default function NutritionTracker() {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
 
-  const {
-    meals,
-    addMeal,
-    removeMeal,
-    supplements,
-    addSupplement,
-    removeSupplement,
-  } = useDayLog();
+  const { dayData, addMeal, removeMeal, addSupplement, removeSupplement } =
+    useDayLog();
+
+  // Stable today key — initialized after mount to avoid hydration mismatch.
+  const [todayKey, setTodayKey] = useState<string>("");
+  useEffect(() => setTodayKey(toDateKey(new Date())), []);
+
+  const { meals, supplements } = useMemo(
+    () => (todayKey ? dayData(todayKey) : { meals: [], supplements: [] }),
+    [dayData, todayKey],
+  );
 
   // Add-meal modal state.
   const [addType, setAddType] = useState<MealType | null>(null);
@@ -49,9 +55,9 @@ export default function NutritionTracker() {
 
   const mealTypes: { type: MealType; label: string; icon: LucideIcon }[] = [
     { type: "breakfast", label: t.breakfast, icon: Egg },
-    { type: "lunch", label: t.lunch, icon: Soup },
-    { type: "dinner", label: t.dinner, icon: Pizza },
-    { type: "snack", label: t.extraMeal, icon: Apple },
+    { type: "lunch",     label: t.lunch,     icon: Soup },
+    { type: "dinner",    label: t.dinner,    icon: Pizza },
+    { type: "snack",     label: t.extraMeal, icon: Apple },
   ];
 
   const labelFor = (mt: MealType) =>
@@ -62,58 +68,43 @@ export default function NutritionTracker() {
 
   const supplementTypeLabel = (st: SupplementType) =>
     ({
-      protein: t.suppProtein,
-      vitamin: t.suppVitamin,
+      protein:  t.suppProtein,
+      vitamin:  t.suppVitamin,
       creatine: t.suppCreatine,
-      omega3: t.suppOmega,
-      other: t.suppOther,
+      omega3:   t.suppOmega,
+      other:    t.suppOther,
     })[st];
 
   const openAdd = (mt: MealType) => {
     setAddType(mt);
-    setName("");
-    setCalories("");
-    setProtein("");
-    setCarbs("");
-    setFat("");
+    setName(""); setCalories(""); setProtein(""); setCarbs(""); setFat("");
   };
 
-  // Parse an optional non-negative number field; empty/invalid → undefined.
   const parseMacro = (v: string) => {
     const n = parseInt(v, 10);
     return !Number.isNaN(n) && n > 0 ? n : undefined;
   };
 
   const openSupplementAdd = () => {
-    setSuppName("");
-    setSuppDose("");
-    setSuppType("protein");
+    setSuppName(""); setSuppDose(""); setSuppType("protein");
     setSuppModalOpen(true);
   };
 
   const submitMeal = (e: React.FormEvent) => {
     e.preventDefault();
     const kcal = parseInt(calories, 10);
-    if (!name.trim() || Number.isNaN(kcal) || kcal <= 0 || !addType) return;
-    addMeal({
-      name: name.trim(),
-      calories: kcal,
-      type: addType,
-      protein: parseMacro(protein),
-      carbs: parseMacro(carbs),
-      fat: parseMacro(fat),
+    if (!name.trim() || Number.isNaN(kcal) || kcal <= 0 || !addType || !todayKey) return;
+    addMeal(todayKey, {
+      name: name.trim(), calories: kcal, type: addType,
+      protein: parseMacro(protein), carbs: parseMacro(carbs), fat: parseMacro(fat),
     });
     setAddType(null);
   };
 
   const submitSupplement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!suppName.trim()) return;
-    addSupplement({
-      name: suppName.trim(),
-      dose: suppDose.trim(),
-      type: suppType,
-    });
+    if (!suppName.trim() || !todayKey) return;
+    addSupplement(todayKey, { name: suppName.trim(), dose: suppDose.trim(), type: suppType });
     setSuppModalOpen(false);
   };
 
@@ -138,7 +129,6 @@ export default function NutritionTracker() {
               >
                 <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
                   <Icon className="h-7 w-7" aria-hidden="true" />
-                  {/* + badge — top-right of the icon circle */}
                   <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                     {total > 0
                       ? <span className="text-[10px] font-bold leading-none">{total}</span>
@@ -152,7 +142,7 @@ export default function NutritionTracker() {
             );
           })}
 
-          {/* Supplements: fifth category, same design as meals */}
+          {/* Supplements — fifth icon, same design */}
           <button
             type="button"
             onClick={openSupplementAdd}
@@ -160,7 +150,6 @@ export default function NutritionTracker() {
           >
             <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
               <Pill className="h-7 w-7" aria-hidden="true" />
-              {/* + badge — top-right of the icon circle */}
               <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 {supplements.length > 0
                   ? <span className="text-[10px] font-bold leading-none">{supplements.length}</span>
@@ -177,10 +166,7 @@ export default function NutritionTracker() {
         {meals.length > 0 && (
           <ul className="mt-4 divide-y divide-border border-t border-border">
             {meals.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between gap-3 py-3"
-              >
+              <li key={m.id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{m.name}</div>
                   <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
@@ -188,12 +174,10 @@ export default function NutritionTracker() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-semibold tabular-nums">
-                    {m.calories} {t.kcal}
-                  </span>
+                  <span className="text-sm font-semibold tabular-nums">{m.calories} {t.kcal}</span>
                   <button
                     type="button"
-                    onClick={() => removeMeal(m.id)}
+                    onClick={() => todayKey && removeMeal(todayKey, m.id)}
                     aria-label={dict.common.delete}
                     className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition"
                   >
@@ -209,10 +193,7 @@ export default function NutritionTracker() {
         {supplements.length > 0 && (
           <ul className="mt-2 divide-y divide-border border-t border-border">
             {supplements.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between gap-3 py-3"
-              >
+              <li key={s.id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{s.name}</div>
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
@@ -221,14 +202,10 @@ export default function NutritionTracker() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {s.dose && (
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {s.dose}
-                    </span>
-                  )}
+                  {s.dose && <span className="text-sm font-medium text-muted-foreground">{s.dose}</span>}
                   <button
                     type="button"
-                    onClick={() => removeSupplement(s.id)}
+                    onClick={() => todayKey && removeSupplement(todayKey, s.id)}
                     aria-label={dict.common.delete}
                     className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition"
                   >
@@ -240,9 +217,6 @@ export default function NutritionTracker() {
           </ul>
         )}
       </section>
-
-      {/* Daily nutrient composition chart */}
-      <NutritionChart />
 
       {/* Add-meal modal */}
       {addType && (
@@ -259,9 +233,7 @@ export default function NutritionTracker() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold">
-                {t.addMeal} — {labelFor(addType)}
-              </h3>
+              <h3 className="text-base font-semibold">{t.addMeal} — {labelFor(addType)}</h3>
               <button
                 type="button"
                 onClick={() => setAddType(null)}
@@ -271,76 +243,30 @@ export default function NutritionTracker() {
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-
             <form onSubmit={submitMeal} className="space-y-4">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.mealName}
-                </span>
-                <input
-                  className={inputClass}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <span className="text-xs font-medium text-muted-foreground">{t.mealName}</span>
+                <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
               </label>
-
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.mealCalories}
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className={inputClass}
-                  value={calories}
-                  onChange={(e) => setCalories(e.target.value)}
-                />
+                <span className="text-xs font-medium text-muted-foreground">{t.mealCalories}</span>
+                <input type="number" inputMode="numeric" className={inputClass} value={calories} onChange={(e) => setCalories(e.target.value)} />
               </label>
-
-              {/* Optional macros — power the daily composition chart */}
               <div className="grid grid-cols-3 gap-3">
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {t.proteinG}
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    className={inputClass}
-                    value={protein}
-                    onChange={(e) => setProtein(e.target.value)}
-                  />
+                  <span className="text-xs font-medium text-muted-foreground">{t.proteinG}</span>
+                  <input type="number" inputMode="numeric" className={inputClass} value={protein} onChange={(e) => setProtein(e.target.value)} />
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {t.carbsG}
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    className={inputClass}
-                    value={carbs}
-                    onChange={(e) => setCarbs(e.target.value)}
-                  />
+                  <span className="text-xs font-medium text-muted-foreground">{t.carbsG}</span>
+                  <input type="number" inputMode="numeric" className={inputClass} value={carbs} onChange={(e) => setCarbs(e.target.value)} />
                 </label>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {t.fatG}
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    className={inputClass}
-                    value={fat}
-                    onChange={(e) => setFat(e.target.value)}
-                  />
+                  <span className="text-xs font-medium text-muted-foreground">{t.fatG}</span>
+                  <input type="number" inputMode="numeric" className={inputClass} value={fat} onChange={(e) => setFat(e.target.value)} />
                 </label>
               </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition"
-              >
+              <button type="submit" className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition">
                 {t.add}
               </button>
             </form>
@@ -348,7 +274,7 @@ export default function NutritionTracker() {
         </div>
       )}
 
-      {/* Add-supplement modal (same design as add-meal) */}
+      {/* Add-supplement modal */}
       {suppModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
@@ -364,48 +290,22 @@ export default function NutritionTracker() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold">{t.addSupplement}</h3>
-              <button
-                type="button"
-                onClick={() => setSuppModalOpen(false)}
-                aria-label={dict.common.close}
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
-              >
+              <button type="button" onClick={() => setSuppModalOpen(false)} aria-label={dict.common.close} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition">
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-
             <form onSubmit={submitSupplement} className="space-y-4">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.supplementName}
-                </span>
-                <input
-                  className={inputClass}
-                  value={suppName}
-                  onChange={(e) => setSuppName(e.target.value)}
-                />
+                <span className="text-xs font-medium text-muted-foreground">{t.supplementName}</span>
+                <input className={inputClass} value={suppName} onChange={(e) => setSuppName(e.target.value)} />
               </label>
-
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.supplementDose}
-                </span>
-                <input
-                  className={inputClass}
-                  value={suppDose}
-                  onChange={(e) => setSuppDose(e.target.value)}
-                />
+                <span className="text-xs font-medium text-muted-foreground">{t.supplementDose}</span>
+                <input className={inputClass} value={suppDose} onChange={(e) => setSuppDose(e.target.value)} />
               </label>
-
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.supplementType}
-                </span>
-                <select
-                  className={inputClass}
-                  value={suppType}
-                  onChange={(e) => setSuppType(e.target.value as SupplementType)}
-                >
+                <span className="text-xs font-medium text-muted-foreground">{t.supplementType}</span>
+                <select className={inputClass} value={suppType} onChange={(e) => setSuppType(e.target.value as SupplementType)}>
                   <option value="protein">{t.suppProtein}</option>
                   <option value="vitamin">{t.suppVitamin}</option>
                   <option value="creatine">{t.suppCreatine}</option>
@@ -413,11 +313,7 @@ export default function NutritionTracker() {
                   <option value="other">{t.suppOther}</option>
                 </select>
               </label>
-
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition"
-              >
+              <button type="submit" className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition">
                 {t.add}
               </button>
             </form>

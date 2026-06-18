@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useMemo,
   useState,
@@ -9,10 +10,10 @@ import {
 } from "react";
 
 // === Shared day-log store ===
-// Holds the day's meals, activities, and supplements so the Calories
-// dashboard (gauge) and the Nutrition diet log stay in sync without a
-// backend round-trip. Swap the in-memory state for SWR + the Thruxion API
-// later without changing consumers.
+// Data is keyed by ISO date string (YYYY-MM-DD) so every day has its own
+// independent meals, activities and supplements.  The Calories view owns
+// the selected date; both the gauge and the composition chart read the
+// same date's data from this store.
 
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 export type ActivityType =
@@ -33,7 +34,6 @@ export type Meal = {
   name: string;
   calories: number;
   type: MealType;
-  // Optional macronutrient grams, used for the daily composition chart.
   protein?: number;
   carbs?: number;
   fat?: number;
@@ -57,57 +57,142 @@ export type Supplement = {
 export const CONSUMED_GOAL = 1940;
 export const BURNED_GOAL = 2383;
 
-type DayLogValue = {
+// ---- per-day data structure ----
+type DayData = {
   meals: Meal[];
   activities: Activity[];
   supplements: Supplement[];
-  consumed: number;
-  burned: number;
-  addMeal: (meal: Omit<Meal, "id">) => void;
-  removeMeal: (id: number) => void;
-  addActivity: (activity: Omit<Activity, "id">) => void;
-  removeActivity: (id: number) => void;
-  addSupplement: (supplement: Omit<Supplement, "id">) => void;
-  removeSupplement: (id: number) => void;
+};
+
+const emptyDay = (): DayData => ({
+  meals: [],
+  activities: [],
+  supplements: [],
+});
+
+// ---- context value ----
+type DayLogValue = {
+  // Returns the data for any given ISO date key.
+  dayData: (dateKey: string) => DayData;
+  // Convenience totals for a given date.
+  consumedFor: (dateKey: string) => number;
+  burnedFor: (dateKey: string) => number;
+  // Mutations — all scoped by date key.
+  addMeal: (dateKey: string, meal: Omit<Meal, "id">) => void;
+  removeMeal: (dateKey: string, id: number) => void;
+  addActivity: (dateKey: string, activity: Omit<Activity, "id">) => void;
+  removeActivity: (dateKey: string, id: number) => void;
+  addSupplement: (dateKey: string, supplement: Omit<Supplement, "id">) => void;
+  removeSupplement: (dateKey: string, id: number) => void;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
 
 export function DayLogProvider({ children }: { children: ReactNode }) {
-  const [meals, setMeals] = useState<Meal[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [supplements, setSupplements] = useState<Supplement[]>([]);
+  // Map from ISO date string → DayData.
+  const [log, setLog] = useState<Record<string, DayData>>({});
 
-  const consumed = useMemo(
-    () => meals.reduce((sum, m) => sum + m.calories, 0),
-    [meals],
+  const dayData = useCallback(
+    (dateKey: string): DayData => log[dateKey] ?? emptyDay(),
+    [log],
   );
-  const burned = useMemo(
-    () => activities.reduce((sum, a) => sum + a.calories, 0),
-    [activities],
+
+  const consumedFor = useCallback(
+    (dateKey: string) =>
+      (log[dateKey]?.meals ?? []).reduce((s, m) => s + m.calories, 0),
+    [log],
+  );
+
+  const burnedFor = useCallback(
+    (dateKey: string) =>
+      (log[dateKey]?.activities ?? []).reduce((s, a) => s + a.calories, 0),
+    [log],
+  );
+
+  // Helper to patch one day's data immutably.
+  const patchDay = useCallback(
+    (dateKey: string, fn: (prev: DayData) => DayData) =>
+      setLog((prev) => ({
+        ...prev,
+        [dateKey]: fn(prev[dateKey] ?? emptyDay()),
+      })),
+    [],
+  );
+
+  const addMeal = useCallback(
+    (dateKey: string, meal: Omit<Meal, "id">) =>
+      patchDay(dateKey, (d) => ({
+        ...d,
+        meals: [{ id: Date.now(), ...meal }, ...d.meals],
+      })),
+    [patchDay],
+  );
+  const removeMeal = useCallback(
+    (dateKey: string, id: number) =>
+      patchDay(dateKey, (d) => ({
+        ...d,
+        meals: d.meals.filter((m) => m.id !== id),
+      })),
+    [patchDay],
+  );
+
+  const addActivity = useCallback(
+    (dateKey: string, activity: Omit<Activity, "id">) =>
+      patchDay(dateKey, (d) => ({
+        ...d,
+        activities: [{ id: Date.now(), ...activity }, ...d.activities],
+      })),
+    [patchDay],
+  );
+  const removeActivity = useCallback(
+    (dateKey: string, id: number) =>
+      patchDay(dateKey, (d) => ({
+        ...d,
+        activities: d.activities.filter((a) => a.id !== id),
+      })),
+    [patchDay],
+  );
+
+  const addSupplement = useCallback(
+    (dateKey: string, supplement: Omit<Supplement, "id">) =>
+      patchDay(dateKey, (d) => ({
+        ...d,
+        supplements: [{ id: Date.now(), ...supplement }, ...d.supplements],
+      })),
+    [patchDay],
+  );
+  const removeSupplement = useCallback(
+    (dateKey: string, id: number) =>
+      patchDay(dateKey, (d) => ({
+        ...d,
+        supplements: d.supplements.filter((s) => s.id !== id),
+      })),
+    [patchDay],
   );
 
   const value = useMemo<DayLogValue>(
     () => ({
-      meals,
-      activities,
-      supplements,
-      consumed,
-      burned,
-      addMeal: (meal) =>
-        setMeals((prev) => [{ id: Date.now(), ...meal }, ...prev]),
-      removeMeal: (id) =>
-        setMeals((prev) => prev.filter((m) => m.id !== id)),
-      addActivity: (activity) =>
-        setActivities((prev) => [{ id: Date.now(), ...activity }, ...prev]),
-      removeActivity: (id) =>
-        setActivities((prev) => prev.filter((a) => a.id !== id)),
-      addSupplement: (supplement) =>
-        setSupplements((prev) => [{ id: Date.now(), ...supplement }, ...prev]),
-      removeSupplement: (id) =>
-        setSupplements((prev) => prev.filter((s) => s.id !== id)),
+      dayData,
+      consumedFor,
+      burnedFor,
+      addMeal,
+      removeMeal,
+      addActivity,
+      removeActivity,
+      addSupplement,
+      removeSupplement,
     }),
-    [meals, activities, supplements, consumed, burned],
+    [
+      dayData,
+      consumedFor,
+      burnedFor,
+      addMeal,
+      removeMeal,
+      addActivity,
+      removeActivity,
+      addSupplement,
+      removeSupplement,
+    ],
   );
 
   return (
@@ -117,8 +202,6 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
 
 export function useDayLog() {
   const ctx = useContext(DayLogContext);
-  if (!ctx) {
-    throw new Error("useDayLog must be used within a DayLogProvider");
-  }
+  if (!ctx) throw new Error("useDayLog must be used within a DayLogProvider");
   return ctx;
 }
