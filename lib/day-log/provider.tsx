@@ -33,6 +33,10 @@ export type Meal = {
   name: string;
   calories: number;
   type: MealType;
+  // Optional macronutrient grams, used for the daily composition chart.
+  protein?: number;
+  carbs?: number;
+  fat?: number;
 };
 
 export type Activity = {

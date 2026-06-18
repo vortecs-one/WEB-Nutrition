@@ -18,6 +18,7 @@ import {
   type MealType,
   type SupplementType,
 } from "@/lib/day-log/provider";
+import NutritionChart from "./NutritionChart";
 
 export default function NutritionTracker() {
   const { dict } = useI18n();
@@ -36,6 +37,9 @@ export default function NutritionTracker() {
   const [addType, setAddType] = useState<MealType | null>(null);
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
+  const [protein, setProtein] = useState("");
+  const [carbs, setCarbs] = useState("");
+  const [fat, setFat] = useState("");
 
   // Add-supplement modal state.
   const [suppModalOpen, setSuppModalOpen] = useState(false);
@@ -69,6 +73,15 @@ export default function NutritionTracker() {
     setAddType(mt);
     setName("");
     setCalories("");
+    setProtein("");
+    setCarbs("");
+    setFat("");
+  };
+
+  // Parse an optional non-negative number field; empty/invalid → undefined.
+  const parseMacro = (v: string) => {
+    const n = parseInt(v, 10);
+    return !Number.isNaN(n) && n > 0 ? n : undefined;
   };
 
   const openSupplementAdd = () => {
@@ -82,7 +95,14 @@ export default function NutritionTracker() {
     e.preventDefault();
     const kcal = parseInt(calories, 10);
     if (!name.trim() || Number.isNaN(kcal) || kcal <= 0 || !addType) return;
-    addMeal({ name: name.trim(), calories: kcal, type: addType });
+    addMeal({
+      name: name.trim(),
+      calories: kcal,
+      type: addType,
+      protein: parseMacro(protein),
+      carbs: parseMacro(carbs),
+      fat: parseMacro(fat),
+    });
     setAddType(null);
   };
 
@@ -102,14 +122,6 @@ export default function NutritionTracker() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground px-5 py-5 rounded-2xl shadow-sm">
-        <h1 className="text-xl font-semibold text-balance">{t.title}</h1>
-        <p className="text-sm text-primary-foreground/80 mt-0.5">
-          {t.subtitle}
-        </p>
-      </div>
-
       {/* Diet log */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
         <h2 className="text-lg font-semibold mb-4">{t.dietLog}</h2>
@@ -225,6 +237,9 @@ export default function NutritionTracker() {
         )}
       </section>
 
+      {/* Daily nutrient composition chart */}
+      <NutritionChart />
+
       {/* Add-meal modal */}
       {addType && (
         <div
@@ -277,6 +292,46 @@ export default function NutritionTracker() {
                   onChange={(e) => setCalories(e.target.value)}
                 />
               </label>
+
+              {/* Optional macros — power the daily composition chart */}
+              <div className="grid grid-cols-3 gap-3">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t.proteinG}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputClass}
+                    value={protein}
+                    onChange={(e) => setProtein(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t.carbsG}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputClass}
+                    value={carbs}
+                    onChange={(e) => setCarbs(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t.fatG}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputClass}
+                    value={fat}
+                    onChange={(e) => setFat(e.target.value)}
+                  />
+                </label>
+              </div>
 
               <button
                 type="submit"

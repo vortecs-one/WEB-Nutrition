@@ -16,6 +16,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-chart-7: var(--chart-7);
+  --color-chart-6: var(--chart-6);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -71,6 +73,8 @@
   --chart-3: oklch(0.75 0.15 85);
   --chart-4: oklch(0.65 0.18 45);
   --chart-5: oklch(0.55 0.12 250);
+  --chart-6: oklch(0.5 0.09 220);
+  --chart-7: oklch(0.7 0.02 250);
 
   /* Deep green sidebar for a premium, focused navigation surface */
   --sidebar: oklch(0.27 0.04 162);
@@ -111,6 +115,8 @@
   --chart-3: #ff9700;
   --chart-4: #00950b;
   --chart-5: #00b0ff;
+  --chart-6: #007f95;
+  --chart-7: #a2a6b0;
   /* Sidebar / hero surfaces: slightly darker than cards with amber accents */
   --sidebar: #121419;
   --sidebar-foreground: #f5f6f7;
