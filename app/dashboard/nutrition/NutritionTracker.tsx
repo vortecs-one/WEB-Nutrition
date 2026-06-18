@@ -136,15 +136,17 @@ export default function NutritionTracker() {
                 onClick={() => openAdd(type)}
                 className="flex flex-col items-center gap-2 rounded-2xl p-2 hover:bg-accent active:scale-[0.97] transition"
               >
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
                   <Icon className="h-7 w-7" aria-hidden="true" />
+                  {/* + badge — top-right of the icon circle */}
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    {total > 0
+                      ? <span className="text-[10px] font-bold leading-none">{total}</span>
+                      : <Plus className="h-3 w-3" aria-hidden="true" />}
+                  </span>
                 </span>
                 <span className="flex min-h-8 items-center text-xs font-medium text-center leading-tight">
                   {label}
-                </span>
-                <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                  {total > 0 ? `${total}` : ""}
                 </span>
               </button>
             );
@@ -156,15 +158,17 @@ export default function NutritionTracker() {
             onClick={openSupplementAdd}
             className="flex flex-col items-center gap-2 rounded-2xl p-2 hover:bg-accent active:scale-[0.97] transition"
           >
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
               <Pill className="h-7 w-7" aria-hidden="true" />
+              {/* + badge — top-right of the icon circle */}
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                {supplements.length > 0
+                  ? <span className="text-[10px] font-bold leading-none">{supplements.length}</span>
+                  : <Plus className="h-3 w-3" aria-hidden="true" />}
+              </span>
             </span>
             <span className="flex min-h-8 items-center text-xs font-medium text-center leading-tight">
               {t.supplements}
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              {supplements.length > 0 ? `${supplements.length}` : ""}
             </span>
           </button>
         </div>

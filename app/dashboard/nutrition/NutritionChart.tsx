@@ -77,10 +77,31 @@ export default function NutritionChart() {
           {t.noComposition}
         </p>
       ) : (
-        <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+        <div className="mt-4 flex flex-row items-center gap-4">
+          {/* Legend — left side */}
+          <ul className="flex flex-1 flex-col gap-2.5">
+            {data.map((d) => {
+              const pct = Math.round((d.value / total) * 100);
+              return (
+                <li key={d.key} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: d.fill }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {d.label}
+                  </span>
+                  <span className="font-semibold tabular-nums">{pct}%</span>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Pie chart — right side */}
           <ChartContainer
             config={chartConfig}
-            className="mx-auto aspect-square h-52 w-52 shrink-0"
+            className="aspect-square h-48 w-48 shrink-0"
           >
             <PieChart>
               <ChartTooltip
@@ -102,7 +123,7 @@ export default function NutritionChart() {
                 data={data}
                 dataKey="value"
                 nameKey="key"
-                innerRadius={58}
+                innerRadius={54}
                 strokeWidth={4}
               >
                 {data.map((d) => (
@@ -135,26 +156,6 @@ export default function NutritionChart() {
               </Pie>
             </PieChart>
           </ChartContainer>
-
-          {/* Legend with percentages */}
-          <ul className="grid w-full grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-1">
-            {data.map((d) => {
-              const pct = Math.round((d.value / total) * 100);
-              return (
-                <li key={d.key} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: d.fill }}
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {d.label}
-                  </span>
-                  <span className="font-semibold tabular-nums">{pct}%</span>
-                </li>
-              );
-            })}
-          </ul>
         </div>
       )}
     </section>
