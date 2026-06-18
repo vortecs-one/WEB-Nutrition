@@ -6,8 +6,9 @@ import { useI18n } from "@/lib/i18n/provider";
 import { useRole } from "@/lib/role/provider";
 import { getNavItems } from "./nav";
 
-// Native-style bottom tab navigation, shown only on small screens.
-// Surfaces each role's primary destinations with large, thumb-friendly targets.
+// Native-style top tab navigation, shown only on small screens.
+// Sits directly under the sticky header and surfaces each role's primary
+// destinations with large, easy-to-tap targets.
 export default function MobileTabBar() {
   const pathname = usePathname();
   const { dict } = useI18n();
@@ -19,7 +20,7 @@ export default function MobileTabBar() {
 
   return (
     <nav
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-safe"
+      className="lg:hidden sticky top-16 z-30 border-b border-border bg-card"
       aria-label={dict.nav.sectionTitle}
     >
       <ul className="flex items-stretch justify-around">
