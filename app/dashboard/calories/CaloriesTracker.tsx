@@ -1,37 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Flame,
+  Salad,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
+import {
+  useDayLog,
+  CONSUMED_GOAL,
+  BURNED_GOAL,
+  type ActivityType,
+} from "@/lib/day-log/provider";
+import CalorieGauge from "../nutrition/CalorieGauge";
 
-type ActivityType = "cardio" | "strength" | "walking" | "sport" | "other";
-
-type Activity = {
-  id: number;
-  name: string;
-  calories: number;
-  type: ActivityType;
-};
-
-// Static demo values; meals come from the nutrition tab in a real backend.
-const CONSUMED = 1800;
-const CALORIE_GOAL = 2000;
+// Symmetric dial range in kcal: left = surplus, right = deficit.
+const GAUGE_RANGE = 1000;
 
 export default function CaloriesTracker() {
-  const { dict } = useI18n();
+  const { dict, locale } = useI18n();
   const t = dict.caloriesUser;
 
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const { consumed, burned, activities, addActivity, removeActivity } =
+    useDayLog();
+
+  // Initialized after mount to avoid SSR/client hydration mismatch.
+  const [date, setDate] = useState<Date | null>(null);
+  useEffect(() => setDate(new Date()), []);
+
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
   const [type, setType] = useState<ActivityType>("cardio");
 
-  const burned = useMemo(
-    () => activities.reduce((sum, a) => sum + a.calories, 0),
-    [activities],
-  );
-  const net = CONSUMED - burned;
-  const deficit = net < CALORIE_GOAL;
+  // Positive net = calorie deficit (burned more than eaten).
+  const net = burned - consumed;
+  const goalNet = BURNED_GOAL - CONSUMED_GOAL;
 
   const activityTypeLabel = (at: ActivityType) =>
     ({
@@ -42,77 +48,112 @@ export default function CaloriesTracker() {
       other: t.other,
     })[at];
 
-  const addActivity = (e: React.FormEvent) => {
+  const shiftDay = (delta: number) =>
+    setDate((d) => {
+      const next = new Date(d ?? new Date());
+      next.setDate(next.getDate() + delta);
+      return next;
+    });
+
+  const onAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
     const kcal = parseInt(calories, 10);
     if (!name.trim() || Number.isNaN(kcal) || kcal <= 0) return;
-    setActivities((prev) => [
-      { id: Date.now(), name: name.trim(), calories: kcal, type },
-      ...prev,
-    ]);
+    addActivity({ name: name.trim(), calories: kcal, type });
     setName("");
     setCalories("");
   };
 
-  const removeActivity = (id: number) =>
-    setActivities((prev) => prev.filter((a) => a.id !== id));
+  const dateLabel = date
+    ? date.toLocaleDateString(locale, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "\u00A0"; // non-breaking space placeholder before mount
 
   const inputClass =
     "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5">
-      {/* Section header */}
-      <div className="bg-primary text-primary-foreground px-5 py-5 rounded-2xl shadow-sm">
-        <h1 className="text-xl font-semibold text-balance">{t.title}</h1>
-        <p className="text-sm text-primary-foreground/80 mt-0.5">{t.subtitle}</p>
-      </div>
-
-      {/* Balance summary */}
-      <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-medium text-sm">{t.balance}</h2>
-          <span className="text-xs text-muted-foreground">{t.goal}: {CALORIE_GOAL}</span>
+    <div className="mx-auto w-full max-w-2xl space-y-5">
+      {/* Hero: date navigator + calorie balance gauge */}
+      <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-5">
+        {/* Date navigator */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => shiftDay(-1)}
+            aria-label={`${dict.common.edit} -1`}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <span className="text-base font-medium">{dateLabel}</span>
+          <button
+            type="button"
+            onClick={() => shiftDay(1)}
+            aria-label={`${dict.common.edit} +1`}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div>
-            <div className="text-xl font-semibold tabular-nums">{CONSUMED}</div>
-            <div className="text-xs text-muted-foreground">{t.consumed}</div>
-          </div>
-          <div>
-            <div className="text-xl font-semibold tabular-nums text-primary">
-              {burned}
-            </div>
-            <div className="text-xs text-muted-foreground">{t.burned}</div>
-          </div>
-          <div>
-            <div
-              className={`text-xl font-semibold tabular-nums ${
-                deficit ? "text-green-600" : "text-destructive"
-              }`}
-            >
-              {net}
-            </div>
-            <div className="text-xs text-muted-foreground">{t.net}</div>
-          </div>
+        {/* Gauge */}
+        <div className="mt-1">
+          <CalorieGauge
+            value={net}
+            range={GAUGE_RANGE}
+            goal={goalNet}
+            label={net >= 0 ? t.calorieDeficit : t.calorieSurplus}
+            goalLabel={t.goalLabel}
+          />
         </div>
 
-        <p
-          className={`mt-4 text-xs ${
-            deficit ? "text-green-600" : "text-destructive"
-          }`}
-        >
-          {deficit ? t.deficit : t.surplus}
-        </p>
+        {/* Burned / consumed stats */}
+        <div className="grid grid-cols-2 gap-4 mt-2">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-4 text-white shrink-0">
+              <Flame className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-sidebar-foreground/70">
+                {t.totalBurned}
+              </div>
+              <div className="text-sm font-semibold tabular-nums">
+                {burned}{" "}
+                <span className="font-normal text-sidebar-foreground/60">
+                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
+              <Salad className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-sidebar-foreground/70">
+                {t.totalConsumed}
+              </div>
+              <div className="text-sm font-semibold tabular-nums">
+                {consumed}{" "}
+                <span className="font-normal text-sidebar-foreground/60">
+                  / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Add activity form */}
-      <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm p-5">
+      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
         <h2 className="font-medium text-sm mb-4">{t.addActivity}</h2>
         <form
-          onSubmit={addActivity}
+          onSubmit={onAddActivity}
           className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:items-end"
         >
           <label className="flex flex-col gap-1.5">
@@ -166,7 +207,7 @@ export default function CaloriesTracker() {
       </section>
 
       {/* Activity list */}
-      <section className="bg-card text-card-foreground rounded-2xl border border-border shadow-sm overflow-hidden">
+      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-border">
           <h2 className="font-medium text-sm">{t.activities}</h2>
         </div>
@@ -189,7 +230,7 @@ export default function CaloriesTracker() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-sm font-semibold tabular-nums">
-                    -{a.calories} kcal
+                    -{a.calories} {t.kcal ?? "kcal"}
                   </span>
                   <button
                     type="button"

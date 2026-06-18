@@ -1,64 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import {
-  Flame,
-  Salad,
   Egg,
   Soup,
   Pizza,
   Apple,
   Plus,
+  Pill,
   Trash2,
   X,
-  ChevronLeft,
-  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
-import CalorieGauge from "./CalorieGauge";
-
-type MealType = "breakfast" | "lunch" | "dinner" | "snack";
-
-type Meal = {
-  id: number;
-  name: string;
-  calories: number;
-  type: MealType;
-};
-
-// Daily targets (could later come from the user's profile / Thruxion API).
-const CONSUMED_GOAL = 1940;
-const BURNED_GOAL = 2383;
-// Symmetric dial range in kcal: left = surplus, right = deficit.
-const GAUGE_RANGE = 1000;
+import {
+  useDayLog,
+  type MealType,
+  type SupplementType,
+} from "@/lib/day-log/provider";
 
 export default function NutritionTracker() {
-  const { dict, locale } = useI18n();
+  const { dict } = useI18n();
   const t = dict.nutritionUser;
 
-  // Initialized after mount to avoid SSR/client hydration mismatch
-  // (new Date() is variable input that can differ between server and client).
-  const [date, setDate] = useState<Date | null>(null);
-  useEffect(() => setDate(new Date()), []);
-
-  const [meals, setMeals] = useState<Meal[]>([]);
-  // Calories burned for the day (linkable to the activities tracker later).
-  const [burned] = useState(0);
+  const {
+    meals,
+    addMeal,
+    removeMeal,
+    supplements,
+    addSupplement,
+    removeSupplement,
+  } = useDayLog();
 
   // Add-meal modal state.
   const [addType, setAddType] = useState<MealType | null>(null);
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
 
-  const consumed = useMemo(
-    () => meals.reduce((sum, m) => sum + m.calories, 0),
-    [meals],
-  );
-
-  // Positive net = calorie deficit (burned more than eaten).
-  const net = burned - consumed;
-  const goalNet = BURNED_GOAL - CONSUMED_GOAL;
+  // Supplement form state.
+  const [suppName, setSuppName] = useState("");
+  const [suppDose, setSuppDose] = useState("");
+  const [suppType, setSuppType] = useState<SupplementType>("protein");
 
   const mealTypes: { type: MealType; label: string; icon: LucideIcon }[] = [
     { type: "breakfast", label: t.breakfast, icon: Egg },
@@ -73,12 +55,14 @@ export default function NutritionTracker() {
   const caloriesFor = (mt: MealType) =>
     meals.filter((m) => m.type === mt).reduce((s, m) => s + m.calories, 0);
 
-  const shiftDay = (delta: number) =>
-    setDate((d) => {
-      const next = new Date(d ?? new Date());
-      next.setDate(next.getDate() + delta);
-      return next;
-    });
+  const supplementTypeLabel = (st: SupplementType) =>
+    ({
+      protein: t.suppProtein,
+      vitamin: t.suppVitamin,
+      creatine: t.suppCreatine,
+      omega3: t.suppOmega,
+      other: t.suppOther,
+    })[st];
 
   const openAdd = (mt: MealType) => {
     setAddType(mt);
@@ -90,97 +74,34 @@ export default function NutritionTracker() {
     e.preventDefault();
     const kcal = parseInt(calories, 10);
     if (!name.trim() || Number.isNaN(kcal) || kcal <= 0 || !addType) return;
-    setMeals((prev) => [
-      { id: Date.now(), name: name.trim(), calories: kcal, type: addType },
-      ...prev,
-    ]);
+    addMeal({ name: name.trim(), calories: kcal, type: addType });
     setAddType(null);
   };
 
-  const removeMeal = (id: number) =>
-    setMeals((prev) => prev.filter((m) => m.id !== id));
+  const submitSupplement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suppName.trim()) return;
+    addSupplement({
+      name: suppName.trim(),
+      dose: suppDose.trim(),
+      type: suppType,
+    });
+    setSuppName("");
+    setSuppDose("");
+  };
 
-  const dateLabel = date
-    ? date.toLocaleDateString(locale, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "\u00A0"; // non-breaking space placeholder before mount
+  const inputClass =
+    "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
-      {/* Hero: date navigator + calorie balance gauge */}
-      <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-5">
-        {/* Date navigator */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => shiftDay(-1)}
-            aria-label={`${dict.common.edit} -1`}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-          >
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <span className="text-base font-medium">{dateLabel}</span>
-          <button
-            type="button"
-            onClick={() => shiftDay(1)}
-            aria-label={`${dict.common.edit} +1`}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-
-        {/* Gauge */}
-        <div className="mt-1">
-          <CalorieGauge
-            value={net}
-            range={GAUGE_RANGE}
-            goal={goalNet}
-            label={net >= 0 ? t.calorieDeficit : t.calorieSurplus}
-            goalLabel={t.goalLabel}
-          />
-        </div>
-
-        {/* Burned / consumed stats */}
-        <div className="grid grid-cols-2 gap-4 mt-2">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-4 text-white shrink-0">
-              <Flame className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-xs text-sidebar-foreground/70">
-                {t.totalBurned}
-              </div>
-              <div className="text-sm font-semibold tabular-nums">
-                {burned}{" "}
-                <span className="font-normal text-sidebar-foreground/60">
-                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
-              <Salad className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-xs text-sidebar-foreground/70">
-                {t.totalConsumed}
-              </div>
-              <div className="text-sm font-semibold tabular-nums">
-                {consumed}{" "}
-                <span className="font-normal text-sidebar-foreground/60">
-                  / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Header */}
+      <div className="bg-primary text-primary-foreground px-5 py-5 rounded-2xl shadow-sm">
+        <h1 className="text-xl font-semibold text-balance">{t.title}</h1>
+        <p className="text-sm text-primary-foreground/80 mt-0.5">
+          {t.subtitle}
+        </p>
+      </div>
 
       {/* Diet log */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
@@ -244,6 +165,105 @@ export default function NutritionTracker() {
         )}
       </section>
 
+      {/* Supplements */}
+      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground shrink-0">
+            <Pill className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <h2 className="text-lg font-semibold">{t.supplements}</h2>
+        </div>
+
+        <form
+          onSubmit={submitSupplement}
+          className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:items-end"
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              {t.supplementName}
+            </span>
+            <input
+              className={inputClass}
+              value={suppName}
+              onChange={(e) => setSuppName(e.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              {t.supplementDose}
+            </span>
+            <input
+              className={`${inputClass} sm:w-32`}
+              value={suppDose}
+              onChange={(e) => setSuppDose(e.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              {t.supplementType}
+            </span>
+            <select
+              className={`${inputClass} sm:w-36`}
+              value={suppType}
+              onChange={(e) => setSuppType(e.target.value as SupplementType)}
+            >
+              <option value="protein">{t.suppProtein}</option>
+              <option value="vitamin">{t.suppVitamin}</option>
+              <option value="creatine">{t.suppCreatine}</option>
+              <option value="omega3">{t.suppOmega}</option>
+              <option value="other">{t.suppOther}</option>
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            className="rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition w-full sm:w-auto"
+          >
+            {t.add}
+          </button>
+        </form>
+
+        {/* Logged supplements */}
+        {supplements.length === 0 ? (
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            {t.noSupplements}
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-border border-t border-border">
+            {supplements.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-sm truncate">{s.name}</div>
+                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
+                    {supplementTypeLabel(s.type)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {s.dose && (
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {s.dose}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeSupplement(s.id)}
+                    aria-label={dict.common.delete}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition"
+                  >
+                    <Trash2 className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Add-meal modal */}
       {addType && (
         <div
@@ -278,7 +298,7 @@ export default function NutritionTracker() {
                   {t.mealName}
                 </span>
                 <input
-                  className="w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+                  className={inputClass}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -291,7 +311,7 @@ export default function NutritionTracker() {
                 <input
                   type="number"
                   inputMode="numeric"
-                  className="w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+                  className={inputClass}
                   value={calories}
                   onChange={(e) => setCalories(e.target.value)}
                 />
