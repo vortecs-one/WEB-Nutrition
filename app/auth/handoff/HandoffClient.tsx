@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useTranslation } from "@/lib/i18n/provider";
+import { LOCALE_COOKIE, isLocale } from "@/lib/i18n/config";
 
 type Status = "working" | "error";
 
@@ -37,6 +38,22 @@ export default function HandoffClient() {
       if (res?.error || !res?.ok) {
         setStatus("error");
         return;
+      }
+
+      // Persist the language the user picked in the native app (carried in the
+      // session as `locale`) into the NEXT_LOCALE cookie. The root layout reads
+      // this cookie on every load, so the app's choice is honored site-wide
+      // without the layout needing to read the session during render.
+      try {
+        const session = await getSession();
+        const sessionLocale = (session?.user as { locale?: string } | undefined)
+          ?.locale;
+        if (isLocale(sessionLocale)) {
+          // 1 year, root path so every route sees it.
+          document.cookie = `${LOCALE_COOKIE}=${sessionLocale}; path=/; max-age=31536000; samesite=lax`;
+        }
+      } catch {
+        // Non-fatal: fall back to whatever locale cookie already exists.
       }
 
       // Replace so the one-time token never stays in WebView history.
