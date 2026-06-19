@@ -12,44 +12,25 @@ type NavItem = {
   children?: { label: string; href: string }[];
 };
 
+// Normal user nav items (default view).
+// Nutritionist-only sections (Grupos, Pacientes, Antropometría) will be
+// added back here once the professional role logic is implemented.
 const navItems: NavItem[] = [
   {
-    label: "Grupos",
-    href: "/dashboard/groups",
-    icon: "👥",
-  },
-  {
-    label: "Pacientes",
-    href: "/dashboard/patients",
-    icon: "👨‍👩‍👧‍👦",
-  },
-  {
-    label: "Antropometría",
-    icon: "📏",
-    children: [
-      { label: "Puntos de corte", href: "/dashboard/antropometria/puntosdecorte" },
-      { label: "Bicompartimental", href: "/dashboard/antropometria/bicompartimental" },
-      { label: "Tetracompartimental", href: "/dashboard/antropometria/tetracompartimental" },
-      { label: "Pentacompartimental", href: "/dashboard/antropometria/pentacompartimental" },
-    ],
-  },
-  {
-    label: "Nutrición",
-    icon: "🍽️ ",
+    label: "Mi Nutrición",
+    icon: "🍽️",
     children: [
       { label: "Alimentación", href: "/dashboard/alimentacion/alimentacion" },
       { label: "Hidratación", href: "/dashboard/alimentacion/hidratacion" },
     ],
   },
-
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   const [open, setOpen] = useState<Record<string, boolean>>({
-    Antropometría: true,
-    Nutrición: true,
+    "Mi Nutrición": true,
   });
 
   const toggle = (label: string) => {
