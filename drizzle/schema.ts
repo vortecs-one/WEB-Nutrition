@@ -9,6 +9,7 @@ import {
   date,
   integer,
   boolean,
+  index,
 } from "drizzle-orm/pg-core";
 
 // === Usuarios ===
@@ -100,3 +101,41 @@ export const patients = pgTable("patients", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// === Registro diario (comidas, actividades y suplementos por usuario/día) ===
+// One row per logged item. Scoped to a user via `userKey` (the Thruxion
+// human_id when available, otherwise the email) and to a day via `logDate`
+// (YYYY-MM-DD). This persists the diet/activity log across logins.
+export const dayLogEntries = pgTable(
+  "day_log_entries",
+  {
+    id: serial("id").primaryKey(),
+    // Stable per-user key: Thruxion human_id, falling back to email.
+    userKey: text("user_key").notNull(),
+    // Day this entry belongs to (YYYY-MM-DD).
+    logDate: date("log_date").notNull(),
+    // "meal" | "activity" | "supplement".
+    kind: varchar("kind", { length: 20 }).notNull(),
+    // Meal/activity/supplement subtype (e.g. "breakfast", "cardio", "protein").
+    subtype: varchar("subtype", { length: 20 }).notNull(),
+    name: text("name").notNull(),
+    // kcal for meals (consumed) and activities (burned); null for supplements.
+    calories: integer("calories"),
+    // Supplement dose (free text); null otherwise.
+    dose: text("dose"),
+    // Optional macros for meals.
+    protein: integer("protein"),
+    carbs: integer("carbs"),
+    fat: integer("fat"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    // Fast lookup of a user's entries for a given day.
+    userDayIdx: index("day_log_entries_user_day_idx").on(
+      table.userKey,
+      table.logDate,
+    ),
+  }),
+);

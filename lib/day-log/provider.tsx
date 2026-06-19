@@ -5,64 +5,34 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
+import useSWR from "swr";
+import {
+  fetchUserDayLog,
+  addMealEntry,
+  addActivityEntry,
+  addSupplementEntry,
+  removeEntry,
+} from "./actions";
+import type {
+  Meal,
+  Activity,
+  Supplement,
+  DayData,
+  DayLog,
+} from "./types";
 
-// === Shared day-log store ===
-// Data is keyed by ISO date string (YYYY-MM-DD) so every day has its own
-// independent meals, activities and supplements.  The Calories view owns
-// the selected date; both the gauge and the composition chart read the
-// same date's data from this store.
+// Re-export shared types & constants so existing imports from
+// "@/lib/day-log/provider" keep working unchanged.
+export * from "./types";
 
-export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
-export type ActivityType =
-  | "cardio"
-  | "strength"
-  | "walking"
-  | "sport"
-  | "other";
-export type SupplementType =
-  | "protein"
-  | "vitamin"
-  | "creatine"
-  | "omega3"
-  | "other";
-
-export type Meal = {
-  id: number;
-  name: string;
-  calories: number;
-  type: MealType;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-};
-
-export type Activity = {
-  id: number;
-  name: string;
-  calories: number;
-  type: ActivityType;
-};
-
-export type Supplement = {
-  id: number;
-  name: string;
-  dose: string;
-  type: SupplementType;
-};
-
-// Daily targets (could later come from the user's profile / Thruxion API).
-export const CONSUMED_GOAL = 1940;
-export const BURNED_GOAL = 2383;
-
-// ---- per-day data structure ----
-type DayData = {
-  meals: Meal[];
-  activities: Activity[];
-  supplements: Supplement[];
-};
+// === Shared day-log store (database-backed) ===
+// Data is keyed by ISO date string (YYYY-MM-DD). It is persisted per user in
+// the `day_log_entries` table via server actions, so logs survive logouts and
+// are restored on the next login. SWR caches the user's log on the client and
+// mutations update optimistically, then reconcile with the authoritative
+// server state (which carries the real row ids).
 
 const emptyDay = (): DayData => ({
   meals: [],
@@ -70,14 +40,10 @@ const emptyDay = (): DayData => ({
   supplements: [],
 });
 
-// ---- context value ----
 type DayLogValue = {
-  // Returns the data for any given ISO date key.
   dayData: (dateKey: string) => DayData;
-  // Convenience totals for a given date.
   consumedFor: (dateKey: string) => number;
   burnedFor: (dateKey: string) => number;
-  // Mutations — all scoped by date key.
   addMeal: (dateKey: string, meal: Omit<Meal, "id">) => void;
   removeMeal: (dateKey: string, id: number) => void;
   addActivity: (dateKey: string, activity: Omit<Activity, "id">) => void;
@@ -88,9 +54,24 @@ type DayLogValue = {
 
 const DayLogContext = createContext<DayLogValue | null>(null);
 
+// Immutably patch one day's data within the full log.
+function patchDay(
+  log: DayLog,
+  dateKey: string,
+  fn: (prev: DayData) => DayData,
+): DayLog {
+  return { ...log, [dateKey]: fn(log[dateKey] ?? emptyDay()) };
+}
+
 export function DayLogProvider({ children }: { children: ReactNode }) {
-  // Map from ISO date string → DayData.
-  const [log, setLog] = useState<Record<string, DayData>>({});
+  // The server action resolves the user from the session, so a constant key
+  // is correct per browser session (each user has their own session cookie).
+  const { data, mutate } = useSWR<DayLog>("day-log", () => fetchUserDayLog(), {
+    fallbackData: {},
+    revalidateOnFocus: false,
+  });
+
+  const log = data ?? {};
 
   const dayData = useCallback(
     (dateKey: string): DayData => log[dateKey] ?? emptyDay(),
@@ -109,65 +90,112 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [log],
   );
 
-  // Helper to patch one day's data immutably.
-  const patchDay = useCallback(
-    (dateKey: string, fn: (prev: DayData) => DayData) =>
-      setLog((prev) => ({
-        ...prev,
-        [dateKey]: fn(prev[dateKey] ?? emptyDay()),
-      })),
-    [],
+  // Runs an optimistic local update, performs the DB write, then replaces the
+  // cache with fresh server state (so temporary ids become real row ids).
+  // Rolls the optimistic change back if the server write fails.
+  const runMutation = useCallback(
+    (optimistic: (log: DayLog) => DayLog, action: () => Promise<unknown>) => {
+      void mutate(
+        async () => {
+          await action();
+          return fetchUserDayLog();
+        },
+        {
+          optimisticData: (current?: DayLog) => optimistic(current ?? {}),
+          rollbackOnError: true,
+          revalidate: false,
+          populateCache: true,
+        },
+      );
+    },
+    [mutate],
   );
 
   const addMeal = useCallback(
-    (dateKey: string, meal: Omit<Meal, "id">) =>
-      patchDay(dateKey, (d) => ({
-        ...d,
-        meals: [{ id: Date.now(), ...meal }, ...d.meals],
-      })),
-    [patchDay],
+    (dateKey: string, meal: Omit<Meal, "id">) => {
+      const optimisticMeal: Meal = { id: -Date.now(), ...meal };
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            meals: [optimisticMeal, ...d.meals],
+          })),
+        () => addMealEntry(dateKey, meal),
+      );
+    },
+    [runMutation],
   );
+
   const removeMeal = useCallback(
-    (dateKey: string, id: number) =>
-      patchDay(dateKey, (d) => ({
-        ...d,
-        meals: d.meals.filter((m) => m.id !== id),
-      })),
-    [patchDay],
+    (dateKey: string, id: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            meals: d.meals.filter((m) => m.id !== id),
+          })),
+        () => removeEntry(id),
+      );
+    },
+    [runMutation],
   );
 
   const addActivity = useCallback(
-    (dateKey: string, activity: Omit<Activity, "id">) =>
-      patchDay(dateKey, (d) => ({
-        ...d,
-        activities: [{ id: Date.now(), ...activity }, ...d.activities],
-      })),
-    [patchDay],
+    (dateKey: string, activity: Omit<Activity, "id">) => {
+      const optimisticActivity: Activity = { id: -Date.now(), ...activity };
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            activities: [optimisticActivity, ...d.activities],
+          })),
+        () => addActivityEntry(dateKey, activity),
+      );
+    },
+    [runMutation],
   );
+
   const removeActivity = useCallback(
-    (dateKey: string, id: number) =>
-      patchDay(dateKey, (d) => ({
-        ...d,
-        activities: d.activities.filter((a) => a.id !== id),
-      })),
-    [patchDay],
+    (dateKey: string, id: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            activities: d.activities.filter((a) => a.id !== id),
+          })),
+        () => removeEntry(id),
+      );
+    },
+    [runMutation],
   );
 
   const addSupplement = useCallback(
-    (dateKey: string, supplement: Omit<Supplement, "id">) =>
-      patchDay(dateKey, (d) => ({
-        ...d,
-        supplements: [{ id: Date.now(), ...supplement }, ...d.supplements],
-      })),
-    [patchDay],
+    (dateKey: string, supplement: Omit<Supplement, "id">) => {
+      const optimisticSupp: Supplement = { id: -Date.now(), ...supplement };
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            supplements: [optimisticSupp, ...d.supplements],
+          })),
+        () => addSupplementEntry(dateKey, supplement),
+      );
+    },
+    [runMutation],
   );
+
   const removeSupplement = useCallback(
-    (dateKey: string, id: number) =>
-      patchDay(dateKey, (d) => ({
-        ...d,
-        supplements: d.supplements.filter((s) => s.id !== id),
-      })),
-    [patchDay],
+    (dateKey: string, id: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            supplements: d.supplements.filter((s) => s.id !== id),
+          })),
+        () => removeEntry(id),
+      );
+    },
+    [runMutation],
   );
 
   const value = useMemo<DayLogValue>(
