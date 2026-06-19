@@ -26,7 +26,7 @@ export default function Topbar() {
   const initial = (userName[0] ?? "U").toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border bg-card/90 px-4 backdrop-blur lg:px-8">
+    <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-2 border-b border-border bg-card/90 px-4 backdrop-blur lg:flex lg:px-8">
       {/* Left: brand on mobile, date on desktop */}
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground lg:hidden">
