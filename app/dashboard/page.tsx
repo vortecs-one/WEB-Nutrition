@@ -6,9 +6,9 @@ import { getCurrentRole } from "@/lib/role/server";
 export default async function DashboardHomePage() {
   const role = await getCurrentRole();
 
-  // Normal users land directly on their nutrition tracker.
+  // Normal users land directly on their Dashboard (calorie balance) view.
   if (role === "user") {
-    redirect("/dashboard/nutrition");
+    redirect("/dashboard/calories");
   }
 
   const { dict } = await getServerI18n();

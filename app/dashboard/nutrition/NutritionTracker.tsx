@@ -37,14 +37,18 @@ export default function NutritionTracker() {
     addSupplement,
     removeSupplement,
     addActivity,
+    removeActivity,
   } = useDayLog();
 
   // Stable today key — initialized after mount to avoid hydration mismatch.
   const [todayKey, setTodayKey] = useState<string>("");
   useEffect(() => setTodayKey(toDateKey(new Date())), []);
 
-  const { meals, supplements } = useMemo(
-    () => (todayKey ? dayData(todayKey) : { meals: [], supplements: [] }),
+  const { meals, supplements, activities } = useMemo(
+    () =>
+      todayKey
+        ? dayData(todayKey)
+        : { meals: [], supplements: [], activities: [] },
     [dayData, todayKey],
   );
 
@@ -88,6 +92,9 @@ export default function NutritionTracker() {
       omega3:   t.suppOmega,
       other:    t.suppOther,
     })[st];
+
+  const activityTypeLabel = (at: ActivityType) =>
+    ({ cardio: ta.cardio, strength: ta.strength, walking: ta.walking, sport: ta.sport, other: ta.other })[at];
 
   const openAdd = (mt: MealType) => {
     setAddType(mt);
@@ -283,6 +290,38 @@ export default function NutritionTracker() {
             {ta.add}
           </button>
         </form>
+
+        {/* Today's activities */}
+        <h3 className="text-sm font-medium mt-6 mb-1">{ta.activities}</h3>
+        {activities.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">{ta.noActivities}</p>
+        ) : (
+          <ul className="divide-y divide-border border-t border-border">
+            {activities.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-sm truncate">{a.name}</div>
+                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
+                    {activityTypeLabel(a.type)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-semibold tabular-nums">
+                    -{a.calories} {ta.kcal}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => todayKey && removeActivity(todayKey, a.id)}
+                    aria-label={dict.common.delete}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition"
+                  >
+                    <Trash2 className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Add-meal modal */}

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Flame,
   Salad,
-  Trash2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -13,7 +12,6 @@ import {
   useDayLog,
   CONSUMED_GOAL,
   BURNED_GOAL,
-  type ActivityType,
 } from "@/lib/day-log/provider";
 import CalorieGauge from "../nutrition/CalorieGauge";
 import NutritionChart from "../nutrition/NutritionChart";
@@ -30,12 +28,7 @@ export default function CaloriesTracker() {
   const { dict, locale } = useI18n();
   const t = dict.caloriesUser;
 
-  const {
-    dayData,
-    consumedFor,
-    burnedFor,
-    removeActivity,
-  } = useDayLog();
+  const { consumedFor, burnedFor } = useDayLog();
 
   // Initialized after mount to avoid SSR/client hydration mismatch.
   const [date, setDate] = useState<Date | null>(null);
@@ -54,16 +47,9 @@ export default function CaloriesTracker() {
     () => (dateKey ? burnedFor(dateKey) : 0),
     [burnedFor, dateKey],
   );
-  const activities = useMemo(
-    () => (dateKey ? dayData(dateKey).activities : []),
-    [dayData, dateKey],
-  );
 
   const net = burned - consumed;
   const goalNet = BURNED_GOAL - CONSUMED_GOAL;
-
-  const activityTypeLabel = (at: ActivityType) =>
-    ({ cardio: t.cardio, strength: t.strength, walking: t.walking, sport: t.sport, other: t.other })[at];
 
   // Today's date key — used to cap forward navigation.
   const [todayKey] = useState(() => toDateKey(new Date()));
@@ -158,42 +144,6 @@ export default function CaloriesTracker() {
 
       {/* Nutrient composition chart — driven by the same date key as the gauge */}
       {dateKey && <NutritionChart dateKey={dateKey} />}
-
-      {/* Activity list */}
-      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="font-medium text-sm">{t.activities}</h2>
-        </div>
-        {activities.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">{t.noActivities}</p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {activities.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <div className="font-medium text-sm truncate">{a.name}</div>
-                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
-                    {activityTypeLabel(a.type)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-semibold tabular-nums">
-                    -{a.calories} {t.kcal ?? "kcal"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => dateKey && removeActivity(dateKey, a.id)}
-                    aria-label={dict.common.delete}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition"
-                  >
-                    <Trash2 className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }
