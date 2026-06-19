@@ -73,6 +73,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: identity.role ?? null,
             platform: identity.platform ?? null,
             humanId: identity.humanId ?? null,
+            // Language the user picked in the native app, carried into the
+            // web session so it can be applied on every load.
+            locale: identity.lang ?? null,
           };
         } catch (err) {
           console.log("[v0] handoff authorize error:", (err as Error).message);
@@ -97,6 +100,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (token as any).role = (user as any).role ?? null;
         (token as any).platform = (user as any).platform ?? null;
         (token as any).humanId = (user as any).humanId ?? null;
+        (token as any).locale = (user as any).locale ?? null;
       }
       return token;
     },
@@ -107,6 +111,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).role = (token as any).role ?? null;
         (session.user as any).platform = (token as any).platform ?? null;
         (session.user as any).humanId = (token as any).humanId ?? null;
+        (session.user as any).locale = (token as any).locale ?? null;
       }
       return session;
     },

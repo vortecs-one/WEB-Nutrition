@@ -24,6 +24,7 @@ import {
   issueHandoffToken,
   purgeExpiredHandoffTokens,
 } from "@/lib/handoff";
+import { resolveLocale } from "@/lib/i18n/config";
 
 export async function POST(req: Request) {
   // Read the RAW body first — the HMAC is computed over the exact bytes.
@@ -45,10 +46,12 @@ export async function POST(req: Request) {
 
   let email: string | undefined;
   let password: string | undefined;
+  let lang: string | undefined;
   try {
     const parsed = JSON.parse(rawBody || "{}");
     email = parsed.email;
     password = parsed.password;
+    lang = parsed.lang;
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid JSON body" },
@@ -86,6 +89,11 @@ export async function POST(req: Request) {
   // Opportunistic cleanup so the table doesn't grow unbounded.
   void purgeExpiredHandoffTokens();
 
+  // Normalize the app-selected language to a supported locale ("es"/"en").
+  // Anything unknown/missing falls back to the default locale, so a tampered
+  // value can never inject an unsupported language into the session.
+  const resolvedLang = resolveLocale(lang);
+
   const { token, expiresAt } = await issueHandoffToken({
     email: user.email ?? email,
     userId: user.id != null ? String(user.id) : null,
@@ -93,6 +101,7 @@ export async function POST(req: Request) {
     name: user.name ?? null,
     role: user.role ?? null,
     platform: user.platform ?? null,
+    lang: resolvedLang,
   });
 
   const origin = new URL(req.url).origin;

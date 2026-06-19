@@ -41,6 +41,9 @@ export type HandoffIdentity = {
   name?: string | null;
   role?: string | null;
   platform?: string | null;
+  // Preferred UI language selected in the native app (already validated
+  // against the supported locales before being stored).
+  lang?: string | null;
 };
 
 function sha256Hex(value: string): string {
@@ -114,6 +117,7 @@ export async function issueHandoffToken(
     name: identity.name ?? null,
     role: identity.role ?? null,
     platform: identity.platform ?? null,
+    lang: identity.lang ?? null,
     expiresAt,
     used: false,
   });
@@ -155,6 +159,7 @@ export async function consumeHandoffToken(
     name: record.name,
     role: record.role,
     platform: record.platform,
+    lang: record.lang,
   };
 }
 

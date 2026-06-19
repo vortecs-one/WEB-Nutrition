@@ -38,6 +38,9 @@ export const handoffTokens = pgTable("handoff_tokens", {
   name: text("name"),
   role: text("role"),
   platform: varchar("platform", { length: 100 }),
+  // Preferred UI language selected in the native app (e.g. "es" / "en").
+  // Validated server-side at issue time and propagated into the web session.
+  lang: varchar("lang", { length: 8 }),
   // Single-use + short expiry.
   used: boolean("used").notNull().default(false),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
