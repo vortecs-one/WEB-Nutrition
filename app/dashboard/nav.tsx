@@ -83,10 +83,10 @@ function userNav(dict: Dictionary): NavItem[] {
   const t = dict.nav;
   return [
     {
-      key: "myNutrition",
-      label: t.myNutrition,
-      href: "/dashboard/nutrition",
-      icon: Salad,
+      key: "myProfile",
+      label: t.myProfile,
+      href: "/dashboard/profile",
+      icon: UserCircle,
     },
     {
       key: "myCalories",
@@ -95,10 +95,10 @@ function userNav(dict: Dictionary): NavItem[] {
       icon: Flame,
     },
     {
-      key: "myProfile",
-      label: t.myProfile,
-      href: "/dashboard/profile",
-      icon: UserCircle,
+      key: "myNutrition",
+      label: t.myNutrition,
+      href: "/dashboard/nutrition",
+      icon: Salad,
     },
   ];
 }

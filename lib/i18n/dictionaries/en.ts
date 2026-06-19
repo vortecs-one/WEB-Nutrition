@@ -32,9 +32,9 @@ const en: Dictionary = {
     nutrition: "Nutrition",
     food: "Food",
     hydration: "Hydration",
-    myProfile: "My information",
-    myNutrition: "My nutrition",
-    myCalories: "Calories",
+    myProfile: "Profile",
+    myNutrition: "Log",
+    myCalories: "Dashboard",
   },
   topbar: {
     plan: "Standard",

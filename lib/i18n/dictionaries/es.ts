@@ -31,9 +31,9 @@ const es = {
     nutrition: "Nutrición",
     food: "Alimentación",
     hydration: "Hidratación",
-    myProfile: "Mi información",
-    myNutrition: "Mi nutrición",
-    myCalories: "Calorías",
+    myProfile: "Perfil",
+    myNutrition: "Registro",
+    myCalories: "Panel",
   },
   topbar: {
     plan: "Estandar",
