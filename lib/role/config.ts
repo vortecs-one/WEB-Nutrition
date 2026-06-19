@@ -12,7 +12,9 @@ export const roles = ["nutritionist", "user"] as const;
 export type Role = (typeof roles)[number];
 
 // Default role when nothing is set yet.
-export const defaultRole: Role = "nutritionist";
+// Everyone logs in as a normal "user" by default. Professional
+// nutritionist accounts will be derived from the session/role later.
+export const defaultRole: Role = "user";
 
 // Human-readable labels (resolved through the dictionary at render time,
 // these are just fallbacks / keys).
