@@ -20,7 +20,7 @@ export default function MobileTabBar() {
 
   return (
     <nav
-      className="lg:hidden sticky top-16 z-30 border-b border-border bg-card"
+      className="lg:hidden sticky top-0 z-30 border-b border-border bg-card"
       aria-label={dict.nav.sectionTitle}
     >
       <ul className="flex items-stretch justify-around">
