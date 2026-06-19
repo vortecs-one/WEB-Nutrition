@@ -17,6 +17,7 @@ import {
   useDayLog,
   type MealType,
   type SupplementType,
+  type ActivityType,
 } from "@/lib/day-log/provider";
 
 function toDateKey(d: Date) {
@@ -26,9 +27,17 @@ function toDateKey(d: Date) {
 export default function NutritionTracker() {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
+  // Activity form labels reuse the existing calories-view strings.
+  const ta = dict.caloriesUser;
 
-  const { dayData, addMeal, removeMeal, addSupplement, removeSupplement } =
-    useDayLog();
+  const {
+    dayData,
+    addMeal,
+    removeMeal,
+    addSupplement,
+    removeSupplement,
+    addActivity,
+  } = useDayLog();
 
   // Stable today key — initialized after mount to avoid hydration mismatch.
   const [todayKey, setTodayKey] = useState<string>("");
@@ -52,6 +61,11 @@ export default function NutritionTracker() {
   const [suppName, setSuppName] = useState("");
   const [suppDose, setSuppDose] = useState("");
   const [suppType, setSuppType] = useState<SupplementType>("protein");
+
+  // Activity-log form state.
+  const [actName, setActName] = useState("");
+  const [actCalories, setActCalories] = useState("");
+  const [actType, setActType] = useState<ActivityType>("cardio");
 
   const mealTypes: { type: MealType; label: string; icon: LucideIcon }[] = [
     { type: "breakfast", label: t.breakfast, icon: Egg },
@@ -106,6 +120,15 @@ export default function NutritionTracker() {
     if (!suppName.trim() || !todayKey) return;
     addSupplement(todayKey, { name: suppName.trim(), dose: suppDose.trim(), type: suppType });
     setSuppModalOpen(false);
+  };
+
+  const submitActivity = (e: React.FormEvent) => {
+    e.preventDefault();
+    const kcal = parseInt(actCalories, 10);
+    if (!actName.trim() || Number.isNaN(kcal) || kcal <= 0 || !todayKey) return;
+    addActivity(todayKey, { name: actName.trim(), calories: kcal, type: actType });
+    setActName("");
+    setActCalories("");
   };
 
   const inputClass =
@@ -216,6 +239,50 @@ export default function NutritionTracker() {
             ))}
           </ul>
         )}
+      </section>
+
+      {/* Activity log */}
+      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
+        <h2 className="text-lg font-semibold mb-4">{t.activityLog}</h2>
+        <form
+          onSubmit={submitActivity}
+          className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:items-end"
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">{ta.activityName}</span>
+            <input className={inputClass} value={actName} onChange={(e) => setActName(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">{ta.activityCalories}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              className={`${inputClass} sm:w-32`}
+              value={actCalories}
+              onChange={(e) => setActCalories(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">{ta.activityType}</span>
+            <select
+              className={`${inputClass} sm:w-36`}
+              value={actType}
+              onChange={(e) => setActType(e.target.value as ActivityType)}
+            >
+              <option value="cardio">{ta.cardio}</option>
+              <option value="strength">{ta.strength}</option>
+              <option value="walking">{ta.walking}</option>
+              <option value="sport">{ta.sport}</option>
+              <option value="other">{ta.other}</option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition w-full sm:w-auto"
+          >
+            {ta.add}
+          </button>
+        </form>
       </section>
 
       {/* Add-meal modal */}

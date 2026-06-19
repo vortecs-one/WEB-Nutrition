@@ -94,6 +94,7 @@ const es = {
     onTrack: "Vas bien con tu meta.",
     extraMeal: "Comida extra",
     dietLog: "Registro de comidas",
+    activityLog: "Registro de actividad",
     totalBurned: "Total gastado",
     totalConsumed: "Total consumido",
     calorieDeficit: "Déficit calórico",

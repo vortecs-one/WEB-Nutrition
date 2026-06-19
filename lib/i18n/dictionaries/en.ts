@@ -95,6 +95,7 @@ const en: Dictionary = {
     onTrack: "You're on track with your goal.",
     extraMeal: "Extra meal",
     dietLog: "Diet log",
+    activityLog: "Activity log",
     totalBurned: "Total burned",
     totalConsumed: "Total consumed",
     calorieDeficit: "Calorie deficit",

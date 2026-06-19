@@ -34,7 +34,6 @@ export default function CaloriesTracker() {
     dayData,
     consumedFor,
     burnedFor,
-    addActivity,
     removeActivity,
   } = useDayLog();
 
@@ -60,10 +59,6 @@ export default function CaloriesTracker() {
     [dayData, dateKey],
   );
 
-  const [name, setName] = useState("");
-  const [calories, setCalories] = useState("");
-  const [type, setType] = useState<ActivityType>("cardio");
-
   const net = burned - consumed;
   const goalNet = BURNED_GOAL - CONSUMED_GOAL;
 
@@ -85,21 +80,9 @@ export default function CaloriesTracker() {
       return next;
     });
 
-  const onAddActivity = (e: React.FormEvent) => {
-    e.preventDefault();
-    const kcal = parseInt(calories, 10);
-    if (!name.trim() || Number.isNaN(kcal) || kcal <= 0 || !dateKey) return;
-    addActivity(dateKey, { name: name.trim(), calories: kcal, type });
-    setName("");
-    setCalories("");
-  };
-
   const dateLabel = date
     ? date.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" })
     : "\u00A0";
-
-  const inputClass =
-    "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
@@ -175,50 +158,6 @@ export default function CaloriesTracker() {
 
       {/* Nutrient composition chart — driven by the same date key as the gauge */}
       {dateKey && <NutritionChart dateKey={dateKey} />}
-
-      {/* Add activity form */}
-      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
-        <h2 className="font-medium text-sm mb-4">{t.addActivity}</h2>
-        <form
-          onSubmit={onAddActivity}
-          className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:items-end"
-        >
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{t.activityName}</span>
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{t.activityCalories}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              className={`${inputClass} sm:w-32`}
-              value={calories}
-              onChange={(e) => setCalories(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{t.activityType}</span>
-            <select
-              className={`${inputClass} sm:w-36`}
-              value={type}
-              onChange={(e) => setType(e.target.value as ActivityType)}
-            >
-              <option value="cardio">{t.cardio}</option>
-              <option value="strength">{t.strength}</option>
-              <option value="walking">{t.walking}</option>
-              <option value="sport">{t.sport}</option>
-              <option value="other">{t.other}</option>
-            </select>
-          </label>
-          <button
-            type="submit"
-            className="rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition w-full sm:w-auto"
-          >
-            {t.add}
-          </button>
-        </form>
-      </section>
 
       {/* Activity list */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm overflow-hidden">
