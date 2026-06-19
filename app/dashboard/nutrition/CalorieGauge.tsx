@@ -63,8 +63,20 @@ export default function CalorieGauge({
   const needleTip = polar(needleAngle, R - 18);
 
   const goalAngle = goal != null ? valueToAngle(goal, range) : null;
-  const goalPos = goalAngle != null ? polar(goalAngle, R - 4) : null;
-  const goalCap = goalAngle != null ? polar(goalAngle, R - 30) : null;
+  // The dot sits on the arc edge; the label sits clearly outside the arc.
+  const goalPos   = goalAngle != null ? polar(goalAngle, R + 6)  : null;
+  // Place label further out and offset it slightly along the arc direction
+  // so it clears the dot and the outer tick marks.
+  const goalCap   = goalAngle != null ? polar(goalAngle, R + 26) : null;
+  // Anchor the text to whichever side of the dial the goal marker is on.
+  const goalAnchor =
+    goalAngle != null
+      ? goalAngle > 90
+        ? "end"
+        : goalAngle < 90
+        ? "start"
+        : "middle"
+      : "middle";
 
   return (
     <svg
@@ -144,9 +156,10 @@ export default function CalorieGauge({
           <text
             x={goalCap.x}
             y={goalCap.y}
-            fill="rgba(255,255,255,0.7)"
-            fontSize={11}
-            textAnchor="middle"
+            fill="rgba(255,255,255,0.85)"
+            fontSize={10}
+            fontWeight={600}
+            textAnchor={goalAnchor}
             dominantBaseline="middle"
           >
             {goalLabel}
