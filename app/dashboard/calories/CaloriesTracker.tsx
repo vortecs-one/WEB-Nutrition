@@ -70,10 +70,18 @@ export default function CaloriesTracker() {
   const activityTypeLabel = (at: ActivityType) =>
     ({ cardio: t.cardio, strength: t.strength, walking: t.walking, sport: t.sport, other: t.other })[at];
 
+  // Today's date key — used to cap forward navigation.
+  const [todayKey] = useState(() => toDateKey(new Date()));
+  const isToday = dateKey === todayKey;
+
   const shiftDay = (delta: number) =>
     setDate((d) => {
       const next = new Date(d ?? new Date());
       next.setDate(next.getDate() + delta);
+      // Never allow navigating past today.
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (next > today) return d ?? new Date();
       return next;
     });
 
@@ -112,7 +120,8 @@ export default function CaloriesTracker() {
             type="button"
             onClick={() => shiftDay(1)}
             aria-label="next day"
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+            disabled={isToday}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition disabled:opacity-30 disabled:pointer-events-none"
           >
             <ChevronRight className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -129,22 +138,9 @@ export default function CaloriesTracker() {
           />
         </div>
 
-        {/* Burned / consumed stats */}
+        {/* Consumed (left) / Burned (right) stats */}
         <div className="grid grid-cols-2 gap-4 mt-2">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-4 text-white shrink-0">
-              <Flame className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-xs text-sidebar-foreground/70">{t.totalBurned}</div>
-              <div className="text-sm font-semibold tabular-nums">
-                {burned}{" "}
-                <span className="font-normal text-sidebar-foreground/60">
-                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Consumed — left */}
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
               <Salad className="h-5 w-5" aria-hidden="true" />
@@ -155,6 +151,21 @@ export default function CaloriesTracker() {
                 {consumed}{" "}
                 <span className="font-normal text-sidebar-foreground/60">
                   / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* Burned — right */}
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-3 text-white shrink-0">
+              <Flame className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-sidebar-foreground/70">{t.totalBurned}</div>
+              <div className="text-sm font-semibold tabular-nums">
+                {burned}{" "}
+                <span className="font-normal text-sidebar-foreground/60">
+                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
                 </span>
               </div>
             </div>

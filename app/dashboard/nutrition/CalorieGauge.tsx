@@ -74,11 +74,17 @@ export default function CalorieGauge({
       aria-label={`${label}: ${value}`}
     >
       <defs>
+        {/*
+          Left side = surplus (consumed > burned) → teal/green from the brand palette.
+          Right side = deficit (burned > consumed)  → amber/red from the brand palette.
+          Matches the stat cards: Consumed (teal) left, Burned (amber→red) right.
+        */}
         <linearGradient id="gaugeArc" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#ef4444" />
-          <stop offset="35%" stopColor="#f59e0b" />
-          <stop offset="60%" stopColor="#eab308" />
-          <stop offset="100%" stopColor="#22c55e" />
+          <stop offset="0%"   stopColor="#09c0db" />
+          <stop offset="40%"  stopColor="#22c55e" />
+          <stop offset="60%"  stopColor="#ffbe00" />
+          <stop offset="80%"  stopColor="#ff9700" />
+          <stop offset="100%" stopColor="#ef4444" />
         </linearGradient>
       </defs>
 
@@ -103,6 +109,26 @@ export default function CalorieGauge({
           strokeWidth={t.major ? 2 : 1}
         />
       ))}
+
+      {/* Scale labels at -range, -range/2, 0, +range/2, +range */}
+      {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+        const angle = 180 - fraction * 180;
+        const pos = polar(angle, R - 26);
+        const val = Math.round(-range + fraction * 2 * range);
+        return (
+          <text
+            key={fraction}
+            x={pos.x}
+            y={pos.y}
+            fill="rgba(255,255,255,0.55)"
+            fontSize={9}
+            textAnchor="middle"
+            dominantBaseline="middle"
+          >
+            {val === 0 ? "0" : val > 0 ? `+${val}` : val}
+          </text>
+        );
+      })}
 
       {/* Goal marker */}
       {goalPos && goalCap && (
