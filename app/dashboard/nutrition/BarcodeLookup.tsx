@@ -336,85 +336,92 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
         </div>
       )}
 
-      {/* Saved foods list */}
+      {/* Saved foods modal */}
       {showSaved && savedFoods.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-border p-4 bg-muted/50">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-sm">Saved Foods ({savedFoods.length})</h3>
-            <button
-              type="button"
-              onClick={() => setShowSaved(false)}
-              aria-label={dict.common.close}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowSaved(false)}>
+          <div className="bg-card text-card-foreground rounded-3xl border border-border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="sticky top-0 bg-card border-b border-border p-5 flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-lg">Saved Foods ({savedFoods.length})</h3>
+              <button
+                type="button"
+                onClick={() => setShowSaved(false)}
+                aria-label={dict.common.close}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Saved foods list */}
+            <div className="p-5">
+              <ul className="space-y-3">
+                {savedFoods.map((food) => (
+                  <li key={food.barcode} className="rounded-lg border border-border bg-background p-4 hover:bg-accent/5 transition">
+                    <div className="flex gap-4 items-start">
+                      {food.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={food.image || "/placeholder.svg"}
+                          alt={food.name}
+                          width={56}
+                          height={56}
+                          loading="lazy"
+                          className="h-14 w-14 shrink-0 rounded-lg border border-border object-cover bg-muted"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                          <Barcode className="h-6 w-6" aria-hidden="true" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm leading-tight text-pretty">{food.name}</div>
+                        {food.brand && (
+                          <div className="text-xs text-muted-foreground mt-1">{food.brand}</div>
+                        )}
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {[
+                            { label: t.kcal, value: Math.round(food.nutrition.caloriesServing ?? food.nutrition.calories100g ?? 0) },
+                            { label: t.macroProtein, value: Math.round(food.nutrition.proteinServing ?? food.nutrition.protein100g ?? 0) },
+                            { label: t.macroCarbs, value: Math.round(food.nutrition.carbsServing ?? food.nutrition.carbs100g ?? 0) },
+                            { label: t.macroFat, value: Math.round(food.nutrition.fatServing ?? food.nutrition.fat100g ?? 0) },
+                          ].filter(({ value }) => value > 0).map(({ label, value }) => (
+                            <span key={label} className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                              {value} {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setDetailFood(food)}
+                          aria-label={`View details for ${food.name}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition"
+                        >
+                          <Info className="h-5 w-5" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProduct(food);
+                            const n = food.nutrition;
+                            const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
+                            setBasis(servingAvailable ? "serving" : "100g");
+                            setShowSaved(false);
+                          }}
+                          aria-label={`Quick add ${food.name}`}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10 active:scale-95 transition"
+                        >
+                          <Plus className="h-5 w-5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <ul className="space-y-2 max-h-80 overflow-y-auto">
-            {savedFoods.map((food) => (
-              <li key={food.barcode} className="rounded-lg border border-border bg-background p-3 hover:bg-accent/5 transition">
-                <div className="flex gap-3 items-start">
-                  {food.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={food.image || "/placeholder.svg"}
-                      alt={food.name}
-                      width={48}
-                      height={48}
-                      loading="lazy"
-                      className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover bg-muted"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground text-xs">
-                      <Barcode className="h-5 w-5" aria-hidden="true" />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm leading-tight text-pretty">{food.name}</div>
-                    {food.brand && (
-                      <div className="text-xs text-muted-foreground">{food.brand}</div>
-                    )}
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      {[
-                        { label: t.kcal, value: Math.round(food.nutrition.caloriesServing ?? food.nutrition.calories100g ?? 0) },
-                        { label: t.macroProtein, value: Math.round(food.nutrition.proteinServing ?? food.nutrition.protein100g ?? 0) },
-                        { label: t.macroCarbs, value: Math.round(food.nutrition.carbsServing ?? food.nutrition.carbs100g ?? 0) },
-                        { label: t.macroFat, value: Math.round(food.nutrition.fatServing ?? food.nutrition.fat100g ?? 0) },
-                      ].filter(({ value }) => value > 0).map(({ label, value }) => (
-                        <span key={label} className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium">
-                          {value} {label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setDetailFood(food)}
-                      aria-label={`View details for ${food.name}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition"
-                    >
-                      <Info className="h-5 w-5" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProduct(food);
-                        const n = food.nutrition;
-                        const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
-                        setBasis(servingAvailable ? "serving" : "100g");
-                        setShowSaved(false);
-                      }}
-                      aria-label={`Quick add ${food.name}`}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10 active:scale-95 transition"
-                    >
-                      <Plus className="h-5 w-5" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 
