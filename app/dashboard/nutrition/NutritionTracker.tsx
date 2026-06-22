@@ -10,8 +10,10 @@ import {
   Pill,
   Trash2,
   X,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
+import FoodLibrary from "./FoodLibrary";
 import { useI18n } from "@/lib/i18n/provider";
 import {
   useDayLog,
@@ -47,6 +49,9 @@ export default function NutritionTracker() {
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
 
+  // Food library modal state.
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
   // Add-supplement modal state.
   const [suppModalOpen, setSuppModalOpen] = useState(false);
   const [suppName, setSuppName] = useState("");
@@ -78,6 +83,18 @@ export default function NutritionTracker() {
   const openAdd = (mt: MealType) => {
     setAddType(mt);
     setName(""); setCalories(""); setProtein(""); setCarbs(""); setFat("");
+  };
+
+  // Pre-fill the meal form from a saved food (using servingSize if available,
+  // otherwise the per-100g values as a reference).
+  const handleSelectFood = (food: import("@/lib/day-log/provider").SavedFood) => {
+    const factor = food.servingSize ? food.servingSize / 100 : 1;
+    setName(food.name);
+    setCalories(Math.round(food.caloriesPer100g * factor).toString());
+    setProtein(food.protein != null ? (Math.round(food.protein * factor * 10) / 10).toString() : "");
+    setCarbs(food.carbs != null ? (Math.round(food.carbs * factor * 10) / 10).toString() : "");
+    setFat(food.fat != null ? (Math.round(food.fat * factor * 10) / 10).toString() : "");
+    setLibraryOpen(false);
   };
 
   const parseMacro = (v: string) => {
@@ -234,14 +251,25 @@ export default function NutritionTracker() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold">{t.addMeal} — {labelFor(addType)}</h3>
-              <button
-                type="button"
-                onClick={() => setAddType(null)}
-                aria-label={dict.common.close}
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setLibraryOpen(true)}
+                  aria-label={t.foodLibrary}
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
+                  title={t.selectFromLibrary}
+                >
+                  <BookOpen className="h-5 w-5" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddType(null)}
+                  aria-label={dict.common.close}
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
             <form onSubmit={submitMeal} className="space-y-4">
               <label className="flex flex-col gap-1.5">
@@ -319,6 +347,14 @@ export default function NutritionTracker() {
             </form>
           </div>
         </div>
+      )}
+      {/* Food library modal */}
+      {libraryOpen && (
+        <FoodLibrary
+          targetMeal={addType ?? undefined}
+          onClose={() => setLibraryOpen(false)}
+          onSelectFood={handleSelectFood}
+        />
       )}
     </div>
   );

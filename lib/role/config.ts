@@ -12,7 +12,8 @@ export const roles = ["nutritionist", "user"] as const;
 export type Role = (typeof roles)[number];
 
 // Default role when nothing is set yet.
-export const defaultRole: Role = "nutritionist";
+// Nutritionist logic will be added later; start users in the regular view.
+export const defaultRole: Role = "user";
 
 // Human-readable labels (resolved through the dictionary at render time,
 // these are just fallbacks / keys).

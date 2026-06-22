@@ -57,6 +57,24 @@ export type Supplement = {
 export const CONSUMED_GOAL = 1940;
 export const BURNED_GOAL = 2383;
 
+// ---- saved food library ----
+// Foods saved by the user (manually or via barcode scan) for quick re-use.
+export type SavedFood = {
+  id: number;
+  name: string;
+  brand?: string;
+  barcode?: string;
+  /** kcal per 100 g (or per serving if servingSize is set) */
+  caloriesPer100g: number;
+  servingSize?: number; // grams
+  protein?: number;     // g per 100 g
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;      // mg per 100 g
+};
+
 // ---- per-day data structure ----
 type DayData = {
   meals: Meal[];
@@ -84,6 +102,10 @@ type DayLogValue = {
   removeActivity: (dateKey: string, id: number) => void;
   addSupplement: (dateKey: string, supplement: Omit<Supplement, "id">) => void;
   removeSupplement: (dateKey: string, id: number) => void;
+  // Food library (saved foods for quick re-use).
+  foodLibrary: SavedFood[];
+  addFoodToLibrary: (food: Omit<SavedFood, "id">) => void;
+  removeFoodFromLibrary: (id: number) => void;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
@@ -91,6 +113,8 @@ const DayLogContext = createContext<DayLogValue | null>(null);
 export function DayLogProvider({ children }: { children: ReactNode }) {
   // Map from ISO date string → DayData.
   const [log, setLog] = useState<Record<string, DayData>>({});
+  // Saved food library — persists across days (in-memory for now).
+  const [foodLibrary, setFoodLibrary] = useState<SavedFood[]>([]);
 
   const dayData = useCallback(
     (dateKey: string): DayData => log[dateKey] ?? emptyDay(),
@@ -170,6 +194,18 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [patchDay],
   );
 
+  const addFoodToLibrary = useCallback(
+    (food: Omit<SavedFood, "id">) =>
+      setFoodLibrary((prev) => [{ id: Date.now(), ...food }, ...prev]),
+    [],
+  );
+
+  const removeFoodFromLibrary = useCallback(
+    (id: number) =>
+      setFoodLibrary((prev) => prev.filter((f) => f.id !== id)),
+    [],
+  );
+
   const value = useMemo<DayLogValue>(
     () => ({
       dayData,
@@ -181,6 +217,9 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       removeActivity,
       addSupplement,
       removeSupplement,
+      foodLibrary,
+      addFoodToLibrary,
+      removeFoodFromLibrary,
     }),
     [
       dayData,
@@ -192,6 +231,9 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       removeActivity,
       addSupplement,
       removeSupplement,
+      foodLibrary,
+      addFoodToLibrary,
+      removeFoodFromLibrary,
     ],
   );
 
