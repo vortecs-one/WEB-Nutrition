@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Barcode, Search, Loader2, Plus, X, BookmarkPlus, Bookmark } from "lucide-react";
+import { Barcode, Search, Loader2, Plus, X, BookmarkPlus, Bookmark, Info } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog, type MealType } from "@/lib/day-log/provider";
 import { lookupFoodByBarcode } from "@/lib/foods/actions";
@@ -27,6 +27,7 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const [mealType, setMealType] = useState<MealType>("breakfast");
   const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [showSaved, setShowSaved] = useState(false);
+  const [detailFood, setDetailFood] = useState<FoodProduct | null>(null);
 
   // Load saved foods from localStorage on mount
   useEffect(() => {
@@ -386,24 +387,156 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
                       ))}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProduct(food);
-                      const n = food.nutrition;
-                      const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
-                      setBasis(servingAvailable ? "serving" : "100g");
-                      setShowSaved(false);
-                    }}
-                    aria-label={`Quick add ${food.name}`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10 active:scale-95 transition"
-                  >
-                    <Plus className="h-5 w-5" aria-hidden="true" />
-                  </button>
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDetailFood(food)}
+                      aria-label={`View details for ${food.name}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition"
+                    >
+                      <Info className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProduct(food);
+                        const n = food.nutrition;
+                        const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
+                        setBasis(servingAvailable ? "serving" : "100g");
+                        setShowSaved(false);
+                      }}
+                      aria-label={`Quick add ${food.name}`}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10 active:scale-95 transition"
+                    >
+                      <Plus className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Nutrition details modal */}
+      {detailFood && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDetailFood(null)}>
+          <div className="bg-card text-card-foreground rounded-3xl border border-border shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="sticky top-0 bg-card border-b border-border p-5 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-lg leading-tight text-pretty">{detailFood.name}</h3>
+                {detailFood.brand && (
+                  <p className="text-sm text-muted-foreground mt-1">{detailFood.brand}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">Barcode: {detailFood.barcode}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailFood(null)}
+                aria-label={dict.common.close}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Product image */}
+            {detailFood.image && (
+              <div className="border-b border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={detailFood.image}
+                  alt={detailFood.name}
+                  className="w-full h-auto object-cover bg-muted"
+                />
+              </div>
+            )}
+
+            {/* Nutrition table */}
+            <div className="p-5 space-y-6">
+              {/* Per Serving */}
+              {[detailFood.nutrition.caloriesServing, detailFood.nutrition.proteinServing, detailFood.nutrition.carbsServing, detailFood.nutrition.fatServing].some((v) => v != null) && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-3 text-foreground">Per Serving</h4>
+                  <div className="bg-muted/50 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {detailFood.nutrition.caloriesServing != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.kcal}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{Math.round(detailFood.nutrition.caloriesServing)}</td>
+                          </tr>
+                        )}
+                        {detailFood.nutrition.proteinServing != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.macroProtein}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{detailFood.nutrition.proteinServing.toFixed(1)}g</td>
+                          </tr>
+                        )}
+                        {detailFood.nutrition.carbsServing != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.macroCarbs}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{detailFood.nutrition.carbsServing.toFixed(1)}g</td>
+                          </tr>
+                        )}
+                        {detailFood.nutrition.fatServing != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.macroFat}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{detailFood.nutrition.fatServing.toFixed(1)}g</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Per 100g */}
+              {[detailFood.nutrition.calories100g, detailFood.nutrition.protein100g, detailFood.nutrition.carbs100g, detailFood.nutrition.fat100g].some((v) => v != null) && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-3 text-foreground">Per 100g</h4>
+                  <div className="bg-muted/50 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {detailFood.nutrition.calories100g != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.kcal}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{Math.round(detailFood.nutrition.calories100g)}</td>
+                          </tr>
+                        )}
+                        {detailFood.nutrition.protein100g != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.macroProtein}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{detailFood.nutrition.protein100g.toFixed(1)}g</td>
+                          </tr>
+                        )}
+                        {detailFood.nutrition.carbs100g != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.macroCarbs}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{detailFood.nutrition.carbs100g.toFixed(1)}g</td>
+                          </tr>
+                        )}
+                        {detailFood.nutrition.fat100g != null && (
+                          <tr className="border-b border-border last:border-b-0">
+                            <td className="px-4 py-3 font-medium text-foreground">{t.macroFat}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary">{detailFood.nutrition.fat100g.toFixed(1)}g</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* No nutrition data */}
+              {![detailFood.nutrition.caloriesServing, detailFood.nutrition.proteinServing, detailFood.nutrition.carbsServing, detailFood.nutrition.fatServing, detailFood.nutrition.calories100g, detailFood.nutrition.protein100g, detailFood.nutrition.carbs100g, detailFood.nutrition.fat100g].some((v) => v != null) && (
+                <div className="text-center py-6 text-muted-foreground">
+                  No nutrition information available for this product.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </section>
