@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Barcode, Search, Loader2, Plus, X } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { Barcode, Search, Loader2, Plus, X, BookmarkPlus, Bookmark } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog, type MealType } from "@/lib/day-log/provider";
 import { lookupFoodByBarcode } from "@/lib/foods/actions";
@@ -9,6 +9,10 @@ import type { FoodProduct } from "@/lib/foods/types";
 
 type Basis = "serving" | "100g";
 type Status = "idle" | "loading" | "not-found" | "error";
+
+interface SavedFood extends FoodProduct {
+  savedAt: number;
+}
 
 export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const { dict } = useI18n();
@@ -21,6 +25,29 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const [product, setProduct] = useState<FoodProduct | null>(null);
   const [basis, setBasis] = useState<Basis>("serving");
   const [mealType, setMealType] = useState<MealType>("breakfast");
+  const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
+  const [showSaved, setShowSaved] = useState(false);
+
+  // Load saved foods from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("nutrition-saved-foods");
+      if (stored) {
+        setSavedFoods(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error("[v0] Failed to load saved foods:", err);
+    }
+  }, []);
+
+  // Save foods to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem("nutrition-saved-foods", JSON.stringify(savedFoods));
+    } catch (err) {
+      console.error("[v0] Failed to save foods:", err);
+    }
+  }, [savedFoods]);
 
   const mealOptions: { type: MealType; label: string }[] = [
     { type: "breakfast", label: t.breakfast },
@@ -54,23 +81,42 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const inputClass =
     "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
 
+  const isFoodSaved = useMemo(() => {
+    return product ? savedFoods.some((f) => f.barcode === product.barcode) : false;
+  }, [product, savedFoods]);
+
+  const saveFood = () => {
+    if (!product) return;
+    const alreadySaved = savedFoods.some((f) => f.barcode === product.barcode);
+    if (alreadySaved) {
+      setSavedFoods((prev) => prev.filter((f) => f.barcode !== product.barcode));
+    } else {
+      setSavedFoods((prev) => [{ ...product, savedAt: Date.now() }, ...prev]);
+    }
+  };
+
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = barcode.replace(/\D+/g, "");
     if (!clean) return;
     setStatus("loading");
     setProduct(null);
-    const result = await lookupFoodByBarcode(clean);
-    if (result.ok) {
-      setProduct(result.product);
-      // Default to the basis that actually has data (prefer per serving).
-      const n = result.product.nutrition;
-      const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
-      setBasis(servingAvailable ? "serving" : "100g");
-      setStatus("idle");
-    } else if (result.reason === "not-found") {
-      setStatus("not-found");
-    } else {
+    try {
+      const result = await lookupFoodByBarcode(clean);
+      if (result.ok) {
+        setProduct(result.product);
+        // Default to the basis that actually has data (prefer per serving).
+        const n = result.product.nutrition;
+        const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
+        setBasis(servingAvailable ? "serving" : "100g");
+        setStatus("idle");
+      } else if (result.reason === "not-found") {
+        setStatus("not-found");
+      } else {
+        setStatus("error");
+      }
+    } catch (error) {
+      console.error("[v0] Search error:", error);
       setStatus("error");
     }
   };
@@ -104,11 +150,23 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const fmt = (v: number | null) => (v == null ? "—" : `${Math.round(v)}`);
 
   return (
-    <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
-      <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-        <Barcode className="h-5 w-5" aria-hidden="true" />
-        {t.barcodeTitle}
-      </h2>
+    <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Barcode className="h-5 w-5" aria-hidden="true" />
+          {t.barcodeTitle}
+        </h2>
+        {savedFoods.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowSaved(!showSaved)}
+            className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition"
+          >
+            <Bookmark className="h-4 w-4" aria-hidden="true" />
+            {savedFoods.length} Saved
+          </button>
+        )}
+      </div>
 
       <form onSubmit={onSearch} className="flex gap-2">
         <input
@@ -172,15 +230,34 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
                   {product.brand && (
                     <div className="text-sm text-muted-foreground">{product.brand}</div>
                   )}
+                  <div className="text-xs text-muted-foreground mt-1">Barcode: {product.barcode}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={clearProduct}
-                  aria-label={dict.common.close}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
-                >
-                  <X className="h-5 w-5" aria-hidden="true" />
-                </button>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={saveFood}
+                    aria-label={isFoodSaved ? "Remove from saved" : "Save food"}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+                      isFoodSaved
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {isFoodSaved ? (
+                      <Bookmark className="h-5 w-5" aria-hidden="true" />
+                    ) : (
+                      <BookmarkPlus className="h-5 w-5" aria-hidden="true" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearProduct}
+                    aria-label={dict.common.close}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+                  >
+                    <X className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -255,6 +332,78 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">{t.noNutritionData}</p>
           )}
+        </div>
+      )}
+
+      {/* Saved foods list */}
+      {showSaved && savedFoods.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-border p-4 bg-muted/50">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm">Saved Foods ({savedFoods.length})</h3>
+            <button
+              type="button"
+              onClick={() => setShowSaved(false)}
+              aria-label={dict.common.close}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <ul className="space-y-2 max-h-80 overflow-y-auto">
+            {savedFoods.map((food) => (
+              <li key={food.barcode} className="rounded-lg border border-border bg-background p-3 hover:bg-accent/5 transition">
+                <div className="flex gap-3 items-start">
+                  {food.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={food.image || "/placeholder.svg"}
+                      alt={food.name}
+                      width={48}
+                      height={48}
+                      loading="lazy"
+                      className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover bg-muted"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground text-xs">
+                      <Barcode className="h-5 w-5" aria-hidden="true" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm leading-tight text-pretty">{food.name}</div>
+                    {food.brand && (
+                      <div className="text-xs text-muted-foreground">{food.brand}</div>
+                    )}
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {[
+                        { label: t.kcal, value: Math.round(food.nutrition.caloriesServing ?? food.nutrition.calories100g ?? 0) },
+                        { label: t.macroProtein, value: Math.round(food.nutrition.proteinServing ?? food.nutrition.protein100g ?? 0) },
+                        { label: t.macroCarbs, value: Math.round(food.nutrition.carbsServing ?? food.nutrition.carbs100g ?? 0) },
+                        { label: t.macroFat, value: Math.round(food.nutrition.fatServing ?? food.nutrition.fat100g ?? 0) },
+                      ].filter(({ value }) => value > 0).map(({ label, value }) => (
+                        <span key={label} className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                          {value} {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProduct(food);
+                      const n = food.nutrition;
+                      const servingAvailable = [n.caloriesServing, n.proteinServing, n.carbsServing, n.fatServing].some((v) => v != null);
+                      setBasis(servingAvailable ? "serving" : "100g");
+                      setShowSaved(false);
+                    }}
+                    aria-label={`Quick add ${food.name}`}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10 active:scale-95 transition"
+                  >
+                    <Plus className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </section>
