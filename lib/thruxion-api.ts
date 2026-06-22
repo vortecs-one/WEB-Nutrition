@@ -22,6 +22,7 @@ import {
   BASE_URL,
 } from "./thruxion-token";
 import { PLATFORM } from "./platform";
+import type { FoodProduct } from "./foods/types";
 
 export type ThruxionUser = {
   id?: string | number;
@@ -172,6 +173,84 @@ export async function getHuman(
   };
 
   return json?.data ?? null;
+}
+
+// Coerce an unknown JSON value to a finite number, or null.
+function asNumber(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Look up a food product by its barcode.
+ *
+ * GET /api/foods/barcode/<barcode>
+ * Returns a normalized `FoodProduct` on success, or `null` if no product was
+ * found for the barcode. The raw response exposes many nutriment keys (per
+ * serving and per 100g); we pick the calories + macro fields the app logs.
+ */
+export async function getFoodByBarcode(
+  barcode: string,
+): Promise<FoodProduct | null> {
+  const clean = barcode.trim();
+  if (!clean) return null;
+
+  const res = await thruxionFetch(
+    `/api/foods/barcode/${encodeURIComponent(clean)}`,
+    { method: "GET" },
+  );
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "<no body>");
+    throw new Error(
+      `foods/barcode/${clean} failed (${res.status} ${res.statusText}): ${detail}`,
+    );
+  }
+
+  const data = (await res.json().catch(() => null)) as
+    | {
+        barcode?: string;
+        name?: string;
+        brand?: string;
+        image?: string;
+        nutriments?: Record<string, unknown>;
+      }
+    | null;
+
+  // Treat an empty / shape-less body as "not found".
+  if (!data || (!data.name && !data.nutriments)) {
+    return null;
+  }
+
+  const n = data.nutriments ?? {};
+  const name =
+    typeof data.name === "string" && data.name.trim() ? data.name.trim() : clean;
+
+  return {
+    barcode: typeof data.barcode === "string" ? data.barcode : clean,
+    name,
+    brand:
+      typeof data.brand === "string" && data.brand.trim()
+        ? data.brand.trim()
+        : null,
+    image:
+      typeof data.image === "string" && data.image.trim()
+        ? data.image.trim()
+        : null,
+    nutrition: {
+      caloriesServing: asNumber(n["energy-kcal_serving"]),
+      calories100g: asNumber(n["energy-kcal_100g"]),
+      proteinServing: asNumber(n["proteins_serving"]),
+      protein100g: asNumber(n["proteins_100g"]),
+      carbsServing: asNumber(n["carbohydrates_serving"]),
+      carbs100g: asNumber(n["carbohydrates_100g"]),
+      fatServing: asNumber(n["fat_serving"]),
+      fat100g: asNumber(n["fat_100g"]),
+    },
+  };
 }
 
 // Re-export the token accessor for callers that need the raw bearer token.

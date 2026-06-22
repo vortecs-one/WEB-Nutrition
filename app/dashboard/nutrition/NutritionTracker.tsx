@@ -19,6 +19,7 @@ import {
   type SupplementType,
   type ActivityType,
 } from "@/lib/day-log/provider";
+import BarcodeLookup from "./BarcodeLookup";
 
 function toDateKey(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -143,6 +144,9 @@ export default function NutritionTracker() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
+      {/* Add food by barcode (Thruxion foods API) */}
+      <BarcodeLookup todayKey={todayKey} />
+
       {/* Diet log */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
         <h2 className="text-lg font-semibold mb-4">{t.dietLog}</h2>
