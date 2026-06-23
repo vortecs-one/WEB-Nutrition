@@ -2,17 +2,14 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { Barcode, Search, Loader2, Plus, X, BookmarkPlus, Bookmark, Info } from "lucide-react";
+import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog, type MealType } from "@/lib/day-log/provider";
-import { lookupFoodByBarcode } from "@/lib/foods/actions";
+import { lookupFoodByBarcode, fetchUserSavedFoods, saveFoodProduct, removeSavedFood } from "@/lib/foods/actions";
 import type { FoodProduct } from "@/lib/foods/types";
 
 type Basis = "serving" | "100g";
 type Status = "idle" | "loading" | "not-found" | "error";
-
-interface SavedFood extends FoodProduct {
-  savedAt: number;
-}
 
 export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const { dict } = useI18n();
@@ -25,30 +22,15 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
   const [product, setProduct] = useState<FoodProduct | null>(null);
   const [basis, setBasis] = useState<Basis>("serving");
   const [mealType, setMealType] = useState<MealType>("breakfast");
-  const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [detailFood, setDetailFood] = useState<FoodProduct | null>(null);
 
-  // Load saved foods from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("nutrition-saved-foods");
-      if (stored) {
-        setSavedFoods(JSON.parse(stored));
-      }
-    } catch (err) {
-      console.error("[v0] Failed to load saved foods:", err);
-    }
-  }, []);
-
-  // Save foods to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem("nutrition-saved-foods", JSON.stringify(savedFoods));
-    } catch (err) {
-      console.error("[v0] Failed to save foods:", err);
-    }
-  }, [savedFoods]);
+  // Load saved foods from database on mount
+  const { data: savedFoods = [], mutate: mutateSavedFoods, isLoading: loadingSavedFoods } = useSWR(
+    "saved-foods",
+    () => fetchUserSavedFoods(),
+    { revalidateOnFocus: false }
+  );
 
   const mealOptions: { type: MealType; label: string }[] = [
     { type: "breakfast", label: t.breakfast },
@@ -86,14 +68,18 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
     return product ? savedFoods.some((f) => f.barcode === product.barcode) : false;
   }, [product, savedFoods]);
 
-  const saveFood = () => {
+  const saveFood = async () => {
     if (!product) return;
     const alreadySaved = savedFoods.some((f) => f.barcode === product.barcode);
+    
     if (alreadySaved) {
-      setSavedFoods((prev) => prev.filter((f) => f.barcode !== product.barcode));
+      await removeSavedFood(product.barcode);
     } else {
-      setSavedFoods((prev) => [{ ...product, savedAt: Date.now() }, ...prev]);
+      await saveFoodProduct(product);
     }
+    
+    // Refresh the saved foods list from the database
+    await mutateSavedFoods();
   };
 
   const onSearch = async (e: React.FormEvent) => {

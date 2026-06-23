@@ -25,6 +25,11 @@ export type FoodProduct = {
   nutrition: FoodNutrition;
 };
 
+// A saved food product with optional metadata (savedAt timestamp).
+export type SavedFoodProduct = FoodProduct & {
+  savedAt?: Date;
+};
+
 // Result of a barcode lookup server action. Discriminated so the UI can render
 // the right state without leaking raw errors to the client.
 export type FoodLookupResult =

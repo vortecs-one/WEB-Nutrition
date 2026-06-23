@@ -139,3 +139,34 @@ export const dayLogEntries = pgTable(
     ),
   }),
 );
+
+// === Saved foods (barcode-scanned products bookmarked by user) ===
+// Stores food products saved by users for quick re-use. Each row is scoped
+// to a user via `userKey` and identified by barcode.
+export const savedFoods = pgTable(
+  "saved_foods",
+  {
+    id: serial("id").primaryKey(),
+    // Stable per-user key: Thruxion human_id, falling back to email.
+    userKey: text("user_key").notNull(),
+    // Product barcode (unique identifier from food API).
+    barcode: varchar("barcode", { length: 100 }).notNull(),
+    // Product details (from barcode lookup).
+    name: text("name").notNull(),
+    brand: text("brand"),
+    image: text("image"),
+    // Nutrition data (JSON serialized).
+    nutritionData: text("nutrition_data").notNull(), // JSON stringified FoodNutrition
+    // When the user saved this product.
+    savedAt: timestamp("saved_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    // Ensure one user can't save the same barcode twice.
+    userBarcodeIdx: index("saved_foods_user_barcode_idx").on(
+      table.userKey,
+      table.barcode,
+    ),
+  }),
+);
