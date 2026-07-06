@@ -313,9 +313,6 @@ export default function BarcodeLookup({
         </button>
       </form>
 
-      {status === "idle" && !product && cart.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t.foodSearchHint}</p>
-      )}
       {status === "not-found" && (
         <p className="text-sm text-muted-foreground">{t.barcodeNotFound}</p>
       )}
