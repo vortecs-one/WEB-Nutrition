@@ -175,9 +175,32 @@ export async function getHuman(
   return json?.data ?? null;
 }
 
-// Coerce an unknown JSON value to a finite number, or null.
+// Coerce an unknown JSON value to a finite number, or null. Accepts numeric
+// strings too (the foods API occasionally returns values as strings).
 function asNumber(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+// Coerce an unknown JSON value to a trimmed non-empty string, or null.
+function asString(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+// Coerce common truthy/falsy representations to a boolean, or null when the
+// flag is absent/unknown (the API uses "yes"/"no" for vegan/vegetarian).
+function asBool(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (["yes", "true", "1"].includes(s)) return true;
+    if (["no", "false", "0"].includes(s)) return false;
+  }
+  return null;
 }
 
 /**
@@ -216,6 +239,11 @@ export async function getFoodByBarcode(
         name?: string;
         brand?: string;
         image?: string;
+        ingredients?: string;
+        quantity?: string;
+        serving_size?: string;
+        vegan?: unknown;
+        vegetarian?: unknown;
         nutriments?: Record<string, unknown>;
       }
     | null;
@@ -229,26 +257,46 @@ export async function getFoodByBarcode(
   const name =
     typeof data.name === "string" && data.name.trim() ? data.name.trim() : clean;
 
+  // Serving size can live on the record or inside the nutriments block.
+  const servingSize =
+    asString(data.serving_size) ?? asString(n["serving_size"]);
+
   return {
     barcode: typeof data.barcode === "string" ? data.barcode : clean,
     name,
-    brand:
-      typeof data.brand === "string" && data.brand.trim()
-        ? data.brand.trim()
-        : null,
-    image:
-      typeof data.image === "string" && data.image.trim()
-        ? data.image.trim()
-        : null,
+    brand: asString(data.brand),
+    image: asString(data.image),
     nutrition: {
       caloriesServing: asNumber(n["energy-kcal_serving"]),
       calories100g: asNumber(n["energy-kcal_100g"]),
+      energyKjServing: asNumber(n["energy-kj_serving"]),
+      energyKj100g: asNumber(n["energy-kj_100g"]),
       proteinServing: asNumber(n["proteins_serving"]),
       protein100g: asNumber(n["proteins_100g"]),
       carbsServing: asNumber(n["carbohydrates_serving"]),
       carbs100g: asNumber(n["carbohydrates_100g"]),
       fatServing: asNumber(n["fat_serving"]),
       fat100g: asNumber(n["fat_100g"]),
+      saturatedFatServing: asNumber(n["saturated-fat_serving"]),
+      saturatedFat100g: asNumber(n["saturated-fat_100g"]),
+      sugarsServing: asNumber(n["sugars_serving"]),
+      sugars100g: asNumber(n["sugars_100g"]),
+      addedSugarsServing: asNumber(n["added-sugars_serving"]),
+      addedSugars100g: asNumber(n["added-sugars_100g"]),
+      fiberServing: asNumber(n["fiber_serving"]),
+      fiber100g: asNumber(n["fiber_100g"]),
+      saltServing: asNumber(n["salt_serving"]),
+      salt100g: asNumber(n["salt_100g"]),
+      sodiumServing: asNumber(n["sodium_serving"]),
+      sodium100g: asNumber(n["sodium_100g"]),
+    },
+    meta: {
+      servingSize,
+      quantity: asString(data.quantity),
+      novaGroup: asNumber(n["nova-group"]),
+      vegan: asBool(data.vegan),
+      vegetarian: asBool(data.vegetarian),
+      ingredients: asString(data.ingredients),
     },
   };
 }

@@ -11,6 +11,7 @@ import useSWR from "swr";
 import {
   fetchUserDayLog,
   addMealEntry,
+  addMealEntries,
   addActivityEntry,
   addSupplementEntry,
   removeEntry,
@@ -45,6 +46,7 @@ type DayLogValue = {
   consumedFor: (dateKey: string) => number;
   burnedFor: (dateKey: string) => number;
   addMeal: (dateKey: string, meal: Omit<Meal, "id">) => void;
+  addMeals: (dateKey: string, meals: Omit<Meal, "id">[]) => void;
   removeMeal: (dateKey: string, id: number) => void;
   addActivity: (dateKey: string, activity: Omit<Activity, "id">) => void;
   removeActivity: (dateKey: string, id: number) => void;
@@ -121,6 +123,26 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
             meals: [optimisticMeal, ...d.meals],
           })),
         () => addMealEntry(dateKey, meal),
+      );
+    },
+    [runMutation],
+  );
+
+  const addMeals = useCallback(
+    (dateKey: string, meals: Omit<Meal, "id">[]) => {
+      if (meals.length === 0) return;
+      // Preserve visual order (first item on top) while newest sits first.
+      const optimisticMeals: Meal[] = meals.map((m, i) => ({
+        id: -(Date.now() + i),
+        ...m,
+      }));
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            meals: [...optimisticMeals, ...d.meals],
+          })),
+        () => addMealEntries(dateKey, meals),
       );
     },
     [runMutation],
@@ -204,6 +226,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       consumedFor,
       burnedFor,
       addMeal,
+      addMeals,
       removeMeal,
       addActivity,
       removeActivity,
@@ -215,6 +238,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       consumedFor,
       burnedFor,
       addMeal,
+      addMeals,
       removeMeal,
       addActivity,
       removeActivity,

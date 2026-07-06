@@ -85,6 +85,46 @@ export default function NutritionTracker() {
   const caloriesFor = (mt: MealType) =>
     meals.filter((m) => m.type === mt).reduce((s, m) => s + m.calories, 0);
 
+  // Sum a numeric meal field across today's meals; null if none present.
+  const sumField = (key: keyof (typeof meals)[number]) => {
+    let any = false;
+    let total = 0;
+    for (const m of meals) {
+      const v = m[key];
+      if (typeof v === "number") {
+        any = true;
+        total += v;
+      }
+    }
+    return any ? total : null;
+  };
+
+  // Daily nutrient totals (from logged meals). Sodium is stored in mg.
+  const dailyNutrients = useMemo(
+    () => [
+      { label: t.macroProtein, value: sumField("protein"), unit: t.unitG },
+      { label: t.macroCarbs, value: sumField("carbs"), unit: t.unitG },
+      { label: t.macroFat, value: sumField("fat"), unit: t.unitG },
+      { label: t.satFat, value: sumField("saturatedFat"), unit: t.unitG },
+      { label: t.sugars, value: sumField("sugars"), unit: t.unitG },
+      { label: t.fiber, value: sumField("fiber"), unit: t.unitG },
+      { label: t.sodium, value: sumField("sodium"), unit: t.unitMg },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [meals, t],
+  );
+
+  const hasDailyNutrients = dailyNutrients.some((n) => n.value != null);
+
+  // Compact macro chips for a single logged meal.
+  const mealChips = (m: (typeof meals)[number]) =>
+    [
+      { label: t.macroProtein, value: m.protein, unit: t.unitG },
+      { label: t.macroCarbs, value: m.carbs, unit: t.unitG },
+      { label: t.macroFat, value: m.fat, unit: t.unitG },
+      { label: t.fiber, value: m.fiber, unit: t.unitG },
+    ].filter((c) => c.value != null);
+
   const supplementTypeLabel = (st: SupplementType) =>
     ({
       protein:  t.suppProtein,
@@ -203,9 +243,19 @@ export default function NutritionTracker() {
               <li key={m.id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <div className="font-medium text-sm truncate">{m.name}</div>
-                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground mt-1">
-                    {labelFor(m.type)}
-                  </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      {labelFor(m.type)}
+                    </span>
+                    {mealChips(m).map((c) => (
+                      <span
+                        key={c.label}
+                        className="inline-flex items-center gap-1 rounded-full bg-accent/60 px-2 py-0.5 text-[11px] font-medium text-accent-foreground"
+                      >
+                        {c.value}{c.unit} {c.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-sm font-semibold tabular-nums">{m.calories} {t.kcal}</span>
@@ -249,6 +299,29 @@ export default function NutritionTracker() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      {/* Daily nutrient totals from logged meals */}
+      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
+        <h2 className="text-lg font-semibold">{t.dailyNutrients}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t.dailyNutrientsHint}</p>
+        {hasDailyNutrients ? (
+          <dl className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {dailyNutrients
+              .filter((n) => n.value != null)
+              .map((n) => (
+                <div key={n.label} className="rounded-2xl bg-muted p-3 text-center">
+                  <dt className="text-[11px] font-medium text-muted-foreground">{n.label}</dt>
+                  <dd className="mt-1 text-base font-bold tabular-nums">
+                    {Math.round(n.value as number)}
+                    <span className="ml-0.5 text-xs font-medium text-muted-foreground">{n.unit}</span>
+                  </dd>
+                </div>
+              ))}
+          </dl>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">{t.noDailyNutrients}</p>
         )}
       </section>
 

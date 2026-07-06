@@ -51,6 +51,10 @@ export async function fetchUserDayLog(): Promise<DayLog> {
         protein: row.protein ?? undefined,
         carbs: row.carbs ?? undefined,
         fat: row.fat ?? undefined,
+        saturatedFat: row.saturatedFat ?? undefined,
+        sugars: row.sugars ?? undefined,
+        fiber: row.fiber ?? undefined,
+        sodium: row.sodium ?? undefined,
       });
     } else if (row.kind === "activity") {
       day.activities.push({
@@ -72,6 +76,25 @@ export async function fetchUserDayLog(): Promise<DayLog> {
   return log;
 }
 
+// Build the insertable row for a meal (shared by single + batch inserts).
+function mealValues(userKey: string, dateKey: string, meal: Omit<Meal, "id">) {
+  return {
+    userKey,
+    logDate: dateKey,
+    kind: "meal" as const,
+    subtype: meal.type,
+    name: meal.name,
+    calories: meal.calories,
+    protein: meal.protein ?? null,
+    carbs: meal.carbs ?? null,
+    fat: meal.fat ?? null,
+    saturatedFat: meal.saturatedFat ?? null,
+    sugars: meal.sugars ?? null,
+    fiber: meal.fiber ?? null,
+    sodium: meal.sodium ?? null,
+  };
+}
+
 export async function addMealEntry(
   dateKey: string,
   meal: Omit<Meal, "id">,
@@ -81,20 +104,27 @@ export async function addMealEntry(
 
   const [row] = await db
     .insert(dayLogEntries)
-    .values({
-      userKey,
-      logDate: dateKey,
-      kind: "meal",
-      subtype: meal.type,
-      name: meal.name,
-      calories: meal.calories,
-      protein: meal.protein ?? null,
-      carbs: meal.carbs ?? null,
-      fat: meal.fat ?? null,
-    })
+    .values(mealValues(userKey, dateKey, meal))
     .returning({ id: dayLogEntries.id });
 
   return { id: row.id, ...meal };
+}
+
+// Insert several meals at once (used by the meal-builder cart). Returns the
+// created meals with their real row ids, in the same order.
+export async function addMealEntries(
+  dateKey: string,
+  meals: Omit<Meal, "id">[],
+): Promise<Meal[]> {
+  const userKey = await getUserKey();
+  if (!userKey || meals.length === 0) return [];
+
+  const rows = await db
+    .insert(dayLogEntries)
+    .values(meals.map((m) => mealValues(userKey, dateKey, m)))
+    .returning({ id: dayLogEntries.id });
+
+  return meals.map((m, i) => ({ id: rows[i].id, ...m }));
 }
 
 export async function addActivityEntry(

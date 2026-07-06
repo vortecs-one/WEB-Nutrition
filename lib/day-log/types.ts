@@ -24,6 +24,11 @@ export type Meal = {
   protein?: number;
   carbs?: number;
   fat?: number;
+  // Extended nutrients (grams, except sodium in mg).
+  saturatedFat?: number;
+  sugars?: number;
+  fiber?: number;
+  sodium?: number;
 };
 
 export type Activity = {

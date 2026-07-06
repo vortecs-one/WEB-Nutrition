@@ -123,10 +123,15 @@ export const dayLogEntries = pgTable(
     calories: integer("calories"),
     // Supplement dose (free text); null otherwise.
     dose: text("dose"),
-    // Optional macros for meals.
+    // Optional macros for meals (grams).
     protein: integer("protein"),
     carbs: integer("carbs"),
     fat: integer("fat"),
+    // Optional extended nutrients for meals. Grams, except sodium in mg.
+    saturatedFat: integer("saturated_fat"),
+    sugars: integer("sugars"),
+    fiber: integer("fiber"),
+    sodium: integer("sodium"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

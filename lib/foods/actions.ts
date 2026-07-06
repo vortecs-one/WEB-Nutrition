@@ -5,7 +5,41 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { savedFoods } from "@/drizzle/schema";
 import { getFoodByBarcode } from "@/lib/thruxion-api";
-import type { FoodLookupResult, FoodProduct, SavedFoodProduct } from "./types";
+import type {
+  FoodLookupResult,
+  FoodMeta,
+  FoodNutrition,
+  FoodProduct,
+  SavedFoodProduct,
+} from "./types";
+
+// Default metadata for older saved rows that predate the meta field.
+const emptyMeta = (): FoodMeta => ({
+  servingSize: null,
+  quantity: null,
+  novaGroup: null,
+  vegan: null,
+  vegetarian: null,
+  ingredients: null,
+});
+
+// Parse the `nutrition_data` column, which may be either the current
+// `{ nutrition, meta }` shape or an older flat `FoodNutrition` blob.
+function parseNutritionData(raw: string): {
+  nutrition: FoodNutrition;
+  meta: FoodMeta;
+} {
+  const parsed = JSON.parse(raw) as
+    | { nutrition?: FoodNutrition; meta?: FoodMeta }
+    | FoodNutrition;
+  if (parsed && typeof parsed === "object" && "nutrition" in parsed) {
+    return {
+      nutrition: parsed.nutrition as FoodNutrition,
+      meta: { ...emptyMeta(), ...(parsed.meta ?? {}) },
+    };
+  }
+  return { nutrition: parsed as FoodNutrition, meta: emptyMeta() };
+}
 
 // Resolve a stable per-user key from the session: prefer the Thruxion
 // human_id, fall back to the email. Returns null when unauthenticated.
@@ -63,14 +97,18 @@ export async function fetchUserSavedFoods(): Promise<SavedFoodProduct[]> {
     .where(eq(savedFoods.userKey, userKey))
     .orderBy(desc(savedFoods.savedAt));
 
-  return rows.map((row) => ({
-    barcode: row.barcode,
-    name: row.name,
-    brand: row.brand,
-    image: row.image,
-    nutrition: JSON.parse(row.nutritionData),
-    savedAt: row.savedAt,
-  }));
+  return rows.map((row) => {
+    const { nutrition, meta } = parseNutritionData(row.nutritionData);
+    return {
+      barcode: row.barcode,
+      name: row.name,
+      brand: row.brand,
+      image: row.image,
+      nutrition,
+      meta,
+      savedAt: row.savedAt,
+    };
+  });
 }
 
 // Save a food product for the current user. If already saved, this is a no-op.
@@ -88,7 +126,12 @@ export async function saveFoodProduct(product: FoodProduct): Promise<boolean> {
         name: product.name,
         brand: product.brand ?? null,
         image: product.image ?? null,
-        nutritionData: JSON.stringify(product.nutrition),
+        // Store the current `{ nutrition, meta }` shape so the detail view can
+        // show rich facts for saved foods too.
+        nutritionData: JSON.stringify({
+          nutrition: product.nutrition,
+          meta: product.meta,
+        }),
       })
       .onConflictDoNothing();
 
