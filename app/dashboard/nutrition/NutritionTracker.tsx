@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Egg,
   Soup,
@@ -13,7 +13,6 @@ import {
   Minus,
   Barcode,
   Search,
-  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import useSWR from "swr";
@@ -62,109 +61,6 @@ function pickDefaultBasis(p: FoodProduct): Basis {
   return hasBasis(p.nutrition, "serving") ? "serving" : "100g";
 }
 
-// ─── Saved-food autocomplete input ───────────────────────────────────────────
-
-type FoodAutocompleteProps = {
-  value: string;
-  onChange: (v: string) => void;
-  onSelect: (food: FoodProduct) => void;
-  savedFoods: FoodProduct[];
-  placeholder?: string;
-  inputClass: string;
-};
-
-function FoodAutocomplete({
-  value,
-  onChange,
-  onSelect,
-  savedFoods,
-  placeholder,
-  inputClass,
-}: FoodAutocompleteProps) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  const filtered = useMemo(() => {
-    if (!value.trim()) return savedFoods.slice(0, 8);
-    const q = value.toLowerCase();
-    return savedFoods
-      .filter(
-        (f) =>
-          f.name.toLowerCase().includes(q) ||
-          (f.brand ?? "").toLowerCase().includes(q),
-      )
-      .slice(0, 8);
-  }, [value, savedFoods]);
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <input
-        className={inputClass}
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        placeholder={placeholder}
-        autoComplete="off"
-      />
-      {open && filtered.length > 0 && (
-        <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-card shadow-lg">
-          {filtered.map((food) => (
-            <li key={food.barcode}>
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-accent active:bg-accent/70 transition"
-                onMouseDown={(e) => {
-                  e.preventDefault(); // prevent blur from closing before click
-                  onSelect(food);
-                  setOpen(false);
-                }}
-              >
-                {food.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={food.image}
-                    alt={food.name}
-                    className="h-9 w-9 shrink-0 rounded-lg border border-border object-cover bg-muted"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
-                    <Barcode className="h-4 w-4" aria-hidden="true" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium leading-tight">
-                    {food.name}
-                  </div>
-                  {food.brand && (
-                    <div className="truncate text-xs text-muted-foreground">
-                      {food.brand}
-                    </div>
-                  )}
-                </div>
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 // ─── Meal-builder modal ───────────────────────────────────────────────────────
 
 type MealBuilderModalProps = {
@@ -184,20 +80,13 @@ function MealBuilderModal({
 }: MealBuilderModalProps) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
-  const { addMeal, addMeals } = useDayLog();
+  const { addMeals } = useDayLog();
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // Manual-entry form state
-  const [name, setName] = useState("");
-  const [calories, setCalories] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
-
-  // Whether manual form is expanded
-  const [manualOpen, setManualOpen] = useState(false);
+  // Food search query
+  const [query, setQuery] = useState("");
 
   const inputClass =
     "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
@@ -271,31 +160,11 @@ function MealBuilderModal({
     };
   };
 
-  const parseMacro = (v: string) => {
-    const n = parseInt(v, 10);
-    return !Number.isNaN(n) && n > 0 ? n : undefined;
-  };
-
   const logCart = () => {
     if (!todayKey) return;
     const valid = cart.filter((i) => i.amount > 0);
     if (valid.length === 0) return;
     addMeals(todayKey, valid.map(mealFromItem));
-    onClose();
-  };
-
-  const submitManual = (e: React.FormEvent) => {
-    e.preventDefault();
-    const kcal = parseInt(calories, 10);
-    if (!name.trim() || Number.isNaN(kcal) || kcal <= 0 || !todayKey) return;
-    addMeal(todayKey, {
-      name: name.trim(),
-      calories: kcal,
-      type: mealType,
-      protein: parseMacro(protein),
-      carbs: parseMacro(carbs),
-      fat: parseMacro(fat),
-    });
     onClose();
   };
 
@@ -328,87 +197,137 @@ function MealBuilderModal({
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
-          {/* Saved-foods quick-add */}
-          {savedFoods.length > 0 && (
-            <section>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t.savedFoods}
-              </h4>
-              <ul className="space-y-2">
-                {savedFoods.map((food) => {
-                  const basis = hasBasis(food.nutrition, "serving") ? "serving" : "100g";
-                  const v = valuesForBasis(food.nutrition, basis);
-                  const inCart = cart.some((c) => c.product.barcode === food.barcode);
-                  return (
-                    <li
-                      key={food.barcode}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
-                    >
-                      {food.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={food.image}
-                          alt={food.name}
-                          className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover bg-muted"
-                        />
-                      ) : (
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
-                          <Barcode className="h-5 w-5" aria-hidden="true" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium leading-tight">{food.name}</div>
-                        {food.brand && (
-                          <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
-                        )}
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {v.calories != null && (
-                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
-                              {Math.round(v.calories)} {t.kcal}
-                            </span>
-                          )}
-                          {v.protein != null && (
-                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
-                              {v.protein.toFixed(1)}{t.unitG} {t.macroProtein}
-                            </span>
-                          )}
-                          {v.carbs != null && (
-                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
-                              {v.carbs.toFixed(1)}{t.unitG} {t.macroCarbs}
-                            </span>
-                          )}
-                          {v.fat != null && (
-                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
-                              {v.fat.toFixed(1)}{t.unitG} {t.macroFat}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => (inCart ? undefined : addToCart(food))}
-                        disabled={inCart}
-                        aria-label={`${t.addToMeal}: ${food.name}`}
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition active:scale-95 ${
-                          inCart
-                            ? "bg-primary text-primary-foreground cursor-default"
-                            : "bg-primary/10 text-primary hover:bg-primary/20"
-                        }`}
+          {/* Search + saved-foods list */}
+          <section>
+            {/* Sticky search bar */}
+            <div className="relative mb-3">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <input
+                className="w-full rounded-xl border border-border bg-background pl-9 pr-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t.foodSearchHint}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label={t.clear}
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+
+            {/* Filtered food list */}
+            {(() => {
+              const q = query.trim().toLowerCase();
+              const filtered = q
+                ? savedFoods.filter(
+                    (f) =>
+                      f.name.toLowerCase().includes(q) ||
+                      (f.brand ?? "").toLowerCase().includes(q),
+                  )
+                : savedFoods;
+
+              if (savedFoods.length === 0) {
+                return (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    {t.savedFoodsEmpty}
+                  </p>
+                );
+              }
+              if (filtered.length === 0) {
+                return (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    {t.noNutritionData}
+                  </p>
+                );
+              }
+              return (
+                <ul className="space-y-2">
+                  {filtered.map((food) => {
+                    const basis = hasBasis(food.nutrition, "serving") ? "serving" : "100g";
+                    const v = valuesForBasis(food.nutrition, basis);
+                    const inCart = cart.some((c) => c.product.barcode === food.barcode);
+                    return (
+                      <li
+                        key={food.barcode}
+                        className="flex items-center gap-3 rounded-2xl border border-border bg-background p-3 transition"
                       >
-                        {inCart ? (
-                          <span className="text-lg font-bold leading-none">✓</span>
+                        {food.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={food.image}
+                            alt={food.name}
+                            className="h-12 w-12 shrink-0 rounded-xl border border-border object-cover bg-muted"
+                          />
                         ) : (
-                          <Plus className="h-5 w-5" aria-hidden="true" />
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+                            <Barcode className="h-5 w-5" aria-hidden="true" />
+                          </div>
                         )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold leading-tight">{food.name}</div>
+                          {food.brand && (
+                            <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
+                          )}
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {v.calories != null && (
+                              <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-primary">
+                                {Math.round(v.calories)} {t.kcal}
+                              </span>
+                            )}
+                            {v.protein != null && (
+                              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
+                                {v.protein.toFixed(1)}{t.unitG} P
+                              </span>
+                            )}
+                            {v.carbs != null && (
+                              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
+                                {v.carbs.toFixed(1)}{t.unitG} C
+                              </span>
+                            )}
+                            {v.fat != null && (
+                              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
+                                {v.fat.toFixed(1)}{t.unitG} F
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { if (!inCart) addToCart(food); }}
+                          disabled={inCart}
+                          aria-label={`${t.addToMeal}: ${food.name}`}
+                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition active:scale-95 ${
+                            inCart
+                              ? "bg-primary text-primary-foreground cursor-default"
+                              : "bg-primary/10 text-primary hover:bg-primary/20"
+                          }`}
+                        >
+                          {inCart ? (
+                            <span className="text-base font-bold leading-none">✓</span>
+                          ) : (
+                            <Plus className="h-5 w-5" aria-hidden="true" />
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+            })()}
+          </section>
 
           {/* Cart */}
           {cart.length > 0 && (
@@ -538,75 +457,7 @@ function MealBuilderModal({
             </section>
           )}
 
-          {/* Manual entry (collapsible) */}
-          <section>
-            <button
-              type="button"
-              onClick={() => setManualOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-accent transition"
-            >
-              <span>{t.mealName} — {dict.common.save} manual</span>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${manualOpen ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
-            </button>
 
-            {manualOpen && (
-              <form onSubmit={submitManual} className="mt-3 space-y-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">{t.mealName}</span>
-                  <FoodAutocomplete
-                    value={name}
-                    onChange={setName}
-                    onSelect={(food) => {
-                      setName(food.name);
-                      const v = valuesForBasis(
-                        food.nutrition,
-                        hasBasis(food.nutrition, "serving") ? "serving" : "100g",
-                      );
-                      if (v.calories != null) setCalories(String(Math.round(v.calories)));
-                      if (v.protein != null) setProtein(String(Math.round(v.protein)));
-                      if (v.carbs != null) setCarbs(String(Math.round(v.carbs)));
-                      if (v.fat != null) setFat(String(Math.round(v.fat)));
-                    }}
-                    savedFoods={savedFoods}
-                    inputClass={inputClass}
-                  />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">{t.mealCalories}</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    className={inputClass}
-                    value={calories}
-                    onChange={(e) => setCalories(e.target.value)}
-                  />
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t.proteinG}</span>
-                    <input type="number" inputMode="numeric" className={inputClass} value={protein} onChange={(e) => setProtein(e.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t.carbsG}</span>
-                    <input type="number" inputMode="numeric" className={inputClass} value={carbs} onChange={(e) => setCarbs(e.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t.fatG}</span>
-                    <input type="number" inputMode="numeric" className={inputClass} value={fat} onChange={(e) => setFat(e.target.value)} />
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-secondary text-secondary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-secondary/90 active:scale-[0.98] transition"
-                >
-                  {t.add}
-                </button>
-              </form>
-            )}
-          </section>
         </div>
 
         {/* Footer — log cart button */}
@@ -636,7 +487,6 @@ export default function NutritionTracker() {
 
   const {
     dayData,
-    addMeal,
     removeMeal,
     addSupplement,
     removeSupplement,
@@ -1007,16 +857,48 @@ export default function NutritionTracker() {
               </button>
             </div>
             <form onSubmit={submitSupplement} className="space-y-4">
-              <label className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{t.supplementName}</span>
-                <FoodAutocomplete
-                  value={suppName}
-                  onChange={setSuppName}
-                  onSelect={(food) => setSuppName(food.name)}
-                  savedFoods={savedFoods}
-                  inputClass={inputClass}
-                />
-              </label>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <input
+                    className="w-full rounded-xl border border-border bg-background pl-9 pr-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+                    value={suppName}
+                    onChange={(e) => setSuppName(e.target.value)}
+                    autoComplete="off"
+                  />
+                </div>
+                {savedFoods.length > 0 && (
+                  <ul className="max-h-40 overflow-y-auto rounded-xl border border-border bg-background divide-y divide-border">
+                    {savedFoods
+                      .filter((f) =>
+                        !suppName.trim() ||
+                        f.name.toLowerCase().includes(suppName.toLowerCase()) ||
+                        (f.brand ?? "").toLowerCase().includes(suppName.toLowerCase()),
+                      )
+                      .slice(0, 6)
+                      .map((food) => (
+                        <li key={food.barcode}>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-accent active:bg-accent/70 transition"
+                            onClick={() => setSuppName(food.name)}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">{food.name}</div>
+                              {food.brand && (
+                                <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{t.supplementDose}</span>
                 <input className={inputClass} value={suppDose} onChange={(e) => setSuppDose(e.target.value)} />
