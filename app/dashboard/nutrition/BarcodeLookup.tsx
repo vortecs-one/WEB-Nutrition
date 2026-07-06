@@ -533,6 +533,7 @@ export default function BarcodeLookup({
       )}
 
       {/* Meal builder cart */}
+      {cart.length > 0 && (
       <div className="rounded-2xl border border-border p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
@@ -555,9 +556,7 @@ export default function BarcodeLookup({
           )}
         </div>
 
-        {cart.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t.mealBuilderEmpty}</p>
-        ) : (
+        {(
           <div className="space-y-3">
             <ul className="space-y-3">
               {cart.map((item) => {
@@ -694,6 +693,7 @@ export default function BarcodeLookup({
           </div>
         )}
       </div>
+      )}
 
       {/* Nutrition details modal */}
       {detailFood && (
