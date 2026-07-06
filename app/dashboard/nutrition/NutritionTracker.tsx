@@ -68,7 +68,6 @@ type MealBuilderModalProps = {
   label: string;
   todayKey: string;
   onClose: () => void;
-  savedFoods: FoodProduct[];
 };
 
 function MealBuilderModal({
@@ -76,11 +75,18 @@ function MealBuilderModal({
   label,
   todayKey,
   onClose,
-  savedFoods,
 }: MealBuilderModalProps) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { addMeals } = useDayLog();
+
+  // Fetch saved foods live — uses the shared SWR key so it stays in sync with
+  // BarcodeLookup and always reflects the latest saved foods without a refresh.
+  const { data: savedFoods = [], isLoading: foodsLoading } = useSWR(
+    "saved-foods",
+    () => fetchUserSavedFoods(),
+    { revalidateOnMount: true, revalidateOnFocus: false },
+  );
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [query, setQuery] = useState("");
@@ -231,7 +237,19 @@ function MealBuilderModal({
 
         {/* Scrollable food list */}
         <div className="overflow-y-auto flex-1 px-5 pb-3">
-          {savedFoods.length === 0 ? (
+          {foodsLoading ? (
+            <ul className="divide-y divide-border" aria-busy="true" aria-label="Loading">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="flex items-center gap-3 py-3">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-2/3 rounded-md bg-muted animate-pulse" />
+                    <div className="h-3 w-1/3 rounded-md bg-muted animate-pulse" />
+                  </div>
+                  <div className="h-6 w-6 rounded-full bg-muted animate-pulse shrink-0" />
+                </li>
+              ))}
+            </ul>
+          ) : savedFoods.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {t.savedFoodsEmpty}
             </p>
@@ -403,6 +421,187 @@ function MealBuilderModal({
   );
 }
 
+// ─── Supplement modal ─────────────────────────────────────────────────────────
+
+type SupplementModalProps = {
+  todayKey: string;
+  onClose: () => void;
+};
+
+function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
+  const { dict } = useI18n();
+  const t = dict.nutritionUser;
+  const { addSupplement } = useDayLog();
+
+  // Live saved-foods list — same shared SWR key, always up to date.
+  const { data: savedFoods = [], isLoading: foodsLoading } = useSWR(
+    "saved-foods",
+    () => fetchUserSavedFoods(),
+    { revalidateOnMount: true, revalidateOnFocus: false },
+  );
+
+  const [suppName, setSuppName] = useState("");
+  const [suppDose, setSuppDose] = useState("");
+  const [suppType, setSuppType] = useState<SupplementType>("protein");
+
+  const inputClass =
+    "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suppName.trim() || !todayKey) return;
+    addSupplement(todayKey, { name: suppName.trim(), dose: suppDose.trim(), type: suppType });
+    onClose();
+  };
+
+  const filtered = useMemo(() => {
+    const q = suppName.trim().toLowerCase();
+    return q
+      ? savedFoods.filter(
+          (f) =>
+            f.name.toLowerCase().includes(q) ||
+            (f.brand ?? "").toLowerCase().includes(q),
+        )
+      : savedFoods;
+  }, [suppName, savedFoods]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-md bg-card text-card-foreground rounded-t-3xl shadow-xl max-h-[92dvh] flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.addSupplement}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0">
+          <h3 className="text-base font-semibold">{t.addSupplement}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={dict.common.close}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Search bar */}
+        <div className="shrink-0 px-5 pt-4 pb-2">
+          <span className="block mb-2 text-xs font-medium text-muted-foreground">{t.supplementName}</span>
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <input
+              className="w-full rounded-xl border border-border bg-background pl-9 pr-10 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+              value={suppName}
+              onChange={(e) => setSuppName(e.target.value)}
+              autoComplete="off"
+              placeholder={t.foodSearchHint}
+            />
+            {suppName && (
+              <button
+                type="button"
+                aria-label={t.clear}
+                onClick={() => setSuppName("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Scrollable food list */}
+        <div className="overflow-y-auto flex-1 px-5 pb-3">
+          {foodsLoading ? (
+            <ul className="divide-y divide-border" aria-busy="true">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="flex items-center gap-3 py-3">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-2/3 rounded-md bg-muted animate-pulse" />
+                    <div className="h-3 w-1/3 rounded-md bg-muted animate-pulse" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : savedFoods.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">{t.savedFoodsEmpty}</p>
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">{t.noNutritionData}</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {filtered.map((food) => (
+                <li key={food.barcode}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 py-3 text-left hover:bg-accent/50 active:bg-accent transition rounded-lg -mx-1 px-1"
+                    onClick={() => setSuppName(food.name)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium leading-tight">{food.name}</div>
+                      {food.brand && (
+                        <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
+                      )}
+                    </div>
+                    {suppName.trim().toLowerCase() === food.name.toLowerCase() && (
+                      <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground">
+                        <span className="text-[11px] font-bold leading-none">✓</span>
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer form — dose, type, submit */}
+        <form onSubmit={submit} className="shrink-0 border-t border-border px-5 py-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">{t.supplementDose}</span>
+              <input
+                className={inputClass}
+                value={suppDose}
+                onChange={(e) => setSuppDose(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">{t.supplementType}</span>
+              <select
+                className={inputClass}
+                value={suppType}
+                onChange={(e) => setSuppType(e.target.value as SupplementType)}
+              >
+                <option value="protein">{t.suppProtein}</option>
+                <option value="vitamin">{t.suppVitamin}</option>
+                <option value="creatine">{t.suppCreatine}</option>
+                <option value="omega3">{t.suppOmega}</option>
+                <option value="other">{t.suppOther}</option>
+              </select>
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={!suppName.trim()}
+            className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t.add}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function NutritionTracker() {
@@ -413,7 +612,6 @@ export default function NutritionTracker() {
   const {
     dayData,
     removeMeal,
-    addSupplement,
     removeSupplement,
     addActivity,
     removeActivity,
@@ -430,21 +628,9 @@ export default function NutritionTracker() {
     [dayData, todayKey],
   );
 
-  // Preload saved foods so both BarcodeLookup and the modals share the SWR cache
-  const { data: savedFoods = [] } = useSWR(
-    "saved-foods",
-    () => fetchUserSavedFoods(),
-    { revalidateOnFocus: false },
-  );
-
   // Modal state
   const [addType, setAddType] = useState<MealType | null>(null);
   const [suppModalOpen, setSuppModalOpen] = useState(false);
-
-  // Supplement form state
-  const [suppName, setSuppName] = useState("");
-  const [suppDose, setSuppDose] = useState("");
-  const [suppType, setSuppType] = useState<SupplementType>("protein");
 
   // Activity form state
   const [actName, setActName] = useState("");
@@ -477,18 +663,6 @@ export default function NutritionTracker() {
 
   const activityTypeLabel = (at: ActivityType) =>
     ({ cardio: ta.cardio, strength: ta.strength, walking: ta.walking, sport: ta.sport, other: ta.other })[at];
-
-  const openSupplementAdd = () => {
-    setSuppName(""); setSuppDose(""); setSuppType("protein");
-    setSuppModalOpen(true);
-  };
-
-  const submitSupplement = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!suppName.trim() || !todayKey) return;
-    addSupplement(todayKey, { name: suppName.trim(), dose: suppDose.trim(), type: suppType });
-    setSuppModalOpen(false);
-  };
 
   const submitActivity = (e: React.FormEvent) => {
     e.preventDefault();
@@ -540,7 +714,7 @@ export default function NutritionTracker() {
           {/* Supplements */}
           <button
             type="button"
-            onClick={openSupplementAdd}
+            onClick={() => setSuppModalOpen(true)}
             className="flex flex-col items-center gap-2 rounded-2xl p-2 hover:bg-accent active:scale-[0.97] transition"
           >
             <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -703,98 +877,15 @@ export default function NutritionTracker() {
           label={labelFor(addType)}
           todayKey={todayKey}
           onClose={() => setAddType(null)}
-          savedFoods={savedFoods}
         />
       )}
 
       {/* Supplement modal */}
-      {suppModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-          onClick={() => setSuppModalOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="w-full max-w-md bg-card text-card-foreground rounded-t-3xl shadow-xl p-5 pb-safe"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t.addSupplement}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold">{t.addSupplement}</h3>
-              <button
-                type="button"
-                onClick={() => setSuppModalOpen(false)}
-                aria-label={dict.common.close}
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent active:scale-95 transition"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
-            <form onSubmit={submitSupplement} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">{t.supplementName}</span>
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <input
-                    className="w-full rounded-xl border border-border bg-background pl-9 pr-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
-                    value={suppName}
-                    onChange={(e) => setSuppName(e.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-                {savedFoods.length > 0 && (
-                  <ul className="max-h-40 overflow-y-auto rounded-xl border border-border bg-background divide-y divide-border">
-                    {savedFoods
-                      .filter((f) =>
-                        !suppName.trim() ||
-                        f.name.toLowerCase().includes(suppName.toLowerCase()) ||
-                        (f.brand ?? "").toLowerCase().includes(suppName.toLowerCase()),
-                      )
-                      .slice(0, 6)
-                      .map((food) => (
-                        <li key={food.barcode}>
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-accent active:bg-accent/70 transition"
-                            onClick={() => setSuppName(food.name)}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium">{food.name}</div>
-                              {food.brand && (
-                                <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
-                              )}
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                )}
-              </div>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">{t.supplementDose}</span>
-                <input className={inputClass} value={suppDose} onChange={(e) => setSuppDose(e.target.value)} />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">{t.supplementType}</span>
-                <select className={inputClass} value={suppType} onChange={(e) => setSuppType(e.target.value as SupplementType)}>
-                  <option value="protein">{t.suppProtein}</option>
-                  <option value="vitamin">{t.suppVitamin}</option>
-                  <option value="creatine">{t.suppCreatine}</option>
-                  <option value="omega3">{t.suppOmega}</option>
-                  <option value="other">{t.suppOther}</option>
-                </select>
-              </label>
-              <button type="submit" className="w-full rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition">
-                {t.add}
-              </button>
-            </form>
-          </div>
-        </div>
+      {suppModalOpen && todayKey && (
+        <SupplementModal
+          todayKey={todayKey}
+          onClose={() => setSuppModalOpen(false)}
+        />
       )}
     </div>
   );
