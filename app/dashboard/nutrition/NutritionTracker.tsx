@@ -539,34 +539,6 @@ export default function NutritionTracker() {
   const caloriesFor = (mt: MealType) =>
     meals.filter((m) => m.type === mt).reduce((s, m) => s + m.calories, 0);
 
-  // ── Daily nutrient totals ──────────────────────────────────────────────────
-
-  const sumField = (key: keyof (typeof meals)[number]) => {
-    let any = false;
-    let total = 0;
-    for (const m of meals) {
-      const v = m[key];
-      if (typeof v === "number") { any = true; total += v; }
-    }
-    return any ? total : null;
-  };
-
-  const dailyNutrients = useMemo(
-    () => [
-      { label: t.macroProtein, value: sumField("protein"),     unit: t.unitG  },
-      { label: t.macroCarbs,   value: sumField("carbs"),       unit: t.unitG  },
-      { label: t.macroFat,     value: sumField("fat"),         unit: t.unitG  },
-      { label: t.satFat,       value: sumField("saturatedFat"),unit: t.unitG  },
-      { label: t.sugars,       value: sumField("sugars"),      unit: t.unitG  },
-      { label: t.fiber,        value: sumField("fiber"),       unit: t.unitG  },
-      { label: t.sodium,       value: sumField("sodium"),      unit: t.unitMg },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [meals, t],
-  );
-
-  const hasDailyNutrients = dailyNutrients.some((n) => n.value != null);
-
   const mealChips = (m: (typeof meals)[number]) =>
     [
       { label: t.macroProtein, value: m.protein,  unit: t.unitG },
@@ -606,12 +578,14 @@ export default function NutritionTracker() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
-      {/* Barcode food finder */}
-      <BarcodeLookup todayKey={todayKey} />
-
       {/* Diet log */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
         <h2 className="text-lg font-semibold mb-4">{t.dietLog}</h2>
+
+        {/* Barcode food finder — build meals directly from the diet log */}
+        <div className="mb-5 rounded-2xl border border-border bg-muted/30 p-4">
+          <BarcodeLookup todayKey={todayKey} embedded />
+        </div>
 
         <div className="grid grid-cols-5 gap-1.5">
           {mealTypes.map(({ type, label, icon: Icon }) => {
@@ -721,29 +695,6 @@ export default function NutritionTracker() {
               </li>
             ))}
           </ul>
-        )}
-      </section>
-
-      {/* Daily nutrient totals */}
-      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
-        <h2 className="text-lg font-semibold">{t.dailyNutrients}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{t.dailyNutrientsHint}</p>
-        {hasDailyNutrients ? (
-          <dl className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {dailyNutrients
-              .filter((n) => n.value != null)
-              .map((n) => (
-                <div key={n.label} className="rounded-2xl bg-muted p-3 text-center">
-                  <dt className="text-[11px] font-medium text-muted-foreground">{n.label}</dt>
-                  <dd className="mt-1 text-base font-bold tabular-nums">
-                    {Math.round(n.value as number)}
-                    <span className="ml-0.5 text-xs font-medium text-muted-foreground">{n.unit}</span>
-                  </dd>
-                </div>
-              ))}
-          </dl>
-        ) : (
-          <p className="mt-4 text-sm text-muted-foreground">{t.noDailyNutrients}</p>
         )}
       </section>
 

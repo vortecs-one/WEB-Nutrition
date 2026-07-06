@@ -62,7 +62,15 @@ function scaledValues(item: CartItem): NutrientValues {
   );
 }
 
-export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
+export default function BarcodeLookup({
+  todayKey,
+  embedded = false,
+}: {
+  todayKey: string;
+  // When embedded inside another card (e.g. the diet log), drop the outer
+  // card chrome so it reads as a sub-section rather than a nested card.
+  embedded?: boolean;
+}) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
 
@@ -243,9 +251,21 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
     ].filter((c) => !c.value.startsWith("—"));
 
   return (
-    <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5 space-y-4">
+    <div
+      className={
+        embedded
+          ? "space-y-4"
+          : "bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5 space-y-4"
+      }
+    >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <h2
+          className={
+            embedded
+              ? "flex items-center gap-2 text-sm font-semibold text-muted-foreground"
+              : "flex items-center gap-2 text-lg font-semibold"
+          }
+        >
           <Barcode className="h-5 w-5" aria-hidden="true" />
           {t.barcodeTitle}
         </h2>
@@ -736,6 +756,6 @@ export default function BarcodeLookup({ todayKey }: { todayKey: string }) {
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
