@@ -15,7 +15,6 @@ import {
 } from "@/lib/day-log/provider";
 import CalorieGauge from "../nutrition/CalorieGauge";
 import NutritionChart from "../nutrition/NutritionChart";
-import DailyNutrients from "../nutrition/DailyNutrients";
 
 const GAUGE_RANGE = 1000;
 
@@ -146,8 +145,6 @@ export default function CaloriesTracker() {
       {/* Nutrient composition chart — driven by the same date key as the gauge */}
       {dateKey && <NutritionChart dateKey={dateKey} />}
 
-      {/* Daily nutrient totals — same date key as the gauge/chart */}
-      {dateKey && <DailyNutrients dateKey={dateKey} />}
     </div>
   );
 }

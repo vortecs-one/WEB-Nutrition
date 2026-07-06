@@ -24,6 +24,28 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     [dayData, dateKey],
   );
 
+  // Extended nutrient totals — summed from logged meals.
+  const extendedNutrients = useMemo(() => {
+    const sum = (key: keyof (typeof meals)[number]) => {
+      let any = false;
+      let total = 0;
+      for (const m of meals) {
+        const v = m[key];
+        if (typeof v === "number") { any = true; total += v; }
+      }
+      return any ? Math.round(total) : null;
+    };
+    return [
+      { label: t.macroProtein, value: sum("protein"),      unit: t.unitG  },
+      { label: t.macroCarbs,   value: sum("carbs"),        unit: t.unitG  },
+      { label: t.macroFat,     value: sum("fat"),          unit: t.unitG  },
+      { label: t.satFat,       value: sum("saturatedFat"), unit: t.unitG  },
+      { label: t.sugars,       value: sum("sugars"),       unit: t.unitG  },
+      { label: t.fiber,        value: sum("fiber"),        unit: t.unitG  },
+      { label: t.sodium,       value: sum("sodium"),       unit: t.unitMg },
+    ].filter((n) => n.value != null);
+  }, [meals, t]);
+
   const data = useMemo(() => {
     const protein = meals.reduce((s, m) => s + (m.protein ?? 0), 0);
     const carbs = meals.reduce((s, m) => s + (m.carbs ?? 0), 0);
@@ -161,6 +183,31 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
             </PieChart>
           </ChartContainer>
         </div>
+      )}
+
+      {/* Extended nutrient grid — shown whenever at least one value is present */}
+      {extendedNutrients.length > 0 && (
+        <>
+          <div className="mt-5 border-t border-sidebar-foreground/10" />
+          <dl className="mt-4 grid grid-cols-4 gap-2">
+            {extendedNutrients.map((n) => (
+              <div
+                key={n.label}
+                className="rounded-2xl bg-sidebar-accent/40 p-2.5 text-center"
+              >
+                <dt className="text-[10px] font-medium text-sidebar-foreground/60 leading-tight">
+                  {n.label}
+                </dt>
+                <dd className="mt-1 text-sm font-bold tabular-nums">
+                  {n.value}
+                  <span className="ml-0.5 text-[10px] font-medium text-sidebar-foreground/60">
+                    {n.unit}
+                  </span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
       )}
     </section>
   );
