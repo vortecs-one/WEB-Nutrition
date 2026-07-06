@@ -258,33 +258,7 @@ export default function BarcodeLookup({
           : "bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5 space-y-4"
       }
     >
-      <div className="flex items-center justify-between gap-2">
-        <h2
-          className={
-            embedded
-              ? "flex items-center gap-2 text-sm font-semibold text-muted-foreground"
-              : "flex items-center gap-2 text-lg font-semibold"
-          }
-        >
-          <Barcode className="h-5 w-5" aria-hidden="true" />
-          {t.barcodeTitle}
-        </h2>
-        {savedFoods.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSavedOpen((o) => !o)}
-            aria-expanded={savedOpen}
-            className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 active:scale-95 transition"
-          >
-            <Bookmark className="h-4 w-4" aria-hidden="true" />
-            {savedFoods.length}
-            <ChevronDown
-              className={`h-4 w-4 transition-transform ${savedOpen ? "rotate-180" : ""}`}
-              aria-hidden="true"
-            />
-          </button>
-        )}
-      </div>
+
 
       {/* Search */}
       <form onSubmit={onSearch} className="flex gap-2">
@@ -311,6 +285,21 @@ export default function BarcodeLookup({
             {status === "loading" ? t.barcodeSearching : t.barcodeSearch}
           </span>
         </button>
+        {savedFoods.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSavedOpen((o) => !o)}
+            aria-expanded={savedOpen}
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-accent text-accent-foreground px-4 min-h-12 text-sm font-medium hover:bg-accent/90 active:scale-[0.98] transition"
+          >
+            <Bookmark className="h-4 w-4" aria-hidden="true" />
+            <span>{savedFoods.length}</span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${savedOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
+        )}
       </form>
 
       {status === "not-found" && (
