@@ -285,7 +285,7 @@ export default function BarcodeLookup({
       <form onSubmit={onSearch} className="flex gap-2">
         <div className="relative flex-1">
           <input
-            className={`${inputClass} pr-[4.5rem]`}
+            className={`${inputClass} pl-[4.5rem] pr-[4.5rem]`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
@@ -293,6 +293,20 @@ export default function BarcodeLookup({
             onChange={(e) => setBarcode(e.target.value)}
             aria-label={t.barcodePlaceholder}
           />
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+            <button
+              type="submit"
+              disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition disabled:opacity-50 disabled:hover:bg-transparent"
+              aria-label={t.barcodeSearch}
+            >
+              {status === "loading" ? (
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Search className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+          </div>
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
             <button
               type="button"
@@ -306,18 +320,6 @@ export default function BarcodeLookup({
               aria-label={t.scanBarcode}
             >
               <Camera className="h-5 w-5" aria-hidden="true" />
-            </button>
-            <button
-              type="submit"
-              disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition disabled:opacity-50 disabled:hover:bg-transparent"
-              aria-label={t.barcodeSearch}
-            >
-              {status === "loading" ? (
-                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-              ) : (
-                <Search className="h-5 w-5" aria-hidden="true" />
-              )}
             </button>
           </div>
         </div>
