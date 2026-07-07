@@ -13,7 +13,6 @@ import {
   Info,
   Trash2,
   UtensilsCrossed,
-  ChevronDown,
 } from "lucide-react";
 import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
@@ -290,14 +289,10 @@ export default function BarcodeLookup({
             type="button"
             onClick={() => setSavedOpen((o) => !o)}
             aria-expanded={savedOpen}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-accent text-accent-foreground px-4 min-h-12 text-sm font-medium hover:bg-accent/90 active:scale-[0.98] transition"
+            aria-label={`${t.savedFoods} (${savedFoods.length})`}
+            className="flex shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground p-3 min-h-12 hover:bg-accent/90 active:scale-[0.98] transition"
           >
-            <Bookmark className="h-4 w-4" aria-hidden="true" />
-            <span>{savedFoods.length}</span>
-            <ChevronDown
-              className={`h-4 w-4 transition-transform ${savedOpen ? "rotate-180" : ""}`}
-              aria-hidden="true"
-            />
+            <Bookmark className="h-5 w-5" aria-hidden="true" />
           </button>
         )}
       </form>
