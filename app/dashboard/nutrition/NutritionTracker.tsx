@@ -169,13 +169,12 @@ function MealBuilderModal({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q
-      ? savedFoods.filter(
-          (f) =>
-            f.name.toLowerCase().includes(q) ||
-            (f.brand ?? "").toLowerCase().includes(q),
-        )
-      : savedFoods;
+    if (!q) return [];
+    return savedFoods.filter(
+      (f) =>
+        f.name.toLowerCase().includes(q) ||
+        (f.brand ?? "").toLowerCase().includes(q),
+    );
   }, [query, savedFoods]);
 
   // ── render ──────────────────────────────────────────────────────────────────
@@ -254,6 +253,10 @@ function MealBuilderModal({
           ) : savedFoods.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {t.savedFoodsEmpty}
+            </p>
+          ) : !query.trim() ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {t.foodSearchHint}
             </p>
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
@@ -459,13 +462,12 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
 
   const filtered = useMemo(() => {
     const q = suppName.trim().toLowerCase();
-    return q
-      ? savedFoods.filter(
-          (f) =>
-            f.name.toLowerCase().includes(q) ||
-            (f.brand ?? "").toLowerCase().includes(q),
-        )
-      : savedFoods;
+    if (!q) return [];
+    return savedFoods.filter(
+      (f) =>
+        f.name.toLowerCase().includes(q) ||
+        (f.brand ?? "").toLowerCase().includes(q),
+    );
   }, [suppName, savedFoods]);
 
   return (
@@ -537,6 +539,8 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
             </ul>
           ) : savedFoods.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">{t.savedFoodsEmpty}</p>
+          ) : !suppName.trim() ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">{t.foodSearchHint}</p>
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{t.noNutritionData}</p>
           ) : (
