@@ -152,14 +152,51 @@ export default function BarcodeScanner({
               </div>
             )}
 
-            {/* Scan frame overlay with corner brackets */}
+            {/* Scan frame overlay */}
             {!starting && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="relative h-28 w-64 max-w-[80%]">
-                  <span className="absolute -left-0.5 -top-0.5 h-7 w-7 rounded-tl-xl border-l-4 border-t-4 border-primary" />
-                  <span className="absolute -right-0.5 -top-0.5 h-7 w-7 rounded-tr-xl border-r-4 border-t-4 border-primary" />
-                  <span className="absolute -bottom-0.5 -left-0.5 h-7 w-7 rounded-bl-xl border-b-4 border-l-4 border-primary" />
-                  <span className="absolute -bottom-0.5 -right-0.5 h-7 w-7 rounded-br-xl border-b-4 border-r-4 border-primary" />
+                {/* dark vignette outside the scan zone */}
+                <div className="absolute inset-0 bg-black/50" />
+
+                {/* Scan rectangle */}
+                <div className="relative z-10 h-32 w-72 max-w-[85%] rounded-2xl bg-black/20 backdrop-blur-[1px]">
+                  {/* Corner brackets */}
+                  <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
+                  <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
+                  <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
+                  <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
+
+                  {/* Barcode icon centered inside */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 64 40"
+                      className="h-10 w-auto opacity-80"
+                      aria-hidden="true"
+                      fill="white"
+                    >
+                      {/* Classic 1D barcode pattern: alternating bars of varying widths */}
+                      <rect x="0"  width="3" height="40" />
+                      <rect x="5"  width="1" height="40" />
+                      <rect x="8"  width="2" height="40" />
+                      <rect x="12" width="1" height="40" />
+                      <rect x="15" width="3" height="40" />
+                      <rect x="20" width="1" height="40" />
+                      <rect x="23" width="2" height="40" />
+                      <rect x="27" width="1" height="40" />
+                      <rect x="30" width="3" height="40" />
+                      <rect x="35" width="1" height="40" />
+                      <rect x="38" width="2" height="40" />
+                      <rect x="42" width="1" height="40" />
+                      <rect x="45" width="3" height="40" />
+                      <rect x="50" width="1" height="40" />
+                      <rect x="53" width="2" height="40" />
+                      <rect x="57" width="1" height="40" />
+                      <rect x="61" width="3" height="40" />
+                    </svg>
+                  </div>
+
+                  {/* Animated scan line */}
+                  <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-primary/80 shadow-[0_0_6px_2px] shadow-primary/40 animate-[scanline_2s_ease-in-out_infinite]" />
                 </div>
               </div>
             )}

@@ -151,6 +151,11 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+@keyframes scanline {
+  0%, 100% { transform: translateY(-50%) translateY(-2rem); opacity: 0.6; }
+  50%       { transform: translateY(-50%) translateY(2rem);  opacity: 1;   }
+}
+
 @utility h-safe-bottom {
   height: env(safe-area-inset-bottom, 0px);
 }
