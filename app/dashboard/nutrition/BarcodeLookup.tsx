@@ -13,6 +13,7 @@ import {
   Info,
   Trash2,
   UtensilsCrossed,
+  ChevronLeft,
 } from "lucide-react";
 import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
@@ -759,14 +760,26 @@ export default function BarcodeLookup({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setDetailFood(null)}
-                aria-label={dict.common.close}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {savedOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setDetailFood(null)}
+                    aria-label="Go back"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+                  >
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDetailFood(null)}
+                  aria-label={dict.common.close}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
 
             <div className="p-5">
