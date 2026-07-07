@@ -756,7 +756,7 @@ export default function BarcodeLookup({
                     <p className="mt-0.5 text-sm text-muted-foreground">{detailFood.brand}</p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {t.barcodePlaceholder}: {detailFood.barcode}
+                    Barcode: {detailFood.barcode}
                   </p>
                 </div>
               </div>
