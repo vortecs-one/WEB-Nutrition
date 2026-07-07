@@ -15,6 +15,7 @@ import {
   Trash2,
   UtensilsCrossed,
   ChevronLeft,
+  Camera,
 } from "lucide-react";
 import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
@@ -34,6 +35,7 @@ import {
   roundOrUndef,
 } from "@/lib/foods/nutrition";
 import NutritionFacts from "./NutritionFacts";
+import BarcodeScanner from "./BarcodeScanner";
 
 type Status = "idle" | "loading" | "not-found" | "error";
 
@@ -87,6 +89,7 @@ export default function BarcodeLookup({
   const [detailFood, setDetailFood] = useState<FoodProduct | null>(null);
   // Track whether the detail view was opened from the saved foods list.
   const [fromSaved, setFromSaved] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const anyModalOpen = savedOpen || detailFood !== null;
   useScrollLock(anyModalOpen);
@@ -123,9 +126,8 @@ export default function BarcodeLookup({
     [product, productBasis],
   );
 
-  const onSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = barcode.replace(/\D+/g, "");
+  const runLookup = async (raw: string) => {
+    const clean = raw.replace(/\D+/g, "");
     if (!clean) return;
     setStatus("loading");
     setProduct(null);
@@ -144,6 +146,19 @@ export default function BarcodeLookup({
       console.error("[v0] Search error:", error);
       setStatus("error");
     }
+  };
+
+  const onSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    void runLookup(barcode);
+  };
+
+  // Called when the camera scanner reads a barcode: close it, fill the input,
+  // and immediately look the product up.
+  const onScanDetected = (code: string) => {
+    setScannerOpen(false);
+    setBarcode(code);
+    void runLookup(code);
   };
 
   const toggleSave = async (p: FoodProduct) => {
@@ -270,7 +285,7 @@ export default function BarcodeLookup({
       <form onSubmit={onSearch} className="flex gap-2">
         <div className="relative flex-1">
           <input
-            className={inputClass}
+            className={`${inputClass} pr-[4.5rem]`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
@@ -278,18 +293,28 @@ export default function BarcodeLookup({
             onChange={(e) => setBarcode(e.target.value)}
             aria-label={t.barcodePlaceholder}
           />
-          <button
-            type="submit"
-            disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-muted-foreground hover:text-foreground transition disabled:opacity-50"
-            aria-label={t.barcodeSearch}
-          >
-            {status === "loading" ? (
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            ) : (
-              <Search className="h-5 w-5" aria-hidden="true" />
-            )}
-          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:scale-95 transition"
+              aria-label={t.scanBarcode}
+            >
+              <Camera className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <button
+              type="submit"
+              disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition disabled:opacity-50 disabled:hover:bg-transparent"
+              aria-label={t.barcodeSearch}
+            >
+              {status === "loading" ? (
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Search className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
         {savedFoods.length > 0 && (
           <button
@@ -814,6 +839,13 @@ export default function BarcodeLookup({
             </div>
           </div>
         </div>
+      )}
+
+      {scannerOpen && (
+        <BarcodeScanner
+          onDetected={onScanDetected}
+          onClose={() => setScannerOpen(false)}
+        />
       )}
     </div>
   );
