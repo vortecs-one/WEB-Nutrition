@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import {
   Egg,
   Soup,
@@ -79,6 +80,7 @@ function MealBuilderModal({
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { addMeals } = useDayLog();
+  useScrollLock(true);
 
   // Fetch saved foods live — uses the shared SWR key so it stays in sync with
   // BarcodeLookup and always reflects the latest saved foods without a refresh.
@@ -432,6 +434,7 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { addSupplement } = useDayLog();
+  useScrollLock(true);
 
   // Live saved-foods list — same shared SWR key, always up to date.
   const { data: savedFoods = [], isLoading: foodsLoading } = useSWR(

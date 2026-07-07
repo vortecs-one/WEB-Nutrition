@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import {
   Barcode,
   Search,
@@ -84,6 +85,11 @@ export default function BarcodeLookup({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [savedOpen, setSavedOpen] = useState(false);
   const [detailFood, setDetailFood] = useState<FoodProduct | null>(null);
+  // Track whether the detail view was opened from the saved foods list.
+  const [fromSaved, setFromSaved] = useState(false);
+
+  const anyModalOpen = savedOpen || detailFood !== null;
+  useScrollLock(anyModalOpen);
 
   // Preloaded saved foods (available immediately in the diet-log flow).
   const {
@@ -487,7 +493,7 @@ export default function BarcodeLookup({
                         key={food.barcode}
                         className="flex items-start gap-3 rounded-xl border border-border bg-background p-3 cursor-pointer hover:bg-accent/50 transition"
                         onClick={() => {
-                          setSavedOpen(false);
+                          setFromSaved(true);
                           setDetailFood(food);
                         }}
                         role="button"
@@ -495,7 +501,7 @@ export default function BarcodeLookup({
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            setSavedOpen(false);
+                            setFromSaved(true);
                             setDetailFood(food);
                           }
                         }}
@@ -533,7 +539,7 @@ export default function BarcodeLookup({
                           <button
                             type="button"
                             onClick={() => {
-                              setSavedOpen(false);
+                              setFromSaved(true);
                               setDetailFood(food);
                             }}
                             aria-label={t.viewDetails}
@@ -761,11 +767,15 @@ export default function BarcodeLookup({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                {savedOpen && (
+                {fromSaved && (
                   <button
                     type="button"
-                    onClick={() => setDetailFood(null)}
-                    aria-label="Go back"
+                    onClick={() => {
+                      setDetailFood(null);
+                      setFromSaved(false);
+                      setSavedOpen(true);
+                    }}
+                    aria-label="Back to saved foods"
                     className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
                   >
                     <ChevronLeft className="h-5 w-5" aria-hidden="true" />
@@ -773,7 +783,11 @@ export default function BarcodeLookup({
                 )}
                 <button
                   type="button"
-                  onClick={() => setDetailFood(null)}
+                  onClick={() => {
+                    setDetailFood(null);
+                    setFromSaved(false);
+                    setSavedOpen(false);
+                  }}
                   aria-label={dict.common.close}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
                 >
@@ -789,6 +803,8 @@ export default function BarcodeLookup({
                 onClick={() => {
                   addToCart(detailFood);
                   setDetailFood(null);
+                  setFromSaved(false);
+                  setSavedOpen(false);
                 }}
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition"
               >
