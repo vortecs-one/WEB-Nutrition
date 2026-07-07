@@ -461,7 +461,16 @@ export default function BarcodeLookup({
                 return (
                   <li
                     key={food.barcode}
-                    className="flex items-start gap-3 rounded-xl border border-border bg-background p-3"
+                    className="flex items-start gap-3 rounded-xl border border-border bg-background p-3 cursor-pointer hover:bg-accent/50 transition"
+                    onClick={() => setDetailFood(food)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setDetailFood(food);
+                      }
+                    }}
                   >
                     {food.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
