@@ -679,7 +679,6 @@ export default function NutritionTracker() {
     <div className="mx-auto w-full max-w-2xl space-y-5">
       {/* Diet log */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
-        <h2 className="text-lg font-semibold mb-4">{t.dietLog}</h2>
 
         {/* Barcode food finder — build meals directly from the diet log */}
         <div className="mb-5 rounded-2xl border border-border bg-muted/30 p-4">

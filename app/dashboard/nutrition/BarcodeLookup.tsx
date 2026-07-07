@@ -441,89 +441,129 @@ export default function BarcodeLookup({
         </div>
       )}
 
-      {/* Preloaded saved foods */}
+      {/* Saved foods modal */}
       {savedOpen && (
-        <div className="rounded-2xl border border-border p-4">
-          <h3 className="mb-3 text-sm font-semibold">
-            {t.savedFoods} ({savedFoods.length})
-          </h3>
-          {loadingSaved ? (
-            <p className="text-sm text-muted-foreground">{dict.common.loading}</p>
-          ) : savedFoods.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t.savedFoodsEmpty}</p>
-          ) : (
-            <ul className="space-y-2 max-h-80 overflow-y-auto">
-              {savedFoods.map((food) => {
-                const v = valuesForBasis(
-                  food.nutrition,
-                  hasBasis(food.nutrition, "serving") ? "serving" : "100g",
-                );
-                return (
-                  <li
-                    key={food.barcode}
-                    className="flex items-start gap-3 rounded-xl border border-border bg-background p-3 cursor-pointer hover:bg-accent/50 transition"
-                    onClick={() => setDetailFood(food)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setDetailFood(food);
-                      }
-                    }}
-                  >
-                    {food.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={food.image || "/placeholder.svg"}
-                        alt={food.name}
-                        loading="lazy"
-                        className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover bg-muted"
-                      />
-                    ) : (
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
-                        <Barcode className="h-5 w-5" aria-hidden="true" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium leading-tight">{food.name}</div>
-                      {food.brand && (
-                        <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
-                      )}
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {macroChips(v).map((c) => (
-                          <span
-                            key={c.label}
-                            className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium"
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+          onClick={() => setSavedOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="w-full sm:max-w-lg bg-card text-card-foreground rounded-t-3xl sm:rounded-3xl shadow-lg max-h-[90vh] flex flex-col"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.savedFoods}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card p-5 rounded-t-3xl sm:rounded-t-3xl shrink-0">
+              <div className="flex items-center gap-2">
+                <Bookmark className="h-5 w-5 text-accent-foreground" aria-hidden="true" />
+                <h3 className="text-base font-semibold">
+                  {t.savedFoods} ({savedFoods.length})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSavedOpen(false)}
+                aria-label={dict.common.close}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto p-5">
+              {loadingSaved ? (
+                <p className="text-sm text-muted-foreground">{dict.common.loading}</p>
+              ) : savedFoods.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t.savedFoodsEmpty}</p>
+              ) : (
+                <ul className="space-y-2">
+                  {savedFoods.map((food) => {
+                    const v = valuesForBasis(
+                      food.nutrition,
+                      hasBasis(food.nutrition, "serving") ? "serving" : "100g",
+                    );
+                    return (
+                      <li
+                        key={food.barcode}
+                        className="flex items-start gap-3 rounded-xl border border-border bg-background p-3 cursor-pointer hover:bg-accent/50 transition"
+                        onClick={() => {
+                          setSavedOpen(false);
+                          setDetailFood(food);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSavedOpen(false);
+                            setDetailFood(food);
+                          }
+                        }}
+                      >
+                        {food.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={food.image || "/placeholder.svg"}
+                            alt={food.name}
+                            loading="lazy"
+                            className="h-12 w-12 shrink-0 rounded-lg border border-border object-cover bg-muted"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                            <Barcode className="h-5 w-5" aria-hidden="true" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium leading-tight">{food.name}</div>
+                          {food.brand && (
+                            <div className="truncate text-xs text-muted-foreground">{food.brand}</div>
+                          )}
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {macroChips(v).map((c) => (
+                              <span
+                                key={c.label}
+                                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium"
+                              >
+                                {c.value} {c.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSavedOpen(false);
+                              setDetailFood(food);
+                            }}
+                            aria-label={t.viewDetails}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition"
                           >
-                            {c.value} {c.label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setDetailFood(food)}
-                        aria-label={t.viewDetails}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition"
-                      >
-                        <Info className="h-5 w-5" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addToCart(food)}
-                        aria-label={`${t.addToMeal}: ${food.name}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition"
-                      >
-                        <Plus className="h-5 w-5" aria-hidden="true" />
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                            <Info className="h-5 w-5" aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addToCart(food);
+                              setSavedOpen(false);
+                            }}
+                            aria-label={`${t.addToMeal}: ${food.name}`}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition"
+                          >
+                            <Plus className="h-5 w-5" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
