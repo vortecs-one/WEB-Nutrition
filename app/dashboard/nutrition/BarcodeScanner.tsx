@@ -30,6 +30,7 @@ export default function BarcodeScanner({
   const t = dict.nutritionUser;
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [starting, setStarting] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,12 +45,12 @@ export default function BarcodeScanner({
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
     const reader = new BrowserMultiFormatReader(hints, {
-      // Small delay between scan attempts keeps CPU/battery usage sane.
       delayBetweenScanAttempts: 200,
     });
 
     async function start() {
       try {
+        // Check API availability — some Android WebViews hide mediaDevices.
         if (
           typeof navigator === "undefined" ||
           !navigator.mediaDevices?.getUserMedia
@@ -58,9 +59,42 @@ export default function BarcodeScanner({
           return;
         }
 
-        controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
-          videoRef.current!,
+        // IMPORTANT: call getUserMedia() explicitly first so Android Chrome /
+        // WebView shows the OS-level camera permission dialog. Passing
+        // constraints straight to decodeFromConstraints skips this step on
+        // many Android builds and the permission is never requested.
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        // Keep a ref so we can stop the tracks in cleanup.
+        streamRef.current = stream;
+
+        // Attach the stream to the video element directly, then hand it to
+        // the zxing reader which can decode frames from an already-playing
+        // video instead of re-opening the camera.
+        const video = videoRef.current!;
+        video.srcObject = stream;
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("muted", "true");
+        await video.play();
+
+        if (cancelled) return;
+        setStarting(false);
+
+        controls = await reader.decodeFromStream(
+          stream,
+          video,
           (result) => {
             if (result && !handled) {
               handled = true;
@@ -73,13 +107,8 @@ export default function BarcodeScanner({
           },
         );
 
-        if (cancelled) {
-          controls.stop();
-          return;
-        }
-        setStarting(false);
+        if (cancelled) controls?.stop();
       } catch (err) {
-        console.error("[v0] Scanner error:", err);
         if (!cancelled) {
           const name = (err as { name?: string })?.name;
           setError(
@@ -96,6 +125,9 @@ export default function BarcodeScanner({
     return () => {
       cancelled = true;
       controls?.stop();
+      // Also stop raw tracks — this releases the camera indicator on Android.
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,6 +167,7 @@ export default function BarcodeScanner({
               className="h-full w-full object-cover"
               playsInline
               muted
+              autoPlay
             />
 
             {starting && (
