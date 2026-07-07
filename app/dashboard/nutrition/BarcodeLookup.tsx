@@ -296,8 +296,13 @@ export default function BarcodeLookup({
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
             <button
               type="button"
-              onClick={() => setScannerOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent active:scale-95 transition"
+              onClick={() => setScannerOpen((o) => !o)}
+              aria-pressed={scannerOpen}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition active:scale-95 ${
+                scannerOpen
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
               aria-label={t.scanBarcode}
             >
               <Camera className="h-5 w-5" aria-hidden="true" />
@@ -328,6 +333,8 @@ export default function BarcodeLookup({
           </button>
         )}
       </form>
+
+      {scannerOpen && <BarcodeScanner onDetected={onScanDetected} />}
 
       {status === "not-found" && (
         <p className="text-sm text-muted-foreground">{t.barcodeNotFound}</p>
@@ -839,13 +846,6 @@ export default function BarcodeLookup({
             </div>
           </div>
         </div>
-      )}
-
-      {scannerOpen && (
-        <BarcodeScanner
-          onDetected={onScanDetected}
-          onClose={() => setScannerOpen(false)}
-        />
       )}
     </div>
   );

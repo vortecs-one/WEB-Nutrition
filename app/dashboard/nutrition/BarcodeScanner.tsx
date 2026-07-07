@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
-import { X, Loader2, CameraOff } from "lucide-react";
-import { useScrollLock } from "@/lib/use-scroll-lock";
+import { Loader2, CameraOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 
 // Product barcodes are almost always 1D retail formats — restricting the
@@ -21,10 +20,8 @@ const PRODUCT_FORMATS = [
 
 export default function BarcodeScanner({
   onDetected,
-  onClose,
 }: {
   onDetected: (code: string) => void;
-  onClose: () => void;
 }) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
@@ -33,8 +30,6 @@ export default function BarcodeScanner({
   const streamRef = useRef<MediaStream | null>(null);
   const [starting, setStarting] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useScrollLock(true);
 
   useEffect(() => {
     let controls: IScannerControls | null = null;
@@ -73,7 +68,7 @@ export default function BarcodeScanner({
         });
 
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          stream.getTracks().forEach((tr) => tr.stop());
           return;
         }
 
@@ -92,20 +87,16 @@ export default function BarcodeScanner({
         if (cancelled) return;
         setStarting(false);
 
-        controls = await reader.decodeFromStream(
-          stream,
-          video,
-          (result) => {
-            if (result && !handled) {
-              handled = true;
-              const text = result.getText().replace(/\D+/g, "");
-              if (text) {
-                onDetected(text);
-                controls?.stop();
-              }
+        controls = await reader.decodeFromStream(stream, video, (result) => {
+          if (result && !handled) {
+            handled = true;
+            const text = result.getText().replace(/\D+/g, "");
+            if (text) {
+              onDetected(text);
+              controls?.stop();
             }
-          },
-        );
+          }
+        });
 
         if (cancelled) controls?.stop();
       } catch (err) {
@@ -126,37 +117,19 @@ export default function BarcodeScanner({
       cancelled = true;
       controls?.stop();
       // Also stop raw tracks — this releases the camera indicator on Android.
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex flex-col bg-black"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.scannerTitle}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 text-white">
-        <h3 className="text-base font-semibold">{t.scannerTitle}</h3>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={dict.common.close}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:scale-95 transition"
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
-
+    <div className="overflow-hidden rounded-2xl border border-border bg-black">
       {/* Camera viewport */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative aspect-[4/3] w-full">
         {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center text-white">
-            <CameraOff className="h-10 w-10 text-white/70" aria-hidden="true" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
+            <CameraOff className="h-9 w-9 text-white/70" aria-hidden="true" />
             <p className="text-sm text-white/80 text-pretty">{error}</p>
           </div>
         ) : (
@@ -171,7 +144,7 @@ export default function BarcodeScanner({
             />
 
             {starting && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                 <Loader2
                   className="h-8 w-8 animate-spin text-white"
                   aria-hidden="true"
@@ -179,14 +152,14 @@ export default function BarcodeScanner({
               </div>
             )}
 
-            {/* Scan frame overlay */}
+            {/* Scan frame overlay with corner brackets */}
             {!starting && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="relative h-40 w-72 max-w-[80%] rounded-2xl">
-                  <span className="absolute -left-0.5 -top-0.5 h-8 w-8 rounded-tl-2xl border-l-4 border-t-4 border-primary" />
-                  <span className="absolute -right-0.5 -top-0.5 h-8 w-8 rounded-tr-2xl border-r-4 border-t-4 border-primary" />
-                  <span className="absolute -bottom-0.5 -left-0.5 h-8 w-8 rounded-bl-2xl border-b-4 border-l-4 border-primary" />
-                  <span className="absolute -bottom-0.5 -right-0.5 h-8 w-8 rounded-br-2xl border-b-4 border-r-4 border-primary" />
+                <div className="relative h-28 w-64 max-w-[80%]">
+                  <span className="absolute -left-0.5 -top-0.5 h-7 w-7 rounded-tl-xl border-l-4 border-t-4 border-primary" />
+                  <span className="absolute -right-0.5 -top-0.5 h-7 w-7 rounded-tr-xl border-r-4 border-t-4 border-primary" />
+                  <span className="absolute -bottom-0.5 -left-0.5 h-7 w-7 rounded-bl-xl border-b-4 border-l-4 border-primary" />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-7 w-7 rounded-br-xl border-b-4 border-r-4 border-primary" />
                 </div>
               </div>
             )}
@@ -195,9 +168,11 @@ export default function BarcodeScanner({
       </div>
 
       {/* Hint */}
-      <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 text-center">
-        <p className="text-sm text-white/80 text-pretty">{t.scannerHint}</p>
-      </div>
+      {!error && (
+        <p className="px-4 py-3 text-center text-sm text-white/80 text-pretty">
+          {t.scannerHint}
+        </p>
+      )}
     </div>
   );
 }
