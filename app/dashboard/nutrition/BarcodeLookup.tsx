@@ -262,29 +262,29 @@ export default function BarcodeLookup({
 
       {/* Search */}
       <form onSubmit={onSearch} className="flex gap-2">
-        <input
-          className={inputClass}
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder={t.barcodePlaceholder}
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          aria-label={t.barcodePlaceholder}
-        />
-        <button
-          type="submit"
-          disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
-          className="flex shrink-0 items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100"
-        >
-          {status === "loading" ? (
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-          ) : (
-            <Search className="h-5 w-5" aria-hidden="true" />
-          )}
-          <span className="hidden sm:inline">
-            {status === "loading" ? t.barcodeSearching : t.barcodeSearch}
-          </span>
-        </button>
+        <div className="relative flex-1">
+          <input
+            className={inputClass}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder={t.barcodePlaceholder}
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            aria-label={t.barcodePlaceholder}
+          />
+          <button
+            type="submit"
+            disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-muted-foreground hover:text-foreground transition disabled:opacity-50"
+            aria-label={t.barcodeSearch}
+          >
+            {status === "loading" ? (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Search className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </div>
         {savedFoods.length > 0 && (
           <button
             type="button"
