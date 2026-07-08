@@ -17,9 +17,34 @@ const PRODUCT_FORMATS = [
   BarcodeFormat.ITF,
 ];
 
+// Native BarcodeDetector format equivalents (Android Chrome / modern browsers).
+const NATIVE_FORMATS = [
+  "ean_13",
+  "ean_8",
+  "upc_a",
+  "upc_e",
+  "code_128",
+  "code_39",
+  "itf",
+];
+
+// How often to attempt a decode (ms). Running every animation frame (~16ms)
+// is wasteful and can starve the decoder; ~8 attempts/sec is plenty.
+const DECODE_INTERVAL_MS = 120;
+
 const hints = new Map();
 hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
 hints.set(DecodeHintType.TRY_HARDER, true);
+
+// Minimal typing for the native BarcodeDetector API (not in TS DOM libs yet).
+type NativeBarcode = { rawValue: string };
+type NativeDetector = {
+  detect: (source: CanvasImageSource) => Promise<NativeBarcode[]>;
+};
+type BarcodeDetectorCtor = {
+  new (options?: { formats?: string[] }): NativeDetector;
+  getSupportedFormats?: () => Promise<string[]>;
+};
 
 export default function BarcodeScanner({
   active,
@@ -35,75 +60,116 @@ export default function BarcodeScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectedRef = useRef(false);
 
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Manual rAF-driven decode loop — grabs the current video frame, draws it to
-  // an offscreen canvas, and decodes it synchronously. Retries every frame
-  // until a barcode is found or the scanner is deactivated. This is far more
-  // reliable on mobile than ZXing's internal polling (`decodeFromStream`).
-  const startDecodeLoop = useCallback(
-    (reader: BrowserMultiFormatReader, video: HTMLVideoElement) => {
-      // Lazily create the offscreen canvas used to sample video frames.
-      if (!canvasRef.current) {
-        canvasRef.current = document.createElement("canvas");
-      }
-
-      const tick = () => {
-        if (detectedRef.current || !streamRef.current) return;
-
-        const canvas = canvasRef.current;
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-
-        // Wait until the video has real dimensions before sampling.
-        if (!canvas || vw === 0 || vh === 0) {
-          rafRef.current = requestAnimationFrame(tick);
-          return;
-        }
-
-        try {
-          canvas.width = vw;
-          canvas.height = vh;
-          const ctx = canvas.getContext("2d", { willReadFrequently: true });
-          if (!ctx) {
-            rafRef.current = requestAnimationFrame(tick);
-            return;
-          }
-          ctx.drawImage(video, 0, 0, vw, vh);
-
-          const result = reader.decodeFromCanvas(canvas);
-          const text = result.getText().replace(/\D+/g, "");
-          if (text && !detectedRef.current) {
-            detectedRef.current = true;
-            // Stop the stream immediately after detection.
-            streamRef.current?.getTracks().forEach((tr) => tr.stop());
-            streamRef.current = null;
-            onDetected(text);
-            return;
-          }
-          rafRef.current = requestAnimationFrame(tick);
-        } catch (err) {
-          // NotFoundException is normal — no barcode in this frame yet.
-          if (!(err instanceof NotFoundException)) {
-            console.error("[v0] BarcodeScanner decode error:", err);
-          }
-          rafRef.current = requestAnimationFrame(tick);
-        }
-      };
-
-      rafRef.current = requestAnimationFrame(tick);
+  // Fire the detection callback exactly once, then tear down the stream.
+  const handleFound = useCallback(
+    (raw: string) => {
+      const text = raw.replace(/\D+/g, "");
+      if (!text || detectedRef.current) return;
+      detectedRef.current = true;
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current = null;
+      onDetected(text);
     },
     [onDetected],
   );
 
+  // Decode loop. Prefers the native BarcodeDetector API (fast + reliable on
+  // Android Chrome / WebView); falls back to ZXing canvas decoding elsewhere.
+  const startDecodeLoop = useCallback(
+    (reader: BrowserMultiFormatReader, video: HTMLVideoElement) => {
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement("canvas");
+      }
+
+      // Try to build a native detector if the platform supports it.
+      let nativeDetector: NativeDetector | null = null;
+      const Ctor = (
+        globalThis as unknown as { BarcodeDetector?: BarcodeDetectorCtor }
+      ).BarcodeDetector;
+      if (Ctor) {
+        try {
+          nativeDetector = new Ctor({ formats: NATIVE_FORMATS });
+          console.log("[v0] BarcodeScanner: using native BarcodeDetector");
+        } catch {
+          nativeDetector = null;
+        }
+      }
+      if (!nativeDetector) {
+        console.log("[v0] BarcodeScanner: using ZXing fallback decoder");
+      }
+
+      const scheduleNext = () => {
+        if (detectedRef.current || !streamRef.current) return;
+        timerRef.current = setTimeout(tick, DECODE_INTERVAL_MS);
+      };
+
+      const decodeWithZxing = (): string | null => {
+        const canvas = canvasRef.current;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (!canvas || vw === 0 || vh === 0) return null;
+        canvas.width = vw;
+        canvas.height = vh;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return null;
+        ctx.drawImage(video, 0, 0, vw, vh);
+        try {
+          const result = reader.decodeFromCanvas(canvas);
+          return result.getText();
+        } catch (err) {
+          // NotFoundException just means no barcode in this frame.
+          if (!(err instanceof NotFoundException)) {
+            console.error("[v0] BarcodeScanner ZXing error:", err);
+          }
+          return null;
+        }
+      };
+
+      const tick = async () => {
+        if (detectedRef.current || !streamRef.current) return;
+
+        // Wait for real video dimensions before trying to decode.
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+          scheduleNext();
+          return;
+        }
+
+        try {
+          if (nativeDetector) {
+            const codes = await nativeDetector.detect(video);
+            if (codes && codes.length > 0 && codes[0].rawValue) {
+              handleFound(codes[0].rawValue);
+              return;
+            }
+          } else {
+            const text = decodeWithZxing();
+            if (text) {
+              handleFound(text);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("[v0] BarcodeScanner detect error:", err);
+        }
+
+        scheduleNext();
+      };
+
+      void tick();
+    },
+    [handleFound],
+  );
+
   const stopAll = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     streamRef.current = null;
@@ -142,8 +208,8 @@ export default function BarcodeScanner({
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
           audio: false,
         });
@@ -154,6 +220,24 @@ export default function BarcodeScanner({
         }
 
         streamRef.current = stream;
+
+        // Ask the camera for continuous autofocus — barcodes are usually held
+        // close to the lens, and without this many Android cameras stay fixed
+        // at infinity focus and never resolve the bars.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track.getCapabilities?.() as
+            | { focusMode?: string[] }
+            | undefined;
+          if (caps?.focusMode?.includes("continuous")) {
+            await track.applyConstraints({
+              // @ts-expect-error focusMode isn't in the standard TS types yet
+              advanced: [{ focusMode: "continuous" }],
+            });
+          }
+        } catch {
+          // Non-fatal — focus tuning is a best-effort enhancement.
+        }
 
         const video = videoRef.current!;
         video.srcObject = stream;
@@ -167,10 +251,26 @@ export default function BarcodeScanner({
           return;
         }
 
+        // Wait until the video actually has frame data before decoding.
+        if (video.readyState < 2) {
+          await new Promise<void>((resolve) => {
+            const onReady = () => {
+              video.removeEventListener("loadeddata", onReady);
+              resolve();
+            };
+            video.addEventListener("loadeddata", onReady);
+          });
+        }
+
+        if (cancelled) {
+          stopAll();
+          return;
+        }
+
         setStarting(false);
 
-        // Small delay to let the first frames settle (especially on Android).
-        await new Promise((r) => setTimeout(r, 300));
+        // Small delay to let autofocus settle (especially on Android).
+        await new Promise((r) => setTimeout(r, 400));
 
         if (!cancelled) {
           startDecodeLoop(reader, video);
