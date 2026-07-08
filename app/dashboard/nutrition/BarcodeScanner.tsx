@@ -33,6 +33,7 @@ export default function BarcodeScanner({
   const t = dict.nutritionUser;
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const detectedRef = useRef(false);
@@ -40,17 +41,41 @@ export default function BarcodeScanner({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Manual rAF-driven decode loop — fires once per animation frame and retries
+  // Manual rAF-driven decode loop — grabs the current video frame, draws it to
+  // an offscreen canvas, and decodes it synchronously. Retries every frame
   // until a barcode is found or the scanner is deactivated. This is far more
   // reliable on mobile than ZXing's internal polling (`decodeFromStream`).
   const startDecodeLoop = useCallback(
     (reader: BrowserMultiFormatReader, video: HTMLVideoElement) => {
+      // Lazily create the offscreen canvas used to sample video frames.
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement("canvas");
+      }
+
       const tick = () => {
-        if (detectedRef.current) return;
-        if (!streamRef.current) return;
+        if (detectedRef.current || !streamRef.current) return;
+
+        const canvas = canvasRef.current;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+
+        // Wait until the video has real dimensions before sampling.
+        if (!canvas || vw === 0 || vh === 0) {
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
 
         try {
-          const result = reader.decodeFromVideoElement(video);
+          canvas.width = vw;
+          canvas.height = vh;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (!ctx) {
+            rafRef.current = requestAnimationFrame(tick);
+            return;
+          }
+          ctx.drawImage(video, 0, 0, vw, vh);
+
+          const result = reader.decodeFromCanvas(canvas);
           const text = result.getText().replace(/\D+/g, "");
           if (text && !detectedRef.current) {
             detectedRef.current = true;
@@ -58,15 +83,15 @@ export default function BarcodeScanner({
             streamRef.current?.getTracks().forEach((tr) => tr.stop());
             streamRef.current = null;
             onDetected(text);
+            return;
           }
+          rafRef.current = requestAnimationFrame(tick);
         } catch (err) {
           // NotFoundException is normal — no barcode in this frame yet.
-          if (err instanceof NotFoundException) {
-            rafRef.current = requestAnimationFrame(tick);
-          } else {
+          if (!(err instanceof NotFoundException)) {
             console.error("[v0] BarcodeScanner decode error:", err);
-            rafRef.current = requestAnimationFrame(tick);
           }
+          rafRef.current = requestAnimationFrame(tick);
         }
       };
 
