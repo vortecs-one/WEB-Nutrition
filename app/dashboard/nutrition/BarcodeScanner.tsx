@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
-import { Loader2, CameraOff, VideoOff } from "lucide-react";
+import { Loader2, CameraOff, VideoOff, Zap, ZapOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 
 // Product barcodes — restrict to common retail 1D formats for speed.
@@ -65,6 +65,8 @@ export default function BarcodeScanner({
 
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
 
   // Fire the detection callback exactly once, then tear down the stream.
   const handleFound = useCallback(
@@ -95,13 +97,9 @@ export default function BarcodeScanner({
       if (Ctor) {
         try {
           nativeDetector = new Ctor({ formats: NATIVE_FORMATS });
-          console.log("[v0] BarcodeScanner: using native BarcodeDetector");
         } catch {
           nativeDetector = null;
         }
-      }
-      if (!nativeDetector) {
-        console.log("[v0] BarcodeScanner: using ZXing fallback decoder");
       }
 
       const scheduleNext = () => {
@@ -123,9 +121,9 @@ export default function BarcodeScanner({
           const result = reader.decodeFromCanvas(canvas);
           return result.getText();
         } catch (err) {
-          // NotFoundException just means no barcode in this frame.
+          // NotFoundException just means no barcode in this frame — expected.
           if (!(err instanceof NotFoundException)) {
-            console.error("[v0] BarcodeScanner ZXing error:", err);
+            console.error("BarcodeScanner ZXing error:", err);
           }
           return null;
         }
@@ -155,7 +153,7 @@ export default function BarcodeScanner({
             }
           }
         } catch (err) {
-          console.error("[v0] BarcodeScanner detect error:", err);
+          console.error("BarcodeScanner detect error:", err);
         }
 
         scheduleNext();
@@ -177,7 +175,25 @@ export default function BarcodeScanner({
       videoRef.current.srcObject = null;
     }
     detectedRef.current = false;
+    setTorchOn(false);
+    setTorchSupported(false);
   }, []);
+
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        // @ts-expect-error torch is not in standard TS types yet
+        advanced: [{ torch: next }],
+      });
+      setTorchOn(next);
+    } catch {
+      // Device reported torch support but failed — hide the button.
+      setTorchSupported(false);
+    }
+  }, [torchOn]);
 
   useEffect(() => {
     if (!active) {
@@ -237,6 +253,19 @@ export default function BarcodeScanner({
           }
         } catch {
           // Non-fatal — focus tuning is a best-effort enhancement.
+        }
+
+        // Check if the track supports the torch/flashlight constraint.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track.getCapabilities?.() as
+            | { torch?: boolean }
+            | undefined;
+          if (caps?.torch) {
+            setTorchSupported(true);
+          }
+        } catch {
+          // Non-fatal.
         }
 
         const video = videoRef.current!;
@@ -385,6 +414,27 @@ export default function BarcodeScanner({
               {/* Animated scan line */}
               <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-primary/80 shadow-[0_0_6px_2px] shadow-primary/40 animate-[scanline_2s_ease-in-out_infinite]" />
             </div>
+
+            {/* Torch toggle — only shown when the device supports it */}
+            {torchSupported && (
+              <button
+                type="button"
+                onClick={toggleTorch}
+                aria-label={torchOn ? t.scannerTorchOff : t.scannerTorchOn}
+                aria-pressed={torchOn}
+                className={`pointer-events-auto absolute bottom-4 right-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border transition-colors duration-200 ${
+                  torchOn
+                    ? "border-primary bg-primary text-black"
+                    : "border-white/40 bg-black/50 text-white/80 hover:border-white/70 hover:text-white"
+                }`}
+              >
+                {torchOn ? (
+                  <ZapOff className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <Zap className="h-5 w-5" aria-hidden="true" />
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>

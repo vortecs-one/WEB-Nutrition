@@ -107,6 +107,8 @@ const en: Dictionary = {
     scannerHint: "Point your camera at a product barcode",
     scannerError: "Couldn't access the camera. Check permissions and try again.",
     scannerNoCamera: "No camera found on this device.",
+    scannerTorchOn: "Turn flash on",
+    scannerTorchOff: "Turn flash off",
     perServing: "Per serving",
     per100g: "Per 100 g",
     addToLog: "Add to diet log",

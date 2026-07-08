@@ -106,6 +106,8 @@ const es = {
     scannerHint: "Apunta la cámara al código de barras del producto",
     scannerError: "No se pudo acceder a la cámara. Revisa los permisos e inténtalo de nuevo.",
     scannerNoCamera: "No se encontró ninguna cámara en este dispositivo.",
+    scannerTorchOn: "Encender linterna",
+    scannerTorchOff: "Apagar linterna",
     perServing: "Por porción",
     per100g: "Por 100 g",
     addToLog: "Agregar al registro",
