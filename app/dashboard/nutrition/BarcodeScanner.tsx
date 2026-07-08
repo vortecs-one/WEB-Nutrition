@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType } from "@zxing/library";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
 import { Loader2, CameraOff, VideoOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 
-// Product barcodes are almost always 1D retail formats — restricting the
-// decoder to these makes detection noticeably faster and more reliable.
+// Product barcodes — restrict to common retail 1D formats for speed.
 const PRODUCT_FORMATS = [
   BarcodeFormat.EAN_13,
   BarcodeFormat.EAN_8,
@@ -17,6 +16,10 @@ const PRODUCT_FORMATS = [
   BarcodeFormat.CODE_39,
   BarcodeFormat.ITF,
 ];
+
+const hints = new Map();
+hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
+hints.set(DecodeHintType.TRY_HARDER, true);
 
 export default function BarcodeScanner({
   active,
@@ -31,39 +34,78 @@ export default function BarcodeScanner({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const detectedRef = useRef(false);
+
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Manual rAF-driven decode loop — fires once per animation frame and retries
+  // until a barcode is found or the scanner is deactivated. This is far more
+  // reliable on mobile than ZXing's internal polling (`decodeFromStream`).
+  const startDecodeLoop = useCallback(
+    (reader: BrowserMultiFormatReader, video: HTMLVideoElement) => {
+      const tick = () => {
+        if (detectedRef.current) return;
+        if (!streamRef.current) return;
+
+        try {
+          const result = reader.decodeFromVideoElement(video);
+          const text = result.getText().replace(/\D+/g, "");
+          if (text && !detectedRef.current) {
+            detectedRef.current = true;
+            // Stop the stream immediately after detection.
+            streamRef.current?.getTracks().forEach((tr) => tr.stop());
+            streamRef.current = null;
+            onDetected(text);
+          }
+        } catch (err) {
+          // NotFoundException is normal — no barcode in this frame yet.
+          if (err instanceof NotFoundException) {
+            rafRef.current = requestAnimationFrame(tick);
+          } else {
+            console.error("[v0] BarcodeScanner decode error:", err);
+            rafRef.current = requestAnimationFrame(tick);
+          }
+        }
+      };
+
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [onDetected],
+  );
+
+  const stopAll = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    detectedRef.current = false;
+  }, []);
+
   useEffect(() => {
-    // When not active, stop any running stream and reset state.
     if (!active) {
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+      stopAll();
       setStarting(false);
       setError(null);
       return;
     }
 
-    // Active — start the camera stream.
-    let controls: IScannerControls | null = null;
     let cancelled = false;
-    let handled = false;
 
     setStarting(true);
     setError(null);
+    detectedRef.current = false;
 
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
-    const reader = new BrowserMultiFormatReader(hints, {
-      delayBetweenScanAttempts: 200,
-    });
+    const reader = new BrowserMultiFormatReader(hints);
 
     async function start() {
       try {
-        // Check API availability — some Android WebViews hide mediaDevices.
         if (
           typeof navigator === "undefined" ||
           !navigator.mediaDevices?.getUserMedia
@@ -72,8 +114,6 @@ export default function BarcodeScanner({
           return;
         }
 
-        // IMPORTANT: call getUserMedia() explicitly first so Android Chrome /
-        // WebView shows the OS-level camera permission dialog.
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
@@ -94,23 +134,22 @@ export default function BarcodeScanner({
         video.srcObject = stream;
         video.setAttribute("playsinline", "true");
         video.setAttribute("muted", "true");
+
         await video.play();
 
-        if (cancelled) return;
+        if (cancelled) {
+          stopAll();
+          return;
+        }
+
         setStarting(false);
 
-        controls = await reader.decodeFromStream(stream, video, (result) => {
-          if (result && !handled) {
-            handled = true;
-            const text = result.getText().replace(/\D+/g, "");
-            if (text) {
-              onDetected(text);
-              controls?.stop();
-            }
-          }
-        });
+        // Small delay to let the first frames settle (especially on Android).
+        await new Promise((r) => setTimeout(r, 300));
 
-        if (cancelled) controls?.stop();
+        if (!cancelled) {
+          startDecodeLoop(reader, video);
+        }
       } catch (err) {
         if (!cancelled) {
           const name = (err as { name?: string })?.name;
@@ -128,17 +167,16 @@ export default function BarcodeScanner({
 
     return () => {
       cancelled = true;
-      controls?.stop();
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
+      stopAll();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-black">
       {/* Camera viewport */}
       <div className="relative aspect-[4/3] w-full">
+
         {/* Idle / camera-off state */}
         {!active && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
@@ -155,17 +193,19 @@ export default function BarcodeScanner({
           </div>
         )}
 
-        {/* Video element — always in the DOM when active */}
+        {/* Video — always in the DOM so the ref is always valid */}
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
-          className={`h-full w-full object-cover transition-opacity duration-300 ${active && !error ? "opacity-100" : "opacity-0"}`}
+          className={`h-full w-full object-cover transition-opacity duration-300 ${
+            active && !error ? "opacity-100" : "opacity-0"
+          }`}
           playsInline
           muted
           autoPlay
         />
 
-        {/* Loading spinner overlay */}
+        {/* Loading spinner */}
         {active && starting && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <Loader2
@@ -175,10 +215,10 @@ export default function BarcodeScanner({
           </div>
         )}
 
-        {/* Scan frame overlay — only when active and ready */}
+        {/* Scan frame overlay */}
         {active && !starting && !error && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            {/* dark vignette outside the scan zone */}
+            {/* Vignette */}
             <div className="absolute inset-0 bg-black/50" />
 
             {/* Scan rectangle */}
@@ -189,7 +229,7 @@ export default function BarcodeScanner({
               <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
               <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
 
-              {/* Barcode icon centered inside */}
+              {/* Barcode icon */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <svg
                   viewBox="0 0 64 40"
@@ -224,7 +264,7 @@ export default function BarcodeScanner({
         )}
       </div>
 
-      {/* Hint */}
+      {/* Hint text */}
       <p className="px-4 py-3 text-center text-sm text-white/80 text-pretty">
         {active && !error ? t.scannerHint : t.scanBarcode}
       </p>
