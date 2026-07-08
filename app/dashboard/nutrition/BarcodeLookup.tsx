@@ -153,8 +153,8 @@ export default function BarcodeLookup({
     void runLookup(barcode);
   };
 
-  // Called when the camera scanner reads a barcode: close it, fill the input,
-  // and immediately look the product up.
+  // Called when the camera scanner reads a barcode: deactivate it, fill the
+  // input, and immediately look the product up.
   const onScanDetected = (code: string) => {
     setScannerOpen(false);
     setBarcode(code);
@@ -336,7 +336,7 @@ export default function BarcodeLookup({
         )}
       </form>
 
-      {scannerOpen && <BarcodeScanner onDetected={onScanDetected} />}
+      <BarcodeScanner active={scannerOpen} onDetected={onScanDetected} />
 
       {status === "not-found" && (
         <p className="text-sm text-muted-foreground">{t.barcodeNotFound}</p>

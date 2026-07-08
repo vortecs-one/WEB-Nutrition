@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
-import { Loader2, CameraOff } from "lucide-react";
+import { Loader2, CameraOff, VideoOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 
 // Product barcodes are almost always 1D retail formats — restricting the
@@ -19,8 +19,11 @@ const PRODUCT_FORMATS = [
 ];
 
 export default function BarcodeScanner({
+  active,
   onDetected,
 }: {
+  /** When false the camera stream is stopped but the frame stays visible. */
+  active: boolean;
   onDetected: (code: string) => void;
 }) {
   const { dict } = useI18n();
@@ -28,14 +31,29 @@ export default function BarcodeScanner({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [starting, setStarting] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // When not active, stop any running stream and reset state.
+    if (!active) {
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current = null;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      setStarting(false);
+      setError(null);
+      return;
+    }
+
+    // Active — start the camera stream.
     let controls: IScannerControls | null = null;
     let cancelled = false;
-    // Guard so we only report the first successful decode.
     let handled = false;
+
+    setStarting(true);
+    setError(null);
 
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
@@ -55,9 +73,7 @@ export default function BarcodeScanner({
         }
 
         // IMPORTANT: call getUserMedia() explicitly first so Android Chrome /
-        // WebView shows the OS-level camera permission dialog. Passing
-        // constraints straight to decodeFromConstraints skips this step on
-        // many Android builds and the permission is never requested.
+        // WebView shows the OS-level camera permission dialog.
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
@@ -72,12 +88,8 @@ export default function BarcodeScanner({
           return;
         }
 
-        // Keep a ref so we can stop the tracks in cleanup.
         streamRef.current = stream;
 
-        // Attach the stream to the video element directly, then hand it to
-        // the zxing reader which can decode frames from an already-playing
-        // video instead of re-opening the camera.
         const video = videoRef.current!;
         video.srcObject = stream;
         video.setAttribute("playsinline", "true");
@@ -107,6 +119,7 @@ export default function BarcodeScanner({
               ? t.scannerNoCamera
               : t.scannerError,
           );
+          setStarting(false);
         }
       }
     }
@@ -116,100 +129,105 @@ export default function BarcodeScanner({
     return () => {
       cancelled = true;
       controls?.stop();
-      // Also stop raw tracks — this releases the camera indicator on Android.
       streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [active]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-black">
       {/* Camera viewport */}
       <div className="relative aspect-[4/3] w-full">
-        {error ? (
+        {/* Idle / camera-off state */}
+        {!active && !error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
+            <VideoOff className="h-9 w-9 text-white/40" aria-hidden="true" />
+            <p className="text-sm text-white/50 text-pretty">{t.scanBarcode}</p>
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
             <CameraOff className="h-9 w-9 text-white/70" aria-hidden="true" />
             <p className="text-sm text-white/80 text-pretty">{error}</p>
           </div>
-        ) : (
-          <>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              ref={videoRef}
-              className="h-full w-full object-cover"
-              playsInline
-              muted
-              autoPlay
+        )}
+
+        {/* Video element — always in the DOM when active */}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          ref={videoRef}
+          className={`h-full w-full object-cover transition-opacity duration-300 ${active && !error ? "opacity-100" : "opacity-0"}`}
+          playsInline
+          muted
+          autoPlay
+        />
+
+        {/* Loading spinner overlay */}
+        {active && starting && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <Loader2
+              className="h-8 w-8 animate-spin text-white"
+              aria-hidden="true"
             />
+          </div>
+        )}
 
-            {starting && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <Loader2
-                  className="h-8 w-8 animate-spin text-white"
+        {/* Scan frame overlay — only when active and ready */}
+        {active && !starting && !error && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            {/* dark vignette outside the scan zone */}
+            <div className="absolute inset-0 bg-black/50" />
+
+            {/* Scan rectangle */}
+            <div className="relative z-10 h-32 w-72 max-w-[85%] rounded-2xl bg-black/20 backdrop-blur-[1px]">
+              {/* Corner brackets */}
+              <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
+              <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
+              <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
+              <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
+
+              {/* Barcode icon centered inside */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg
+                  viewBox="0 0 64 40"
+                  className="h-10 w-auto opacity-80"
                   aria-hidden="true"
-                />
+                  fill="white"
+                >
+                  <rect x="0"  width="3" height="40" />
+                  <rect x="5"  width="1" height="40" />
+                  <rect x="8"  width="2" height="40" />
+                  <rect x="12" width="1" height="40" />
+                  <rect x="15" width="3" height="40" />
+                  <rect x="20" width="1" height="40" />
+                  <rect x="23" width="2" height="40" />
+                  <rect x="27" width="1" height="40" />
+                  <rect x="30" width="3" height="40" />
+                  <rect x="35" width="1" height="40" />
+                  <rect x="38" width="2" height="40" />
+                  <rect x="42" width="1" height="40" />
+                  <rect x="45" width="3" height="40" />
+                  <rect x="50" width="1" height="40" />
+                  <rect x="53" width="2" height="40" />
+                  <rect x="57" width="1" height="40" />
+                  <rect x="61" width="3" height="40" />
+                </svg>
               </div>
-            )}
 
-            {/* Scan frame overlay */}
-            {!starting && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                {/* dark vignette outside the scan zone */}
-                <div className="absolute inset-0 bg-black/50" />
-
-                {/* Scan rectangle */}
-                <div className="relative z-10 h-32 w-72 max-w-[85%] rounded-2xl bg-black/20 backdrop-blur-[1px]">
-                  {/* Corner brackets */}
-                  <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
-                  <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
-                  <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
-                  <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
-
-                  {/* Barcode icon centered inside */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <svg
-                      viewBox="0 0 64 40"
-                      className="h-10 w-auto opacity-80"
-                      aria-hidden="true"
-                      fill="white"
-                    >
-                      {/* Classic 1D barcode pattern: alternating bars of varying widths */}
-                      <rect x="0"  width="3" height="40" />
-                      <rect x="5"  width="1" height="40" />
-                      <rect x="8"  width="2" height="40" />
-                      <rect x="12" width="1" height="40" />
-                      <rect x="15" width="3" height="40" />
-                      <rect x="20" width="1" height="40" />
-                      <rect x="23" width="2" height="40" />
-                      <rect x="27" width="1" height="40" />
-                      <rect x="30" width="3" height="40" />
-                      <rect x="35" width="1" height="40" />
-                      <rect x="38" width="2" height="40" />
-                      <rect x="42" width="1" height="40" />
-                      <rect x="45" width="3" height="40" />
-                      <rect x="50" width="1" height="40" />
-                      <rect x="53" width="2" height="40" />
-                      <rect x="57" width="1" height="40" />
-                      <rect x="61" width="3" height="40" />
-                    </svg>
-                  </div>
-
-                  {/* Animated scan line */}
-                  <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-primary/80 shadow-[0_0_6px_2px] shadow-primary/40 animate-[scanline_2s_ease-in-out_infinite]" />
-                </div>
-              </div>
-            )}
-          </>
+              {/* Animated scan line */}
+              <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-primary/80 shadow-[0_0_6px_2px] shadow-primary/40 animate-[scanline_2s_ease-in-out_infinite]" />
+            </div>
+          </div>
         )}
       </div>
 
       {/* Hint */}
-      {!error && (
-        <p className="px-4 py-3 text-center text-sm text-white/80 text-pretty">
-          {t.scannerHint}
-        </p>
-      )}
+      <p className="px-4 py-3 text-center text-sm text-white/80 text-pretty">
+        {active && !error ? t.scannerHint : t.scanBarcode}
+      </p>
     </div>
   );
 }
