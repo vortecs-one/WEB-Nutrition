@@ -684,13 +684,13 @@ export default function NutritionTracker() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
+      {/* Barcode scanner — at the top for easy access */}
+      <div className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm p-4">
+        <BarcodeLookup todayKey={todayKey} embedded />
+      </div>
+
       {/* Diet log */}
       <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
-
-        {/* Barcode food finder — build meals directly from the diet log */}
-        <div className="mb-5 rounded-2xl border border-border bg-muted/30 p-4">
-          <BarcodeLookup todayKey={todayKey} embedded />
-        </div>
 
         <div className="grid grid-cols-5 gap-1.5">
           {mealTypes.map(({ type, label, icon: Icon }) => {
