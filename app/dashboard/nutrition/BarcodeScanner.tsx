@@ -329,7 +329,7 @@ export default function BarcodeScanner({
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-black">
       {/* Camera viewport */}
-      <div className="relative aspect-[9/16] w-full">
+      <div className="relative aspect-[16/9] w-full max-w-sm mx-auto">
 
         {/* Idle / camera-off state */}
         {!active && !error && (
