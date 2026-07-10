@@ -335,7 +335,8 @@ export async function testLibreConnection(input: {
 
   try {
     const session = await libreLogin(email, password);
-    const patients = (await libreGetConnections(session)).map((p) => ({
+    const rawPatients = await libreGetConnections(session);
+    const patients = rawPatients.map((p) => ({
       patientId: p.patientId,
       name: [p.firstName, p.lastName].filter(Boolean).join(" "),
       currentMgdl: p.currentMgdl,
