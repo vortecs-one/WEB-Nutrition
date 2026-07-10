@@ -13,6 +13,7 @@ import {
   Boxes,
   UserCircle,
   Flame,
+  Activity,
   type LucideProps,
 } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -99,6 +100,12 @@ function userNav(dict: Dictionary): NavItem[] {
       label: t.myNutrition,
       href: "/dashboard/nutrition",
       icon: Salad,
+    },
+    {
+      key: "myGlucose",
+      label: t.myGlucose,
+      href: "/dashboard/glucose",
+      icon: Activity,
     },
   ];
 }

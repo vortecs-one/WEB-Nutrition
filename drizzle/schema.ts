@@ -145,6 +145,37 @@ export const dayLogEntries = pgTable(
   }),
 );
 
+// === Configuración de glucosa (Nightscout) ===
+// Per-user Nightscout connection settings for the glucose monitoring
+// feature. One row per user (same `userKey` pattern as day_log_entries:
+// Thruxion human_id, falling back to email). Readings are NOT stored here —
+// Nightscout is the source of truth; we only persist the connection config.
+export const glucoseSettings = pgTable("glucose_settings", {
+  id: serial("id").primaryKey(),
+  // Stable per-user key: Thruxion human_id, falling back to email.
+  userKey: text("user_key").notNull().unique(),
+  // Base URL of the user's Nightscout instance (normalized, no trailing slash).
+  nightscoutUrl: text("nightscout_url").notNull(),
+  // Nightscout access token (nullable: some instances allow open reads).
+  // Server-side only — never sent to the client.
+  nightscoutToken: text("nightscout_token"),
+  // Display unit: "mgdl" | "mmol". Values are always stored/fetched in mg/dL.
+  unit: varchar("unit", { length: 10 }).notNull().default("mgdl"),
+  // Alert thresholds in mg/dL (dashed lines on the chart).
+  lowThreshold: integer("low_threshold").notNull().default(70),
+  highThreshold: integer("high_threshold").notNull().default(240),
+  // Target range in mg/dL (green band on the chart).
+  targetLow: integer("target_low").notNull().default(70),
+  targetHigh: integer("target_high").notNull().default(180),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // === Saved foods (barcode-scanned products bookmarked by user) ===
 // Stores food products saved by users for quick re-use. Each row is scoped
 // to a user via `userKey` and identified by barcode.
