@@ -274,6 +274,38 @@ const en: Dictionary = {
     loading: "Loading readings...",
     disclaimer:
       "This information is for reference only. Do not use it for treatment decisions; always consult your medical team.",
+    // --- Data source selector ---
+    sourceLabel: "Data source",
+    sourceNightscout: "Nightscout",
+    sourceLibre: "LibreLinkUp",
+    sourceLibreHint:
+      "Reads glucose directly from Abbott's servers — the same data as the LibreLink and LibreLinkUp apps. Works for your own sensor (main reading) and for patients you follow (remote reading).",
+    // --- LibreLinkUp settings ---
+    libreSettingsTitle: "Connect LibreLinkUp",
+    libreSettingsSubtitle:
+      "Sign in with your LibreLinkUp account. If you wear the sensor, share your data with a LibreLinkUp account from the LibreLink app (Share > Connected apps > LibreLinkUp).",
+    libreEmail: "LibreLinkUp email",
+    libreEmailPlaceholder: "you@example.com",
+    librePassword: "LibreLinkUp password",
+    librePasswordHint:
+      "Stored securely on the server and never sent to the browser.",
+    librePasswordSaved: "Password saved. Leave the field empty to keep it.",
+    libreTestSuccess: "Connected. {count} patient(s) found.",
+    libreInvalidCredentials: "Invalid email or password for LibreLinkUp.",
+    libreTermsPending:
+      "Your account has pending terms to accept. Open the LibreLinkUp app, accept the updated terms, then try again.",
+    libreNoConnections:
+      "No patients found on this account. In the LibreLink app of the sensor wearer, invite this account as a follower (Share > Connected apps > LibreLinkUp).",
+    libreMissingCredentials: "Enter your LibreLinkUp email and password.",
+    // --- Patient switcher ---
+    patientLabel: "Patient",
+    patientOwn: "Main reading",
+    patientRemote: "Remote reading",
+    patientSwitchError: "Could not switch patient. Please try again.",
+    // --- Setup (source-agnostic) ---
+    setupTitleGeneric: "Connect your glucose source",
+    setupBodyGeneric:
+      "Choose how to get your readings: sign in with LibreLinkUp to read directly from your LibreLink app data, or connect your own Nightscout site.",
   },
   auth: {
     loginTitle: "Login",

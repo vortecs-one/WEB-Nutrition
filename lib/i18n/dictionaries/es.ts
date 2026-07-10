@@ -278,6 +278,41 @@ const es = {
     loading: "Cargando lecturas...",
     disclaimer:
       "Esta información es solo de referencia. No la uses para decisiones de tratamiento; consulta siempre a tu equipo médico.",
+    // --- Selector de fuente de datos ---
+    sourceLabel: "Fuente de datos",
+    sourceNightscout: "Nightscout",
+    sourceLibre: "LibreLinkUp",
+    sourceLibreHint:
+      "Lee la glucosa directamente de los servidores de Abbott: los mismos datos que las apps LibreLink y LibreLinkUp. Funciona con tu propio sensor (lectura principal) y con pacientes que sigues (lectura remota).",
+    // --- Configuración de LibreLinkUp ---
+    libreSettingsTitle: "Conectar LibreLinkUp",
+    libreSettingsSubtitle:
+      "Inicia sesión con tu cuenta de LibreLinkUp. Si llevas el sensor, comparte tus datos con una cuenta LibreLinkUp desde la app LibreLink (Compartir > Aplicaciones conectadas > LibreLinkUp).",
+    libreEmail: "Correo de LibreLinkUp",
+    libreEmailPlaceholder: "tu@ejemplo.com",
+    librePassword: "Contraseña de LibreLinkUp",
+    librePasswordHint:
+      "Se guarda de forma segura en el servidor y nunca se envía al navegador.",
+    librePasswordSaved:
+      "Contraseña guardada. Deja el campo vacío para conservarla.",
+    libreTestSuccess: "Conectado. {count} paciente(s) encontrado(s).",
+    libreInvalidCredentials:
+      "Correo o contraseña de LibreLinkUp incorrectos.",
+    libreTermsPending:
+      "Tu cuenta tiene términos pendientes por aceptar. Abre la app LibreLinkUp, acepta los términos actualizados e inténtalo de nuevo.",
+    libreNoConnections:
+      "No se encontraron pacientes en esta cuenta. En la app LibreLink de quien lleva el sensor, invita a esta cuenta como seguidor (Compartir > Aplicaciones conectadas > LibreLinkUp).",
+    libreMissingCredentials:
+      "Ingresa tu correo y contraseña de LibreLinkUp.",
+    // --- Selector de paciente ---
+    patientLabel: "Paciente",
+    patientOwn: "Lectura principal",
+    patientRemote: "Lectura remota",
+    patientSwitchError: "No se pudo cambiar de paciente. Inténtalo de nuevo.",
+    // --- Configuración inicial (independiente de la fuente) ---
+    setupTitleGeneric: "Conecta tu fuente de glucosa",
+    setupBodyGeneric:
+      "Elige cómo obtener tus lecturas: inicia sesión con LibreLinkUp para leer directamente los datos de tu app LibreLink, o conecta tu propio sitio Nightscout.",
   },
   auth: {
     loginTitle: "Iniciar sesión",

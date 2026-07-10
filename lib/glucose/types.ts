@@ -28,11 +28,32 @@ export type GlucoseReading = {
 
 export type GlucoseUnit = "mgdl" | "mmol";
 
-// Client-safe settings (token intentionally excluded — it never leaves the
-// server; we only tell the client whether one is stored).
+// Where the readings come from:
+// - "nightscout": the user's own Nightscout instance
+// - "librelinkup": Abbott's LibreLinkUp follower API (same data the
+//   LibreLink / LibreLinkUp apps show, main sensor + followed patients)
+export type GlucoseSource = "nightscout" | "librelinkup";
+
+// A patient connection visible to the LibreLinkUp account (client-safe).
+export type LibrePatientInfo = {
+  patientId: string;
+  name: string;
+  /** Latest mg/dL value from the connections list, if available. */
+  currentMgdl: number | null;
+};
+
+// Client-safe settings (secrets intentionally excluded — Nightscout tokens
+// and LibreLinkUp passwords never leave the server; we only tell the client
+// whether they are stored).
 export type GlucoseSettings = {
-  nightscoutUrl: string;
+  source: GlucoseSource;
+  nightscoutUrl: string | null;
   hasToken: boolean;
+  /** LibreLinkUp account email (shown in settings; not a secret). */
+  libreEmail: string | null;
+  hasLibreCredentials: boolean;
+  /** Currently selected LibreLinkUp patient connection. */
+  librePatientId: string | null;
   unit: GlucoseUnit;
   lowThreshold: number;
   highThreshold: number;
@@ -44,16 +65,28 @@ export type GlucoseSettings = {
 export type GlucoseStatus = "low" | "in-range" | "high" | "urgent";
 
 export type GlucoseData = {
-  /** Most recent reading, or null if Nightscout returned nothing. */
+  /** Most recent reading, or null if the source returned nothing. */
   current: GlucoseReading | null;
   /** Readings for the requested window, oldest first. */
   readings: GlucoseReading[];
   settings: GlucoseSettings;
+  /** Name of the patient the readings belong to (LibreLinkUp only). */
+  patientName: string | null;
+  /** All patient connections on the account (LibreLinkUp only). */
+  patients: LibrePatientInfo[];
 };
+
+export type GlucoseFetchError =
+  | "not-configured"
+  | "unauthorized"
+  | "invalid-credentials"
+  | "terms"
+  | "unreachable"
+  | "unknown";
 
 export type GlucoseFetchResult =
   | { ok: true; data: GlucoseData }
-  | { ok: false; error: "not-configured" | "unauthorized" | "unreachable" | "unknown" };
+  | { ok: false; error: GlucoseFetchError };
 
 // --- Unit helpers -----------------------------------------------------------
 

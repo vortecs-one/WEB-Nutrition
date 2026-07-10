@@ -1,11 +1,13 @@
 "use client";
 
-// Nightscout-style glucose monitor: big current-reading card with trend
-// arrow + status color, and a history chart with target band and high/low
-// threshold lines (modeled on the classic Nightscout dark chart).
+// Glucose monitor: big current-reading card with trend arrow + status color,
+// a patient switcher (LibreLinkUp main/remote readings), and a history chart
+// with target band and high/low threshold lines (modeled on the classic
+// Nightscout dark chart). Data comes from the configured source: LibreLinkUp
+// (same data as the LibreLink app) or Nightscout.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Settings2, AlertTriangle, Activity } from "lucide-react";
+import { Settings2, AlertTriangle, Activity, Users } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -17,7 +19,7 @@ import {
   Tooltip,
 } from "recharts";
 import { useI18n } from "@/lib/i18n/provider";
-import { fetchGlucoseData } from "@/lib/glucose/actions";
+import { fetchGlucoseData, setLibrePatient } from "@/lib/glucose/actions";
 import {
   type GlucoseData,
   type GlucoseSettings,
@@ -63,6 +65,8 @@ export default function GlucoseTracker({
   // Re-render every 30s so "X min ago" stays current between polls.
   const [, setClockTick] = useState(0);
 
+  const [switchingPatient, setSwitchingPatient] = useState(false);
+
   const rangeRef = useRef<RangeHours>(rangeHours);
   rangeRef.current = rangeHours;
 
@@ -81,6 +85,24 @@ export default function GlucoseTracker({
     }
     setLoading(false);
   }, []);
+
+  // Switch the LibreLinkUp patient (main sensor wearer vs. followed patients)
+  // and reload data for the newly selected connection.
+  const handleSwitchPatient = useCallback(
+    async (patientId: string) => {
+      if (switchingPatient) return;
+      setSwitchingPatient(true);
+      const result = await setLibrePatient(patientId);
+      if (result.ok) {
+        setLoading(true);
+        await load(rangeRef.current);
+      } else {
+        setError("patient-switch");
+      }
+      setSwitchingPatient(false);
+    },
+    [load, switchingPatient],
+  );
 
   // Initial load + polling (only while the tab is visible).
   useEffect(() => {
@@ -145,8 +167,10 @@ export default function GlucoseTracker({
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sidebar-accent">
             <Activity className="h-6 w-6" aria-hidden="true" />
           </span>
-          <h1 className="mt-3 text-lg font-semibold text-balance">{t.setupTitle}</h1>
-          <p className="mt-1 text-sm text-sidebar-foreground/70 text-pretty">{t.setupBody}</p>
+          <h1 className="mt-3 text-lg font-semibold text-balance">{t.setupTitleGeneric}</h1>
+          <p className="mt-1 text-sm text-sidebar-foreground/70 text-pretty">
+            {t.setupBodyGeneric}
+          </p>
         </section>
         <GlucoseSettingsForm
           settings={null}
@@ -168,7 +192,11 @@ export default function GlucoseTracker({
       >
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-sm font-medium opacity-90">{t.currentReading}</div>
+            <div className="text-sm font-medium opacity-90">
+              {settings.source === "librelinkup" && data?.patientName
+                ? data.patientName
+                : t.currentReading}
+            </div>
             <div className="flex items-baseline gap-2">
               <span className="text-6xl font-bold tabular-nums leading-tight">
                 {current ? formatGlucose(current.sgv, unit) : "--"}
@@ -214,6 +242,48 @@ export default function GlucoseTracker({
         )}
       </section>
 
+      {/* Patient switcher (LibreLinkUp: main sensor + followed patients) */}
+      {settings.source === "librelinkup" && (data?.patients?.length ?? 0) > 1 && (
+        <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+            <span className="text-xs font-medium text-sidebar-foreground/70">
+              {t.patientLabel}
+            </span>
+          </div>
+          <div
+            role="group"
+            aria-label={t.patientLabel}
+            className="mt-2 flex flex-wrap gap-2"
+          >
+            {data!.patients.map((p) => {
+              const selected = p.patientId === settings.librePatientId;
+              return (
+                <button
+                  key={p.patientId}
+                  type="button"
+                  onClick={() => handleSwitchPatient(p.patientId)}
+                  disabled={switchingPatient || selected}
+                  aria-pressed={selected}
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition active:scale-95 disabled:pointer-events-none ${
+                    selected
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                  } ${switchingPatient && !selected ? "opacity-50" : ""}`}
+                >
+                  <span>{p.name || t.patientLabel}</span>
+                  {p.currentMgdl !== null && (
+                    <span className="tabular-nums text-xs opacity-80">
+                      {formatGlucose(p.currentMgdl, unit)}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Settings (collapsible) */}
       {showSettings && (
         <GlucoseSettingsForm
@@ -234,7 +304,19 @@ export default function GlucoseTracker({
           className="flex items-center gap-2 rounded-2xl bg-destructive/10 text-destructive px-4 py-3 text-sm"
         >
           <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error === "unauthorized" ? t.errorUnauthorized : t.errorUnreachable}</span>
+          <span>
+            {error === "invalid-credentials"
+              ? t.libreInvalidCredentials
+              : error === "terms"
+                ? t.libreTermsPending
+                : error === "patient-switch"
+                  ? t.patientSwitchError
+                  : error === "unauthorized"
+                    ? settings.source === "librelinkup"
+                      ? t.libreInvalidCredentials
+                      : t.errorUnauthorized
+                    : t.errorUnreachable}
+          </span>
         </div>
       )}
 
@@ -248,7 +330,10 @@ export default function GlucoseTracker({
             aria-label={t.chartTitle}
             className="flex rounded-full bg-sidebar-accent p-1"
           >
-            {RANGES.map((h) => (
+            {/* LibreLinkUp's graph endpoint only returns ~12h of history. */}
+            {RANGES.filter(
+              (h) => settings.source !== "librelinkup" || h <= 12,
+            ).map((h) => (
               <button
                 key={h}
                 type="button"

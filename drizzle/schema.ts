@@ -154,11 +154,27 @@ export const glucoseSettings = pgTable("glucose_settings", {
   id: serial("id").primaryKey(),
   // Stable per-user key: Thruxion human_id, falling back to email.
   userKey: text("user_key").notNull().unique(),
+  // Data source for glucose readings: "nightscout" | "librelinkup".
+  source: varchar("source", { length: 20 }).notNull().default("nightscout"),
   // Base URL of the user's Nightscout instance (normalized, no trailing slash).
-  nightscoutUrl: text("nightscout_url").notNull(),
+  // Nullable: users on the LibreLinkUp source don't need Nightscout.
+  nightscoutUrl: text("nightscout_url"),
   // Nightscout access token (nullable: some instances allow open reads).
   // Server-side only — never sent to the client.
   nightscoutToken: text("nightscout_token"),
+  // --- LibreLinkUp (Abbott LibreView) connection ---
+  // Credentials of the LibreLinkUp follower account. Server-side only.
+  libreEmail: text("libre_email"),
+  librePassword: text("libre_password"),
+  // Regional API host slug resolved at login (e.g. "eu", "us", "la").
+  libreRegion: varchar("libre_region", { length: 10 }),
+  // Cached session token + expiry so we don't re-login on every fetch.
+  libreToken: text("libre_token"),
+  libreTokenExpires: timestamp("libre_token_expires", { withTimezone: true }),
+  // LibreView account id (SHA-256 sent in the account-id header).
+  libreAccountId: text("libre_account_id"),
+  // Selected patient connection id ("main" sensor wearer or a followed patient).
+  librePatientId: text("libre_patient_id"),
   // Display unit: "mgdl" | "mmol". Values are always stored/fetched in mg/dL.
   unit: varchar("unit", { length: 10 }).notNull().default("mgdl"),
   // Alert thresholds in mg/dL (dashed lines on the chart).
