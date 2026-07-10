@@ -293,7 +293,7 @@ const en: Dictionary = {
     libreTestSuccess: "Connected. {count} patient(s) found.",
     libreInvalidCredentials: "Invalid email or password for LibreLinkUp.",
     libreTermsPending:
-      "Your account has pending terms to accept. Open the LibreLinkUp app, accept the updated terms, then try again.",
+      "Abbott requires you to accept new terms. Open the LibreLink or LibreLinkUp app, accept the terms, then try again here.",
     libreNoConnections:
       "No patients found on this account. In the LibreLink app of the sensor wearer, invite this account as a follower (Share > Connected apps > LibreLinkUp).",
     libreMissingCredentials: "Enter your LibreLinkUp email and password.",

@@ -299,7 +299,7 @@ const es = {
     libreInvalidCredentials:
       "Correo o contraseña de LibreLinkUp incorrectos.",
     libreTermsPending:
-      "Tu cuenta tiene términos pendientes por aceptar. Abre la app LibreLinkUp, acepta los términos actualizados e inténtalo de nuevo.",
+      "Abbott requiere que aceptes nuevos términos. Abre la app LibreLink o LibreLinkUp, acepta los términos e inténtalo de nuevo aquí.",
     libreNoConnections:
       "No se encontraron pacientes en esta cuenta. En la app LibreLink de quien lleva el sensor, invita a esta cuenta como seguidor (Compartir > Aplicaciones conectadas > LibreLinkUp).",
     libreMissingCredentials:

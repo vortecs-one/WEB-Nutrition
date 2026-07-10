@@ -150,19 +150,56 @@ type LoginResponse = {
     region?: string;
     authTicket?: { token?: string; expires?: number; duration?: number };
     user?: { id?: string };
+    /** Present when status === 4: a required action (tou, pp, …) */
     step?: { type?: string };
   };
   error?: { message?: string };
 };
 
 /**
- * Logs in to LibreLinkUp with auto region detection. Follows at most two
- * region redirects, which is enough for every documented account setup.
+ * When Abbott requires acceptance of new Terms of Use (status:4), the
+ * login response includes a short-lived authTicket and a step.type
+ * ("tou" | "pp" | …). We POST to /auth/continue/{type} using that
+ * token, which may itself return another status:4 (chained steps).
+ * After all steps are accepted we re-run the full login to get a real
+ * long-lived session token.
+ *
+ * This matches the behaviour of the official LibreLinkUp mobile app and
+ * every documented open-source client.
+ */
+async function acceptContinueStep(
+  region: string | null,
+  stepType: string,
+  stepToken: string,
+): Promise<LoginResponse> {
+  let res: Response;
+  try {
+    res = await llFetch(region, `/auth/continue/${encodeURIComponent(stepType)}`, {
+      method: "POST",
+      headers: {
+        ...baseHeaders(),
+        authorization: `Bearer ${stepToken}`,
+      },
+      body: "{}",
+    });
+  } catch {
+    throw new LibreError("unreachable");
+  }
+  if (!res.ok) throw new LibreError("unreachable");
+  return (await res.json()) as LoginResponse;
+}
+
+/**
+ * Logs in to LibreLinkUp with:
+ *  - Auto region detection (follows `data.redirect` to the correct regional host)
+ *  - Auto TOU/PP acceptance (silently accepts pending Terms of Use steps via
+ *    /auth/continue/{type}, matching what the LibreLinkUp app does)
  */
 export async function libreLogin(email: string, password: string): Promise<LibreSession> {
   let region: string | null = null;
+  let didAcceptTerms = false;
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     let res: Response;
     try {
       res = await llFetch(region, "/llu/auth/login", {
@@ -179,18 +216,45 @@ export async function libreLogin(email: string, password: string): Promise<Libre
 
     const body = (await res.json()) as LoginResponse;
 
-    // Wrong email/password → status 2 with an error message.
+    // Wrong email/password.
     if (body.status === 2) throw new LibreError("invalid-credentials");
 
-    // Account lives in another region → retry there.
+    // Account lives in another region — retry against the correct host.
     if (body.data?.redirect && body.data.region) {
       region = body.data.region;
       continue;
     }
 
-    // Account requires accepting new terms/privacy in the LibreLinkUp app.
-    if (body.data?.step?.type) {
-      throw new LibreError("terms", `pending step: ${body.data.step.type}`);
+    // status:4 = action required before login can complete.
+    // The response includes a short-lived authTicket for /auth/continue/{type}.
+    // We accept up to 2 chained steps (e.g. tou → pp) then re-login.
+    if (body.status === 4) {
+      const step = body.data?.step;
+      const stepToken = body.data?.authTicket?.token;
+
+      if (!step?.type || !stepToken) {
+        // Unknown blocking step — we can't handle it programmatically.
+        throw new LibreError("terms");
+      }
+
+      // Accept first step.
+      let continueBody = await acceptContinueStep(region, step.type, stepToken);
+
+      // Accept a second chained step if present (e.g. tou then pp).
+      if (continueBody.status === 4) {
+        const step2 = continueBody.data?.step;
+        const stepToken2 = continueBody.data?.authTicket?.token;
+        if (step2?.type && stepToken2) {
+          continueBody = await acceptContinueStep(region, step2.type, stepToken2);
+        }
+      }
+
+      // If still blocked after two accepts, bail out gracefully.
+      if (continueBody.status === 4) throw new LibreError("terms");
+
+      // Re-run the full login now that TOU is accepted.
+      didAcceptTerms = true;
+      continue;
     }
 
     const token = body.data?.authTicket?.token;
@@ -207,7 +271,8 @@ export async function libreLogin(email: string, password: string): Promise<Libre
     };
   }
 
-  throw new LibreError("unknown", "too many region redirects");
+  // Reached if we kept redirecting/accepting without getting a real token.
+  throw new LibreError(didAcceptTerms ? "terms" : "unknown", "too many login attempts");
 }
 
 type ConnectionsResponse = {
