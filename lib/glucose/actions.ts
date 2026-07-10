@@ -235,7 +235,6 @@ export async function saveGlucoseSettings(
     }));
   } catch (err) {
     const code = err instanceof LibreError ? err.code : "unknown";
-    console.log("[v0] saveGlucoseSettings libre login failed:", code);
     return { ok: false, error: code };
   }
 
@@ -259,6 +258,9 @@ export async function saveGlucoseSettings(
     libreTokenExpires: new Date(session.expires),
     libreAccountId: session.accountIdHash,
     librePatientId: patientId,
+    libreUserId: session.userId,
+    libreAccountType: session.accountType,
+    libreDisplayName: session.displayName,
   };
 
   const [row] = await db
@@ -293,6 +295,9 @@ async function getLibreSession(row: SettingsRow): Promise<LibreSession> {
       expires: (row.libreTokenExpires as Date).getTime(),
       accountIdHash: row.libreAccountId as string,
       region: row.libreRegion,
+      userId: row.libreUserId ?? "",
+      accountType: row.libreAccountType ?? "llu",
+      displayName: row.libreDisplayName ?? "",
     };
   }
 
@@ -306,6 +311,9 @@ async function getLibreSession(row: SettingsRow): Promise<LibreSession> {
       libreTokenExpires: new Date(session.expires),
       libreAccountId: session.accountIdHash,
       libreRegion: session.region,
+      libreUserId: session.userId,
+      libreAccountType: session.accountType,
+      libreDisplayName: session.displayName,
       updatedAt: new Date(),
     })
     .where(eq(glucoseSettings.id, row.id));

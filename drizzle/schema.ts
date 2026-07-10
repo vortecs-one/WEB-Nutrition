@@ -175,6 +175,12 @@ export const glucoseSettings = pgTable("glucose_settings", {
   libreAccountId: text("libre_account_id"),
   // Selected patient connection id ("main" sensor wearer or a followed patient).
   librePatientId: text("libre_patient_id"),
+  // Raw LibreView user id — equals the patientId for "pat" (sensor-wearer) accounts.
+  libreUserId: text("libre_user_id"),
+  // "pat" = sensor wearer, "llu" = follower. Needed to synthesize self-entry.
+  libreAccountType: varchar("libre_account_type", { length: 10 }),
+  // First + last name from the LibreView user object, used as display label.
+  libreDisplayName: text("libre_display_name"),
   // Display unit: "mgdl" | "mmol". Values are always stored/fetched in mg/dL.
   unit: varchar("unit", { length: 10 }).notNull().default("mgdl"),
   // Alert thresholds in mg/dL (dashed lines on the chart).
