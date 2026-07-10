@@ -248,6 +248,22 @@ export async function saveGlucoseSettings(
     patients.some((p) => p.patientId === existing.librePatientId);
   const patientId = keepPatient ? (existing!.librePatientId as string) : patients[0].patientId;
 
+  // libreGetConnections synthesizes a self-entry for "pat" (sensor-wearer)
+  // accounts even when no real LibreLinkUp share exists, so "patients.length
+  // > 0" above doesn't guarantee the connection actually works. Probe the
+  // graph endpoint once here so a non-working synthesized entry is reported
+  // honestly now, rather than saving settings that will silently show no
+  // readings later.
+  try {
+    await libreGetGraph(session, patientId);
+  } catch (err) {
+    if (err instanceof LibreError && err.code === "not-connected") {
+      return { ok: false, error: "no-connections" };
+    }
+    // Any other error here (rate limit, transient network) shouldn't block
+    // saving — fetchGlucoseData will surface it on the next poll.
+  }
+
   const values = {
     ...shared,
     source: "librelinkup" as const,
@@ -577,6 +593,7 @@ async function fetchFromLibre(
     console.log("[v0] fetchFromLibre failed:", code, (err as Error).message);
     if (code === "invalid-credentials" || code === "terms") return { ok: false, error: code };
     if (code === "unauthorized") return { ok: false, error: "unauthorized" };
+    if (code === "not-connected") return { ok: false, error: "no-connections" };
     return { ok: false, error: "unreachable" };
   }
 }

@@ -32,6 +32,7 @@ export default function CaloriesTracker() {
 
   // Initialized after mount to avoid SSR/client hydration mismatch.
   const [date, setDate] = useState<Date | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only init to avoid SSR/hydration mismatch
   useEffect(() => setDate(new Date()), []);
 
   const dateKey = useMemo(

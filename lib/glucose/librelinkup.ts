@@ -65,7 +65,13 @@ export type LibreGraphResult = {
 };
 
 export class LibreError extends Error {
-  code: "invalid-credentials" | "unauthorized" | "unreachable" | "terms" | "unknown";
+  code:
+    | "invalid-credentials"
+    | "unauthorized"
+    | "unreachable"
+    | "terms"
+    | "not-connected"
+    | "unknown";
   constructor(code: LibreError["code"], message?: string) {
     super(message ?? code);
     this.code = code;
@@ -394,6 +400,16 @@ export async function libreGetGraph(
   if (!res.ok) throw new LibreError("unreachable");
 
   const body = (await res.json()) as GraphResponse;
+
+  // HTTP 200 doesn't mean success here — Abbott reports application-level
+  // errors (e.g. { status: 4, error: { message: "follower not connect to
+  // patient" } }) with a 200 status. Without this check, a "pat" account's
+  // synthesized self-entry (see libreGetConnections) silently produces an
+  // empty reading instead of a clear "not connected" error.
+  if (body.status && body.status !== 0) {
+    throw new LibreError("not-connected", body.status === 4 ? "not connected as a follower" : `status ${body.status}`);
+  }
+
   const connection = body.data?.connection;
 
   const current = toReading(connection?.glucoseMeasurement);

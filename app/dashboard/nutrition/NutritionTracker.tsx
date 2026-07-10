@@ -12,7 +12,6 @@ import {
   Trash2,
   X,
   Minus,
-  Barcode,
   Search,
   type LucideIcon,
 } from "lucide-react";
@@ -625,6 +624,7 @@ export default function NutritionTracker() {
   } = useDayLog();
 
   const [todayKey, setTodayKey] = useState<string>("");
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only init to avoid SSR/hydration mismatch
   useEffect(() => setTodayKey(toDateKey(new Date())), []);
 
   const { meals, supplements, activities } = useMemo(

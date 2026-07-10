@@ -18,6 +18,7 @@ export default function LoginPage() {
     fetch("/api/auth/csrf");
 
     // Always start empty even if browser has saved credentials
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time clear of browser-autofilled values after mount, not a render-derived sync
     setEmail("");
     setPassword("");
   }, []);

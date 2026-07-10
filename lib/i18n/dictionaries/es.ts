@@ -2,7 +2,7 @@
 // Keep keys in sync across all dictionary files.
 const es = {
   common: {
-    appName: "NutritionAI",
+    appName: "V-Healthy",
     panel: "Panel",
     loading: "Cargando...",
     save: "Guardar",

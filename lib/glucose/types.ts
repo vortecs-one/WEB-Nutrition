@@ -81,6 +81,7 @@ export type GlucoseFetchError =
   | "unauthorized"
   | "invalid-credentials"
   | "terms"
+  | "no-connections"
   | "unreachable"
   | "unknown";
 

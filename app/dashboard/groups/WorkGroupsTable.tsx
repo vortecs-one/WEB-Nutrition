@@ -169,7 +169,7 @@ export default function WorkGroupsTable({ groups }: Props) {
         {/* Nota inferior */}
         <div className="px-4 py-3 text-xs text-red-600 bg-red-50 border-t border-red-100">
           ⚠ Si borras un grupo de trabajo, los pacientes que pertenecen a dicho
-          grupo se moverán al grupo <strong>"General"</strong>.
+          grupo se moverán al grupo <strong>&quot;General&quot;</strong>.
         </div>
       </div>
 

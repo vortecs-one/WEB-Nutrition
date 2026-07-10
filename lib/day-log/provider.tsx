@@ -73,7 +73,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     revalidateOnFocus: false,
   });
 
-  const log = data ?? {};
+  const log = useMemo(() => data ?? {}, [data]);
 
   const dayData = useCallback(
     (dateKey: string): DayData => log[dateKey] ?? emptyDay(),

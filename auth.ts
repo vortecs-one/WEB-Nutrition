@@ -97,21 +97,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       // Persist custom fields onto the JWT at sign-in time.
       if (user) {
-        (token as any).role = (user as any).role ?? null;
-        (token as any).platform = (user as any).platform ?? null;
-        (token as any).humanId = (user as any).humanId ?? null;
-        (token as any).locale = (user as any).locale ?? null;
+        token.role = user.role ?? null;
+        token.platform = user.platform ?? null;
+        token.humanId = user.humanId ?? null;
+        token.locale = user.locale ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
         // Safely assign custom id + role + platform + humanId to the session
-        (session.user as any).id = token.sub;
-        (session.user as any).role = (token as any).role ?? null;
-        (session.user as any).platform = (token as any).platform ?? null;
-        (session.user as any).humanId = (token as any).humanId ?? null;
-        (session.user as any).locale = (token as any).locale ?? null;
+        session.user.id = token.sub;
+        session.user.role = token.role ?? null;
+        session.user.platform = token.platform ?? null;
+        session.user.humanId = token.humanId ?? null;
+        session.user.locale = token.locale ?? null;
       }
       return session;
     },

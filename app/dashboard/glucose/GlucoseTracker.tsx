@@ -311,11 +311,13 @@ export default function GlucoseTracker({
                 ? t.libreTermsPending
                 : error === "patient-switch"
                   ? t.patientSwitchError
-                  : error === "unauthorized"
-                    ? settings.source === "librelinkup"
-                      ? t.libreInvalidCredentials
-                      : t.errorUnauthorized
-                    : t.errorUnreachable}
+                  : error === "no-connections"
+                    ? t.libreNoConnections
+                    : error === "unauthorized"
+                      ? settings.source === "librelinkup"
+                        ? t.libreInvalidCredentials
+                        : t.errorUnauthorized
+                      : t.errorUnreachable}
           </span>
         </div>
       )}

@@ -3,7 +3,7 @@ import type { Dictionary } from "./es";
 // English dictionary. Must implement the same shape as the Spanish one.
 const en: Dictionary = {
   common: {
-    appName: "NutritionAI",
+    appName: "V-Healthy",
     panel: "Panel",
     loading: "Loading...",
     save: "Save",

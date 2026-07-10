@@ -51,9 +51,10 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Server error", detail: error.message },
+      { error: "Server error", detail },
       { status: 500 }
     );
   }

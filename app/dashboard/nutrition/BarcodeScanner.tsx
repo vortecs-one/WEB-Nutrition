@@ -348,7 +348,6 @@ export default function BarcodeScanner({
         )}
 
         {/* Video — always in the DOM so the ref is always valid */}
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
           className={`h-full w-full object-cover transition-opacity duration-300 ${

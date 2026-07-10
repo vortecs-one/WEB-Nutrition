@@ -12,7 +12,7 @@ type PatientRow = {
   document: string;
   firstName: string;
   lastName: string;
-  birthDate: any;
+  birthDate: string | Date;
   phone: string | null;
   email: string;
   genderId: number;

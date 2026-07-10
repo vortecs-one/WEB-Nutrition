@@ -24,6 +24,7 @@ export default function HandoffClient() {
     const callbackUrl = params.get("callbackUrl") || "/dashboard";
 
     if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- validating the URL param that kicks off the async sign-in below, not a render-derived sync
       setStatus("error");
       return;
     }
