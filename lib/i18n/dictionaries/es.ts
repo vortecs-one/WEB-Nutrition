@@ -304,6 +304,8 @@ const es = {
       "No se encontraron pacientes en esta cuenta. En la app LibreLink de quien lleva el sensor, invita a esta cuenta como seguidor (Compartir > Aplicaciones conectadas > LibreLinkUp).",
     libreMissingCredentials:
       "Ingresa tu correo y contraseña de LibreLinkUp.",
+    libreTestUnreachable:
+      "No se pudo conectar con LibreLinkUp. Verifica tu conexión e inténtalo de nuevo.",
     // --- Selector de paciente ---
     patientLabel: "Paciente",
     patientOwn: "Lectura principal",

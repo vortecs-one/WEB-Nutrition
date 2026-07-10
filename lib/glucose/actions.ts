@@ -323,7 +323,6 @@ export async function testLibreConnection(input: {
   useSavedPassword?: boolean;
 }): Promise<{ ok: true; patients: LibrePatientInfo[] } | { ok: false; error: string }> {
   const userKey = await getUserKey();
-  console.log("[v0] testLibreConnection: userKey?", Boolean(userKey));
   if (!userKey) return { ok: false, error: "unauthenticated" };
 
   const email = input.libreEmail.trim().toLowerCase();
@@ -332,7 +331,6 @@ export async function testLibreConnection(input: {
     const row = await getSettingsRow(userKey);
     password = row?.librePassword ?? "";
   }
-  console.log("[v0] testLibreConnection: email?", Boolean(email), "password?", Boolean(password));
   if (!email || !password) return { ok: false, error: "missing-credentials" };
 
   try {

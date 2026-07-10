@@ -63,7 +63,7 @@ export default function GlucoseSettingsForm({
       case "missing-credentials":
         return t.libreMissingCredentials;
       default:
-        return t.testUnreachable;
+        return t.libreTestUnreachable;
     }
   };
 

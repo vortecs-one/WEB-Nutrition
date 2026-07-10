@@ -297,6 +297,8 @@ const en: Dictionary = {
     libreNoConnections:
       "No patients found on this account. In the LibreLink app of the sensor wearer, invite this account as a follower (Share > Connected apps > LibreLinkUp).",
     libreMissingCredentials: "Enter your LibreLinkUp email and password.",
+    libreTestUnreachable:
+      "Could not reach LibreLinkUp. Check your connection and try again.",
     // --- Patient switcher ---
     patientLabel: "Patient",
     patientOwn: "Main reading",
