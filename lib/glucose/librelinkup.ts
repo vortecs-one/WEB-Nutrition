@@ -23,7 +23,8 @@ import type { GlucoseReading, TrendDirection } from "./types";
 const GLOBAL_HOST = "api.libreview.io";
 
 // Headers the LibreLinkUp app sends; the API rejects requests without them.
-const LLU_VERSION = "4.12.0";
+// NOTE: Abbott's LA region enforces a minimum version of 4.16.0 (status:920).
+const LLU_VERSION = "4.16.0";
 const LLU_PRODUCT = "llu.android";
 
 export type LibreSession = {
@@ -34,6 +35,19 @@ export type LibreSession = {
   accountIdHash: string;
   /** Region slug (e.g. "eu", "us") or null for the global host. */
   region: string | null;
+  /**
+   * Raw LibreView user id. For "pat" (sensor-wearer) accounts, this equals
+   * their own patientId — the graph endpoint accepts it directly even though
+   * /llu/connections returns an empty array for these accounts.
+   */
+  userId: string;
+  /**
+   * "pat" = sensor wearer (LibreLink account); "llu" = follower account.
+   * A "pat" account sees 0 connections but can fetch its own graph.
+   */
+  accountType: string;
+  /** First + last name from the user object, used as the display name. */
+  displayName: string;
 };
 
 export type LibrePatient = {
@@ -149,7 +163,13 @@ type LoginResponse = {
     redirect?: boolean;
     region?: string;
     authTicket?: { token?: string; expires?: number; duration?: number };
-    user?: { id?: string };
+    user?: {
+      id?: string;
+      firstName?: string;
+      lastName?: string;
+      /** "pat" = sensor wearer, "llu" = follower */
+      accountType?: string;
+    };
     /** Present when status === 4: a required action (tou, pp, …) */
     step?: { type?: string };
   };
@@ -262,12 +282,18 @@ export async function libreLogin(email: string, password: string): Promise<Libre
     const expires = body.data?.authTicket?.expires;
     if (!token || !userId) throw new LibreError("unknown", "missing token in login response");
 
+    const firstName = body.data?.user?.firstName ?? "";
+    const lastName = body.data?.user?.lastName ?? "";
+
     return {
       token,
       // `expires` is epoch seconds; fall back to 30 min if absent.
       expires: expires ? expires * 1000 : Date.now() + 30 * 60_000,
       accountIdHash: await sha256Hex(userId),
       region,
+      userId,
+      accountType: body.data?.user?.accountType ?? "llu",
+      displayName: [firstName, lastName].filter(Boolean).join(" "),
     };
   }
 
@@ -285,7 +311,16 @@ type ConnectionsResponse = {
   }>;
 };
 
-/** Lists the patients (own sensor + followed people) visible to this account. */
+/**
+ * Lists the patients visible to this account.
+ *
+ * - "llu" (follower) accounts: returns the patients they follow via /llu/connections.
+ * - "pat" (sensor-wearer) accounts: /llu/connections returns [] because the
+ *   sensor wearer is NOT listed as their own connection. We synthesize a single
+ *   self-entry using their own userId so the graph endpoint still works.
+ *   The graph endpoint `/llu/connections/{userId}/graph` accepts the user's own
+ *   id even for "pat" accounts.
+ */
 export async function libreGetConnections(session: LibreSession): Promise<LibrePatient[]> {
   let res: Response;
   try {
@@ -298,10 +333,11 @@ export async function libreGetConnections(session: LibreSession): Promise<LibreP
   }
 
   if (res.status === 401 || res.status === 403) throw new LibreError("unauthorized");
+  if (res.status === 429) throw new LibreError("unreachable", "rate-limited");
   if (!res.ok) throw new LibreError("unreachable");
 
   const body = (await res.json()) as ConnectionsResponse;
-  return (body.data ?? [])
+  const connections = (body.data ?? [])
     .filter((c) => c.patientId)
     .map((c) => ({
       patientId: c.patientId as string,
@@ -309,6 +345,19 @@ export async function libreGetConnections(session: LibreSession): Promise<LibreP
       lastName: c.lastName ?? "",
       currentMgdl: c.glucoseMeasurement?.ValueInMgPerDl ?? null,
     }));
+
+  // For "pat" accounts the list is always empty — synthesize their own entry.
+  if (connections.length === 0 && session.accountType === "pat") {
+    const [firstName, ...rest] = session.displayName.split(" ");
+    connections.push({
+      patientId: session.userId,
+      firstName: firstName ?? "",
+      lastName: rest.join(" "),
+      currentMgdl: null,
+    });
+  }
+
+  return connections;
 }
 
 type GraphResponse = {
