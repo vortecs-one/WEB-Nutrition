@@ -121,52 +121,46 @@ export default function CaloriesTracker() {
             />
           </div>
 
-          {/* Consumed / Burned stats — stacked so each stays legible at half width */}
-          <div className="flex flex-col gap-2 mt-1">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-sidebar-foreground/70">{t.totalConsumed}</div>
-                <div className="text-sm sm:text-base font-semibold tabular-nums truncate">
-                  {consumed}{" "}
-                  <span className="font-normal text-sidebar-foreground/60">
-                    / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
-                  </span>
+          {/* Consumed / Burned — two big tappable icons with their totals below */}
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => setShowAddFood(true)}
+              aria-label={dict.nutritionUser.barcodeTitle}
+              className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
+            >
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-2 text-white">
+                <Salad className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                </span>
+              </span>
+              <div className="text-center leading-tight">
+                <div className="text-base sm:text-lg font-semibold tabular-nums">{consumed}</div>
+                <div className="text-[11px] sm:text-xs text-sidebar-foreground/60 tabular-nums">
+                  / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAddFood(true)}
-                aria-label={dict.nutritionUser.barcodeTitle}
-                className="relative flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-chart-2 text-white hover:opacity-90 active:scale-95 transition"
-              >
-                <Salad className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddActivity(true)}
+              aria-label={dict.nutritionUser.activityLog}
+              className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
+            >
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-3 text-white">
+                <Flame className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-xs sm:text-sm text-sidebar-foreground/70">{t.totalBurned}</div>
-                <div className="text-sm sm:text-base font-semibold tabular-nums truncate">
-                  {burned}{" "}
-                  <span className="font-normal text-sidebar-foreground/60">
-                    / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
-                  </span>
+              </span>
+              <div className="text-center leading-tight">
+                <div className="text-base sm:text-lg font-semibold tabular-nums">{burned}</div>
+                <div className="text-[11px] sm:text-xs text-sidebar-foreground/60 tabular-nums">
+                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAddActivity(true)}
-                aria-label={dict.nutritionUser.activityLog}
-                className="relative flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-chart-3 text-white hover:opacity-90 active:scale-95 transition"
-              >
-                <Flame className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
-                </span>
-              </button>
-            </div>
+            </button>
           </div>
         </section>
 
