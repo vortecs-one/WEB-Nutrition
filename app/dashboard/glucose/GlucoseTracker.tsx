@@ -384,19 +384,19 @@ export default function GlucoseTracker({
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Reading pill — keeps the status color (in-range/high/low/urgent) */}
             <div
-              className={`flex shrink-0 flex-col items-center rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
+              className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
             >
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-tight">
-                  {current ? formatGlucose(current.sgv, unit) : "--"}
-                </span>
+              <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-none">
+                {current ? formatGlucose(current.sgv, unit) : "--"}
+              </span>
+              <div className="flex flex-col items-center leading-none">
                 {current && (
-                  <span className="text-lg sm:text-2xl font-semibold" aria-label={current.direction}>
+                  <span className="text-lg sm:text-xl font-semibold" aria-label={current.direction}>
                     {trendArrow(current.direction)}
                   </span>
                 )}
+                <span className="mt-0.5 text-[10px] sm:text-xs opacity-90">{unitLabel(unit)}</span>
               </div>
-              <div className="text-[10px] sm:text-xs opacity-90">{unitLabel(unit)}</div>
             </div>
             {/* Meta: patient, status, freshness */}
             <div className="min-w-0">
