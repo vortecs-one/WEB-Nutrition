@@ -8,9 +8,15 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   title?: string;
+  size?: "md" | "lg";
 }
 
-export function Modal({ isOpen, onClose, children, title }: ModalProps) {
+const sizeClass: Record<NonNullable<ModalProps["size"]>, string> = {
+  md: "max-w-2xl",
+  lg: "max-w-4xl",
+};
+
+export function Modal({ isOpen, onClose, children, title, size = "md" }: ModalProps) {
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
@@ -43,7 +49,7 @@ export function Modal({ isOpen, onClose, children, title }: ModalProps) {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-sidebar text-sidebar-foreground rounded-3xl shadow-xl"
+        className={`w-full ${sizeClass[size]} max-h-[90vh] overflow-y-auto bg-sidebar text-sidebar-foreground rounded-3xl shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-center justify-between bg-sidebar border-b border-sidebar-foreground/10 p-5">
