@@ -13,7 +13,12 @@ export default function MobileTabBar() {
   const pathname = usePathname();
   const { dict } = useI18n();
   const role = useRole();
-  const items = getNavItems(role, dict).filter((item) => item.key !== "myNutrition");
+
+  // Mobile users have a single-page dashboard, so hide the tab bar (menu)
+  // entirely for them — no Profile or Log tab, just the dashboard content.
+  if (role === "user") return null;
+
+  const items = getNavItems(role, dict);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
