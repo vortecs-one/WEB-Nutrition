@@ -32,6 +32,7 @@ import {
   unitLabel,
   STALE_MINUTES,
 } from "@/lib/glucose/types";
+import { Modal } from "@/components/ui/modal";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
 
 const RANGES = [3, 6, 12, 24] as const;
@@ -284,8 +285,12 @@ export default function GlucoseTracker({
         </section>
       )}
 
-      {/* Settings (collapsible) */}
-      {showSettings && (
+      {/* Settings modal */}
+      <Modal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        title={t.settings}
+      >
         <GlucoseSettingsForm
           settings={settings}
           onSaved={(s) => {
@@ -295,7 +300,7 @@ export default function GlucoseTracker({
             load(rangeRef.current);
           }}
         />
-      )}
+      </Modal>
 
       {/* Error banner (fetch problems while configured) */}
       {error && (

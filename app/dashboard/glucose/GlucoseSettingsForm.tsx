@@ -158,7 +158,7 @@ export default function GlucoseSettingsForm({
     }`;
 
   return (
-    <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-5">
+    <div>
       <h2 className="text-base font-semibold">
         {source === "librelinkup" ? t.libreSettingsTitle : t.settingsTitle}
       </h2>
@@ -420,6 +420,6 @@ export default function GlucoseSettingsForm({
           </button>
         </div>
       </form>
-    </section>
+    </div>
   );
 }
