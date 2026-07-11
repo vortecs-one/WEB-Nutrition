@@ -6,6 +6,7 @@ import {
   Salad,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
@@ -13,8 +14,10 @@ import {
   CONSUMED_GOAL,
   BURNED_GOAL,
 } from "@/lib/day-log/provider";
+import { Modal } from "@/components/ui/modal";
 import CalorieGauge from "../nutrition/CalorieGauge";
 import NutritionChart from "../nutrition/NutritionChart";
+import BarcodeLookup from "../nutrition/BarcodeLookup";
 
 const GAUGE_RANGE = 1000;
 
@@ -29,6 +32,9 @@ export default function CaloriesTracker() {
   const t = dict.caloriesUser;
 
   const { consumedFor, burnedFor } = useDayLog();
+
+  // Quick-add food popup (barcode / saved foods, same flow as the Log view).
+  const [showAddFood, setShowAddFood] = useState(false);
 
   // Initialized after mount to avoid SSR/client hydration mismatch.
   const [date, setDate] = useState<Date | null>(null);
@@ -126,6 +132,14 @@ export default function CaloriesTracker() {
                   </span>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowAddFood(true)}
+                aria-label={dict.nutritionUser.barcodeTitle}
+                className="ml-auto flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent hover:bg-sidebar-accent/80 active:scale-95 transition"
+              >
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </button>
             </div>
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-chart-3 text-white shrink-0">
@@ -151,6 +165,15 @@ export default function CaloriesTracker() {
           </div>
         )}
       </div>
+
+      {/* Quick-add food popup — logs to the day selected in the navigator */}
+      <Modal
+        isOpen={showAddFood}
+        onClose={() => setShowAddFood(false)}
+        title={dict.nutritionUser.barcodeTitle}
+      >
+        {dateKey && <BarcodeLookup todayKey={dateKey} embedded />}
+      </Modal>
     </div>
   );
 }
