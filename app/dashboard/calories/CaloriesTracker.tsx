@@ -72,80 +72,85 @@ export default function CaloriesTracker() {
     : "\u00A0";
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5">
-      {/* Hero: date navigator + calorie balance gauge */}
-      <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-5">
-        {/* Date navigator */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => shiftDay(-1)}
-            aria-label="previous day"
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-          >
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <span className="text-base font-medium">{dateLabel}</span>
-          <button
-            type="button"
-            onClick={() => shiftDay(1)}
-            aria-label="next day"
-            disabled={isToday}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition disabled:opacity-30 disabled:pointer-events-none"
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-
-        {/* Gauge */}
-        <div className="mt-1">
-          <CalorieGauge
-            value={net}
-            range={GAUGE_RANGE}
-            goal={goalNet}
-            label={net >= 0 ? t.calorieDeficit : t.calorieSurplus}
-            goalLabel={t.goalLabel}
-          />
-        </div>
-
-        {/* Consumed (left) / Burned (right) stats */}
-        <div className="grid grid-cols-2 gap-4 mt-2">
-          {/* Consumed — left */}
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
-              <Salad className="h-5 w-5" aria-hidden="true" />
+    <div className="mx-auto w-full max-w-4xl">
+      <div className="flex flex-row items-start gap-3">
+        {/* Hero: date navigator + calorie balance gauge */}
+        <section className="min-w-0 flex-1 bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
+          {/* Date navigator */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => shiftDay(-1)}
+              aria-label="previous day"
+              className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition shrink-0"
+            >
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+            </button>
+            <span className="text-xs sm:text-base font-medium text-center truncate px-1">
+              {dateLabel}
             </span>
-            <div className="min-w-0">
-              <div className="text-xs text-sidebar-foreground/70">{t.totalConsumed}</div>
-              <div className="text-sm font-semibold tabular-nums">
-                {consumed}{" "}
-                <span className="font-normal text-sidebar-foreground/60">
-                  / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
-                </span>
+            <button
+              type="button"
+              onClick={() => shiftDay(1)}
+              aria-label="next day"
+              disabled={isToday}
+              className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition disabled:opacity-30 disabled:pointer-events-none shrink-0"
+            >
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* Gauge */}
+          <div className="mt-1">
+            <CalorieGauge
+              value={net}
+              range={GAUGE_RANGE}
+              goal={goalNet}
+              label={net >= 0 ? t.calorieDeficit : t.calorieSurplus}
+              goalLabel={t.goalLabel}
+            />
+          </div>
+
+          {/* Consumed / Burned stats — stacked so each stays legible at half width */}
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
+                <Salad className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10px] sm:text-xs text-sidebar-foreground/70">{t.totalConsumed}</div>
+                <div className="text-xs sm:text-sm font-semibold tabular-nums truncate">
+                  {consumed}{" "}
+                  <span className="font-normal text-sidebar-foreground/60">
+                    / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-chart-3 text-white shrink-0">
+                <Flame className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10px] sm:text-xs text-sidebar-foreground/70">{t.totalBurned}</div>
+                <div className="text-xs sm:text-sm font-semibold tabular-nums truncate">
+                  {burned}{" "}
+                  <span className="font-normal text-sidebar-foreground/60">
+                    / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-          {/* Burned — right */}
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-chart-3 text-white shrink-0">
-              <Flame className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className="text-xs text-sidebar-foreground/70">{t.totalBurned}</div>
-              <div className="text-sm font-semibold tabular-nums">
-                {burned}{" "}
-                <span className="font-normal text-sidebar-foreground/60">
-                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
-                </span>
-              </div>
-            </div>
+        </section>
+
+        {/* Nutrient composition chart — driven by the same date key as the gauge */}
+        {dateKey && (
+          <div className="min-w-0 flex-1">
+            <NutritionChart dateKey={dateKey} />
           </div>
-        </div>
-      </section>
-
-      {/* Nutrient composition chart — driven by the same date key as the gauge */}
-      {dateKey && <NutritionChart dateKey={dateKey} />}
-
+        )}
+      </div>
     </div>
   );
 }

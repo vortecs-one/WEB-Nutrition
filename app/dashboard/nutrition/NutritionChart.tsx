@@ -24,8 +24,8 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     [dayData, dateKey],
   );
 
-  // Extended nutrient totals — summed from logged meals.
-  const extendedNutrients = useMemo(() => {
+  // Nutrient totals — summed from logged meals.
+  const nutrientTotals = useMemo(() => {
     const sum = (key: keyof (typeof meals)[number]) => {
       let any = false;
       let total = 0;
@@ -35,16 +35,37 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       }
       return any ? Math.round(total) : null;
     };
-    return [
-      { label: t.macroProtein, value: sum("protein"),      unit: t.unitG  },
-      { label: t.macroCarbs,   value: sum("carbs"),        unit: t.unitG  },
-      { label: t.macroFat,     value: sum("fat"),          unit: t.unitG  },
-      { label: t.satFat,       value: sum("saturatedFat"), unit: t.unitG  },
-      { label: t.sugars,       value: sum("sugars"),       unit: t.unitG  },
-      { label: t.fiber,        value: sum("fiber"),        unit: t.unitG  },
-      { label: t.sodium,       value: sum("sodium"),       unit: t.unitMg },
-    ].filter((n) => n.value != null);
-  }, [meals, t]);
+    return {
+      protein: sum("protein"),
+      carbs: sum("carbs"),
+      fat: sum("fat"),
+      saturatedFat: sum("saturatedFat"),
+      sugars: sum("sugars"),
+      fiber: sum("fiber"),
+      sodium: sum("sodium"),
+    };
+  }, [meals]);
+
+  // Nutrients without a natural "share of composition" %, shown against
+  // standard 2000-kcal-diet daily value reference amounts instead.
+  // Total sugars has no official daily value, so it's shown gram-only.
+  const extraNutrients = useMemo(() => {
+    const DAILY_VALUE = { saturatedFat: 20, fiber: 28, sodium: 2300 };
+    const rows: { key: string; label: string; value: number; unit: string; pct: number | null }[] = [];
+    if (nutrientTotals.saturatedFat != null) {
+      rows.push({ key: "saturatedFat", label: t.satFat, value: nutrientTotals.saturatedFat, unit: t.unitG, pct: Math.round((nutrientTotals.saturatedFat / DAILY_VALUE.saturatedFat) * 100) });
+    }
+    if (nutrientTotals.sugars != null) {
+      rows.push({ key: "sugars", label: t.sugars, value: nutrientTotals.sugars, unit: t.unitG, pct: null });
+    }
+    if (nutrientTotals.fiber != null) {
+      rows.push({ key: "fiber", label: t.fiber, value: nutrientTotals.fiber, unit: t.unitG, pct: Math.round((nutrientTotals.fiber / DAILY_VALUE.fiber) * 100) });
+    }
+    if (nutrientTotals.sodium != null) {
+      rows.push({ key: "sodium", label: t.sodium, value: nutrientTotals.sodium, unit: t.unitMg, pct: Math.round((nutrientTotals.sodium / DAILY_VALUE.sodium) * 100) });
+    }
+    return rows;
+  }, [nutrientTotals, t]);
 
   const data = useMemo(() => {
     const protein = meals.reduce((s, m) => s + (m.protein ?? 0), 0);
@@ -92,122 +113,113 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   } satisfies ChartConfig;
 
   return (
-    <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-5">
-      <h2 className="text-base font-semibold">{t.composition}</h2>
-      <p className="text-xs text-sidebar-foreground/60 mt-0.5">
-        {t.compositionSubtitle}
-      </p>
-
-      {total === 0 ? (
+    <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
+      {total === 0 && extraNutrients.length === 0 ? (
         <p className="py-10 text-center text-sm text-sidebar-foreground/50">
           {t.noComposition}
         </p>
       ) : (
-        <div className="mt-4 flex flex-row items-center gap-4">
-          {/* Legend — left */}
-          <ul className="flex flex-1 flex-col gap-2.5">
+        <div className="mt-3 sm:mt-4 flex flex-col items-center gap-3">
+          {/* Donut — on top so it stays readable at half card width */}
+          {total > 0 && (
+            <ChartContainer
+              config={chartConfig}
+              className="aspect-square h-28 w-28 sm:h-40 sm:w-40 shrink-0"
+            >
+              <PieChart>
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      nameKey="key"
+                      formatter={(value, name) => {
+                        const pct = Math.round((Number(value) / total) * 100);
+                        const label =
+                          chartConfig[name as keyof typeof chartConfig]?.label ??
+                          name;
+                        return `${label}: ${pct}%`;
+                      }}
+                    />
+                  }
+                />
+                <Pie
+                  data={data}
+                  dataKey="value"
+                  nameKey="key"
+                  innerRadius="58%"
+                  strokeWidth={3}
+                  isAnimationActive={false}
+                >
+                  {data.map((d) => (
+                    <Cell key={d.key} fill={d.fill} />
+                  ))}
+                  <Label
+                    content={({ viewBox }) => {
+                      if (!viewBox || !("cx" in viewBox)) return null;
+                      const { cx, cy } = viewBox as { cx: number; cy: number };
+                      return (
+                        <text x={cx} y={cy} textAnchor="middle">
+                          <tspan
+                            x={cx}
+                            y={cy - 3}
+                            className="fill-foreground text-base sm:text-2xl font-bold"
+                          >
+                            {topPct}%
+                          </tspan>
+                          <tspan
+                            x={cx}
+                            y={cy + 11}
+                            className="fill-muted-foreground text-[8px] sm:text-[11px]"
+                          >
+                            {top.label}
+                          </tspan>
+                        </text>
+                      );
+                    }}
+                  />
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+          )}
+
+          {/* Unified nutrient list — every daily nutrient with its % and amount beside it */}
+          <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
             {data.map((d) => {
               const pct = Math.round((d.value / total) * 100);
+              const grams =
+                d.key === "protein" ? nutrientTotals.protein :
+                d.key === "carbs" ? nutrientTotals.carbs :
+                d.key === "fat" ? nutrientTotals.fat :
+                null;
               return (
-                <li key={d.key} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: d.fill }}
-                    aria-hidden="true"
-                  />
+                <li key={d.key} className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-sm">
                   <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
                     {d.label}
                   </span>
-                  <span className="font-semibold tabular-nums">{pct}%</span>
+                  {grams != null && (
+                    <span className="tabular-nums text-sidebar-foreground/60">
+                      {grams}{t.unitG}
+                    </span>
+                  )}
+                  <span className="font-semibold tabular-nums w-9 text-right">{pct}%</span>
                 </li>
               );
             })}
-          </ul>
-
-          {/* Donut — right */}
-          <ChartContainer
-            config={chartConfig}
-            className="aspect-square h-48 w-48 shrink-0"
-          >
-            <PieChart>
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    nameKey="key"
-                    formatter={(value, name) => {
-                      const pct = Math.round((Number(value) / total) * 100);
-                      const label =
-                        chartConfig[name as keyof typeof chartConfig]?.label ??
-                        name;
-                      return `${label}: ${pct}%`;
-                    }}
-                  />
-                }
-              />
-              <Pie
-                data={data}
-                dataKey="value"
-                nameKey="key"
-                innerRadius={54}
-                strokeWidth={4}
-              >
-                {data.map((d) => (
-                  <Cell key={d.key} fill={d.fill} />
-                ))}
-                <Label
-                  content={({ viewBox }) => {
-                    if (!viewBox || !("cx" in viewBox)) return null;
-                    const { cx, cy } = viewBox as { cx: number; cy: number };
-                    return (
-                      <text x={cx} y={cy} textAnchor="middle">
-                        <tspan
-                          x={cx}
-                          y={cy - 4}
-                          className="fill-foreground text-3xl font-bold"
-                        >
-                          {topPct}%
-                        </tspan>
-                        <tspan
-                          x={cx}
-                          y={cy + 18}
-                          className="fill-muted-foreground text-xs"
-                        >
-                          {top.label}
-                        </tspan>
-                      </text>
-                    );
-                  }}
-                />
-              </Pie>
-            </PieChart>
-          </ChartContainer>
-        </div>
-      )}
-
-      {/* Extended nutrient grid — shown whenever at least one value is present */}
-      {extendedNutrients.length > 0 && (
-        <>
-          <div className="mt-5 border-t border-sidebar-foreground/10" />
-          <dl className="mt-4 grid grid-cols-4 gap-2">
-            {extendedNutrients.map((n) => (
-              <div
-                key={n.label}
-                className="rounded-2xl bg-sidebar-accent/40 p-2.5 text-center"
-              >
-                <dt className="text-[10px] font-medium text-sidebar-foreground/60 leading-tight">
+            {extraNutrients.map((n) => (
+              <li key={n.key} className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-sm">
+                <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
                   {n.label}
-                </dt>
-                <dd className="mt-1 text-sm font-bold tabular-nums">
-                  {n.value}
-                  <span className="ml-0.5 text-[10px] font-medium text-sidebar-foreground/60">
-                    {n.unit}
-                  </span>
-                </dd>
-              </div>
+                </span>
+                <span className="tabular-nums text-sidebar-foreground/60">
+                  {n.value}{n.unit}
+                </span>
+                <span className="font-semibold tabular-nums w-9 text-right">
+                  {n.pct != null ? `${n.pct}%` : ""}
+                </span>
+              </li>
             ))}
-          </dl>
-        </>
+          </ul>
+        </div>
       )}
     </section>
   );
