@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import CalorieGauge from "../nutrition/CalorieGauge";
 import NutritionChart from "../nutrition/NutritionChart";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
+import ActivityLog from "../nutrition/ActivityLog";
 
 const GAUGE_RANGE = 1000;
 
@@ -35,6 +36,8 @@ export default function CaloriesTracker() {
 
   // Quick-add food popup (barcode / saved foods, same flow as the Log view).
   const [showAddFood, setShowAddFood] = useState(false);
+  // Quick-add activity popup (burned-calorie logging, same flow as the Log view).
+  const [showAddActivity, setShowAddActivity] = useState(false);
 
   // Initialized after mount to avoid SSR/client hydration mismatch.
   const [date, setDate] = useState<Date | null>(null);
@@ -154,6 +157,14 @@ export default function CaloriesTracker() {
                   </span>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowAddActivity(true)}
+                aria-label={dict.nutritionUser.activityLog}
+                className="ml-auto flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent hover:bg-sidebar-accent/80 active:scale-95 transition"
+              >
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </button>
             </div>
           </div>
         </section>
@@ -173,6 +184,15 @@ export default function CaloriesTracker() {
         title={dict.nutritionUser.barcodeTitle}
       >
         {dateKey && <BarcodeLookup todayKey={dateKey} embedded />}
+      </Modal>
+
+      {/* Quick-add activity popup — logs burned calories for the selected day */}
+      <Modal
+        isOpen={showAddActivity}
+        onClose={() => setShowAddActivity(false)}
+        title={dict.nutritionUser.activityLog}
+      >
+        {dateKey && <ActivityLog todayKey={dateKey} embedded />}
       </Modal>
     </div>
   );
