@@ -5,7 +5,7 @@ import { fetchGlucoseSettings } from "@/lib/glucose/actions";
 import GlucoseTracker from "../glucose/GlucoseTracker";
 import CaloriesTracker from "./CaloriesTracker";
 
-// Personal dashboard for normal users: glucose monitoring at top, then calorie balance.
+// Personal dashboard for normal users: calorie balance at top, then glucose monitoring.
 export default async function CaloriesPage() {
   const role = await getCurrentRole();
 
@@ -17,8 +17,8 @@ export default async function CaloriesPage() {
 
   return (
     <div className="space-y-6">
-      <GlucoseTracker initialSettings={glucoseSettings} />
       <CaloriesTracker />
+      <GlucoseTracker initialSettings={glucoseSettings} />
     </div>
   );
 }
