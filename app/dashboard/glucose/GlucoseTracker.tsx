@@ -520,9 +520,6 @@ export default function GlucoseTracker({
         </div>
       )}
 
-      {/* Medical disclaimer */}
-      <p className="px-2 text-xs text-muted-foreground text-pretty">{t.disclaimer}</p>
-
       {/* Settings modal */}
       <Modal
         isOpen={showSettings}

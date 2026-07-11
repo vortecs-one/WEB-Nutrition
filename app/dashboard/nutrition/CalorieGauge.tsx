@@ -1,7 +1,9 @@
 "use client";
 
-// Semicircular calorie-balance gauge (speedometer style).
-// Left = surplus (red), center = 0, right = deficit (green).
+// Tachometer-style calorie-balance gauge (car dashboard look).
+// 270° dial: left end = -range (surplus), right end = +range (deficit).
+// Neon-glow ring with a "redline" zone at the deficit extreme, red needle,
+// and the big value centered like a digital speedometer.
 // Pure SVG so it scales crisply and needs no chart dependency.
 
 type Props = {
@@ -18,8 +20,14 @@ type Props = {
 };
 
 const CX = 150;
-const CY = 128;
-const R = 112;
+const CY = 146;
+const R = 112; // outer glowing ring
+
+// Dial sweep: fraction 0 → 225° (bottom-left), fraction 1 → -45° (bottom-right).
+const START_ANGLE = 225;
+const SWEEP = 270;
+// Last 20% of the dial is the "redline" zone.
+const RED_START = 0.8;
 
 // Round to a fixed precision so server (Node) and client (browser) serialize
 // SVG coordinates identically. Math.cos/Math.sin may differ in the last bit
@@ -33,12 +41,26 @@ function polar(angleDeg: number, radius = R) {
   return { x: round(CX + radius * Math.cos(a)), y: round(CY - radius * Math.sin(a)) };
 }
 
-// Map a clamped value in [-range, range] to an angle in [180, 0].
+const fractionToAngle = (f: number) => START_ANGLE - f * SWEEP;
+
+// Map a clamped value in [-range, range] to a dial angle.
 function valueToAngle(value: number, range: number) {
   const clamped = Math.max(-range, Math.min(range, value));
-  const fraction = (clamped + range) / (2 * range); // 0..1
-  return 180 - fraction * 180; // 180 (left) .. 0 (right)
+  return fractionToAngle((clamped + range) / (2 * range));
 }
+
+// Clockwise arc path between two dial fractions at a given radius.
+function arcPath(f0: number, f1: number, radius: number) {
+  const s = polar(fractionToAngle(f0), radius);
+  const e = polar(fractionToAngle(f1), radius);
+  const largeArc = (f1 - f0) * SWEEP > 180 ? 1 : 0;
+  return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${largeArc} 1 ${e.x} ${e.y}`;
+}
+
+const BLUE_CORE = "#3ee6ff";
+const RED = "#ef4444";
+const RED_CORE = "#ff5252";
+const NEEDLE = "#ff3b5c";
 
 export default function CalorieGauge({
   value,
@@ -47,66 +69,85 @@ export default function CalorieGauge({
   label,
   goalLabel,
 }: Props) {
-  const start = polar(180);
-  const end = polar(0);
+  const blueArc = arcPath(0, RED_START, R);
+  const redArc = arcPath(RED_START, 1, R);
+  // Dashed band just inside the ring — the hatched "redline" strip.
+  const redBand = arcPath(RED_START + 0.01, 0.99, R - 10);
 
-  // Tick marks every step degrees along the arc.
-  const ticks = Array.from({ length: 41 }, (_, i) => {
-    const angle = 180 - (i / 40) * 180;
+  // 51 ticks: a major every 5th (each numbered division), 4 minors between.
+  const ticks = Array.from({ length: 51 }, (_, i) => {
+    const f = i / 50;
+    const angle = fractionToAngle(f);
     const major = i % 5 === 0;
-    const outer = polar(angle, R + 2);
-    const inner = polar(angle, major ? R - 14 : R - 8);
-    return { angle, major, outer, inner };
+    const inRed = f > RED_START;
+    return {
+      major,
+      inRed,
+      outer: polar(angle, 97),
+      inner: polar(angle, major ? 84 : 90),
+    };
+  });
+
+  // Dial numbers, shown ÷100 like a tachometer's "×1000" scale.
+  const numbers = Array.from({ length: 11 }, (_, i) => {
+    const f = i / 10;
+    const pos = polar(fractionToAngle(f), 71);
+    return {
+      pos,
+      inRed: f > RED_START,
+      text: String(Math.round((-range + f * 2 * range) / 100)),
+    };
   });
 
   const needleAngle = valueToAngle(value, range);
-  const needleTip = polar(needleAngle, R - 18);
+  const needleInner = polar(needleAngle, 50);
+  const needleTip = polar(needleAngle, 93);
 
   const goalAngle = goal != null ? valueToAngle(goal, range) : null;
-  // The dot sits on the arc edge; the label sits clearly outside the arc.
-  const goalPos   = goalAngle != null ? polar(goalAngle, R + 6)  : null;
-  // Place label further out and offset it slightly along the arc direction
-  // so it clears the dot and the outer tick marks.
-  const goalCap   = goalAngle != null ? polar(goalAngle, R + 26) : null;
+  // The dot sits on the glowing ring; the label sits clearly outside it.
+  const goalPos = goalAngle != null ? polar(goalAngle, R) : null;
+  const goalCap = goalAngle != null ? polar(goalAngle, R + 16) : null;
   // Anchor the text to whichever side of the dial the goal marker is on.
-  const goalAnchor =
-    goalAngle != null
-      ? goalAngle > 90
-        ? "end"
-        : goalAngle < 90
-        ? "start"
-        : "middle"
-      : "middle";
+  const goalCos = goalAngle != null ? Math.cos((goalAngle * Math.PI) / 180) : 0;
+  const goalAnchor = goalCos < -0.25 ? "end" : goalCos > 0.25 ? "start" : "middle";
+
+  const valueText = String(Math.abs(value));
+  const valueSize = valueText.length >= 4 ? 32 : 40;
 
   return (
     <svg
-      viewBox="0 0 300 195"
+      viewBox="0 0 300 264"
       className="w-full max-w-sm mx-auto"
       role="img"
       aria-label={`${label}: ${value}`}
     >
-      <defs>
-        {/*
-          Left side = surplus (consumed > burned) → teal/green from the brand palette.
-          Right side = deficit (burned > consumed)  → amber/red from the brand palette.
-          Matches the stat cards: Consumed (teal) left, Burned (amber→red) right.
-        */}
-        <linearGradient id="gaugeArc" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%"   stopColor="#09c0db" />
-          <stop offset="40%"  stopColor="#22c55e" />
-          <stop offset="60%"  stopColor="#ffbe00" />
-          <stop offset="80%"  stopColor="#ff9700" />
-          <stop offset="100%" stopColor="#ef4444" />
-        </linearGradient>
-      </defs>
+      {/* Outer ring — layered strokes fake the neon glow without filters */}
+      {[
+        { d: blueArc, c: `rgba(9,192,219,0.15)`, w: 13 },
+        { d: blueArc, c: `rgba(9,192,219,0.4)`, w: 7 },
+        { d: blueArc, c: BLUE_CORE, w: 3 },
+        { d: redArc, c: `rgba(239,68,68,0.2)`, w: 13 },
+        { d: redArc, c: `rgba(239,68,68,0.45)`, w: 7 },
+        { d: redArc, c: RED_CORE, w: 3 },
+      ].map((s, i) => (
+        <path
+          key={i}
+          d={s.d}
+          fill="none"
+          stroke={s.c}
+          strokeWidth={s.w}
+          strokeLinecap="round"
+        />
+      ))}
 
-      {/* Colored arc */}
+      {/* Hatched redline band inside the ring */}
       <path
-        d={`M ${start.x} ${start.y} A ${R} ${R} 0 0 1 ${end.x} ${end.y}`}
+        d={redBand}
         fill="none"
-        stroke="url(#gaugeArc)"
-        strokeWidth={14}
-        strokeLinecap="round"
+        stroke={RED}
+        strokeWidth={7}
+        strokeDasharray="3 4"
+        opacity={0.85}
       />
 
       {/* Tick marks */}
@@ -117,30 +158,42 @@ export default function CalorieGauge({
           y1={t.inner.y}
           x2={t.outer.x}
           y2={t.outer.y}
-          stroke="rgba(255,255,255,0.35)"
-          strokeWidth={t.major ? 2 : 1}
+          stroke={
+            t.inRed
+              ? `rgba(255,120,120,${t.major ? 0.9 : 0.45})`
+              : `rgba(158,231,255,${t.major ? 0.9 : 0.45})`
+          }
+          strokeWidth={t.major ? 2.5 : 1}
         />
       ))}
 
-      {/* Scale labels at -range, -range/2, 0, +range/2, +range */}
-      {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
-        const angle = 180 - fraction * 180;
-        const pos = polar(angle, R - 26);
-        const val = Math.round(-range + fraction * 2 * range);
-        return (
-          <text
-            key={fraction}
-            x={pos.x}
-            y={pos.y}
-            fill="rgba(255,255,255,0.55)"
-            fontSize={9}
-            textAnchor="middle"
-            dominantBaseline="middle"
-          >
-            {val === 0 ? "0" : val > 0 ? `+${val}` : val}
-          </text>
-        );
-      })}
+      {/* Dial numbers (value ÷ 100) */}
+      {numbers.map((n, i) => (
+        <text
+          key={i}
+          x={n.pos.x}
+          y={n.pos.y}
+          fill={n.inRed ? "#ffb4b4" : "#d7f5ff"}
+          fontSize={11}
+          fontWeight={600}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          {n.text}
+        </text>
+      ))}
+
+      {/* Scale caption, like a tachometer's "RPM ×1000" */}
+      <text
+        x={CX}
+        y={CY - 48}
+        fill="rgba(255,255,255,0.45)"
+        fontSize={9}
+        letterSpacing={1}
+        textAnchor="middle"
+      >
+        kcal ×100
+      </text>
 
       {/* Goal marker */}
       {goalPos && goalCap && (
@@ -148,7 +201,7 @@ export default function CalorieGauge({
           <circle
             cx={goalPos.x}
             cy={goalPos.y}
-            r={7}
+            r={5}
             fill="#e5e7eb"
             stroke="#0f172a"
             strokeWidth={2}
@@ -167,37 +220,56 @@ export default function CalorieGauge({
         </>
       )}
 
-      {/* Needle */}
-      <line
-        x1={CX}
-        y1={CY}
-        x2={needleTip.x}
-        y2={needleTip.y}
-        stroke="#ffffff"
-        strokeWidth={4}
-        strokeLinecap="round"
-      />
-      <circle cx={CX} cy={CY} r={6} fill="#ffffff" />
+      {/* Needle — floats from the center panel edge to the tick scale */}
+      {[
+        { c: "rgba(255,59,92,0.15)", w: 10 },
+        { c: "rgba(255,59,92,0.4)", w: 5 },
+        { c: NEEDLE, w: 2.5 },
+      ].map((s, i) => (
+        <line
+          key={i}
+          x1={needleInner.x}
+          y1={needleInner.y}
+          x2={needleTip.x}
+          y2={needleTip.y}
+          stroke={s.c}
+          strokeWidth={s.w}
+          strokeLinecap="round"
+        />
+      ))}
 
-      {/* Label + value, placed below the pivot so the needle never overlaps */}
+      {/* Center readout: big value + unit, speedometer style */}
       <text
         x={CX}
-        y={CY + 24}
-        fill="rgba(255,255,255,0.7)"
-        fontSize={13}
-        textAnchor="middle"
-      >
-        {label}
-      </text>
-      <text
-        x={CX}
-        y={CY + 58}
+        y={CY + 10}
         fill="#ffffff"
-        fontSize={40}
+        fontSize={valueSize}
         fontWeight={700}
         textAnchor="middle"
       >
-        {Math.abs(value)}
+        {valueText}
+      </text>
+      <text
+        x={CX}
+        y={CY + 32}
+        fill={BLUE_CORE}
+        fontSize={12}
+        fontWeight={600}
+        letterSpacing={1}
+        textAnchor="middle"
+      >
+        kcal
+      </text>
+
+      {/* Deficit/surplus label in the bottom gap of the dial */}
+      <text
+        x={CX}
+        y={CY + 78}
+        fill="rgba(255,255,255,0.7)"
+        fontSize={12}
+        textAnchor="middle"
+      >
+        {label}
       </text>
     </svg>
   );
