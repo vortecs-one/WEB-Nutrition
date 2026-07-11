@@ -88,14 +88,14 @@ export default function CalorieGauge({
     };
   });
 
-  // Dial numbers, shown ÷100 like a tachometer's "×1000" scale.
+  // Dial numbers show the real net-kcal at each division (…, -200, 0, 200, …).
   const numbers = Array.from({ length: 11 }, (_, i) => {
     const f = i / 10;
     const pos = polar(fractionToAngle(f), 71);
     return {
       pos,
       inRed: f > RED_START,
-      text: String(Math.round((-range + f * 2 * range) / 100)),
+      text: String(Math.round(-range + f * 2 * range)),
     };
   });
 
@@ -182,18 +182,6 @@ export default function CalorieGauge({
           {n.text}
         </text>
       ))}
-
-      {/* Scale caption, like a tachometer's "RPM ×1000" */}
-      <text
-        x={CX}
-        y={CY - 48}
-        fill="rgba(255,255,255,0.45)"
-        fontSize={9}
-        letterSpacing={1}
-        textAnchor="middle"
-      >
-        kcal ×100
-      </text>
 
       {/* Goal marker */}
       {goalPos && goalCap && (

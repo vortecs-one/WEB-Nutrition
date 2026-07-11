@@ -124,12 +124,9 @@ export default function CaloriesTracker() {
           {/* Consumed / Burned stats — stacked so each stays legible at half width */}
           <div className="flex flex-col gap-2 mt-1">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
-                <Salad className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <div className="text-[10px] sm:text-xs text-sidebar-foreground/70">{t.totalConsumed}</div>
-                <div className="text-xs sm:text-sm font-semibold tabular-nums truncate">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-sidebar-foreground/70">{t.totalConsumed}</div>
+                <div className="text-sm sm:text-base font-semibold tabular-nums truncate">
                   {consumed}{" "}
                   <span className="font-normal text-sidebar-foreground/60">
                     / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
@@ -140,18 +137,18 @@ export default function CaloriesTracker() {
                 type="button"
                 onClick={() => setShowAddFood(true)}
                 aria-label={dict.nutritionUser.barcodeTitle}
-                className="ml-auto flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent hover:bg-sidebar-accent/80 active:scale-95 transition"
+                className="relative flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-chart-2 text-white hover:opacity-90 active:scale-95 transition"
               >
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                <Salad className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
+                </span>
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-chart-3 text-white shrink-0">
-                <Flame className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <div className="text-[10px] sm:text-xs text-sidebar-foreground/70">{t.totalBurned}</div>
-                <div className="text-xs sm:text-sm font-semibold tabular-nums truncate">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm text-sidebar-foreground/70">{t.totalBurned}</div>
+                <div className="text-sm sm:text-base font-semibold tabular-nums truncate">
                   {burned}{" "}
                   <span className="font-normal text-sidebar-foreground/60">
                     / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
@@ -162,9 +159,12 @@ export default function CaloriesTracker() {
                 type="button"
                 onClick={() => setShowAddActivity(true)}
                 aria-label={dict.nutritionUser.activityLog}
-                className="ml-auto flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent hover:bg-sidebar-accent/80 active:scale-95 transition"
+                className="relative flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-chart-3 text-white hover:opacity-90 active:scale-95 transition"
               >
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                <Flame className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
+                </span>
               </button>
             </div>
           </div>
