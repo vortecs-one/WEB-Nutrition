@@ -218,6 +218,16 @@ const en: Dictionary = {
     goalLabel: "Goal",
     kcal: "kcal",
   },
+  hydration: {
+    title: "Hydration",
+    gaugeLabel: "Water today",
+    goalLabel: "Goal",
+    liters: "L",
+    ml: "ml",
+    fullLiters: "full liters",
+    todayEntries: "Today's entries",
+    noEntries: "You haven't logged any water today yet.",
+  },
   glucose: {
     title: "Glucose",
     subtitle: "Monitor your glucose in real time from Nightscout.",

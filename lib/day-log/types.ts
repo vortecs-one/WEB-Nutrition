@@ -45,11 +45,18 @@ export type Supplement = {
   type: SupplementType;
 };
 
+// One logged water intake (milliliters).
+export type WaterEntry = {
+  id: number;
+  amountMl: number;
+};
+
 // Per-day data structure.
 export type DayData = {
   meals: Meal[];
   activities: Activity[];
   supplements: Supplement[];
+  water: WaterEntry[];
 };
 
 // Map from ISO date string (YYYY-MM-DD) -> that day's data.
@@ -58,3 +65,4 @@ export type DayLog = Record<string, DayData>;
 // Daily targets (could later come from the user's profile / Thruxion API).
 export const CONSUMED_GOAL = 1940;
 export const BURNED_GOAL = 2383;
+export const WATER_GOAL_ML = 3000;

@@ -217,6 +217,16 @@ const es = {
     goalLabel: "Meta",
     kcal: "kcal",
   },
+  hydration: {
+    title: "Hidratación",
+    gaugeLabel: "Agua del día",
+    goalLabel: "Meta",
+    liters: "L",
+    ml: "ml",
+    fullLiters: "litros completos",
+    todayEntries: "Registros del día",
+    noEntries: "Aún no has registrado agua hoy.",
+  },
   glucose: {
     title: "Glucosa",
     subtitle: "Monitorea tu glucosa en tiempo real desde Nightscout.",

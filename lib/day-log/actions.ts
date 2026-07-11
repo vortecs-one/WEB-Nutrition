@@ -8,6 +8,7 @@ import type {
   Meal,
   Activity,
   Supplement,
+  WaterEntry,
   DayData,
   DayLog,
 } from "./types";
@@ -23,7 +24,12 @@ async function getUserKey(): Promise<string | null> {
   return user?.humanId ?? user?.email ?? null;
 }
 
-const emptyDay = (): DayData => ({ meals: [], activities: [], supplements: [] });
+const emptyDay = (): DayData => ({
+  meals: [],
+  activities: [],
+  supplements: [],
+  water: [],
+});
 
 // Loads every entry for the signed-in user, grouped by ISO date key.
 // Newest-first within each day to mirror the previous in-memory behavior.
@@ -69,6 +75,11 @@ export async function fetchUserDayLog(): Promise<DayLog> {
         name: row.name,
         dose: row.dose ?? "",
         type: row.subtype as Supplement["type"],
+      });
+    } else if (row.kind === "water") {
+      day.water.push({
+        id: row.id,
+        amountMl: row.amountMl ?? 0,
       });
     }
   }
@@ -169,6 +180,28 @@ export async function addSupplementEntry(
     .returning({ id: dayLogEntries.id });
 
   return { id: row.id, ...supplement };
+}
+
+export async function addWaterEntry(
+  dateKey: string,
+  amountMl: number,
+): Promise<WaterEntry | null> {
+  const userKey = await getUserKey();
+  if (!userKey) return null;
+
+  const [row] = await db
+    .insert(dayLogEntries)
+    .values({
+      userKey,
+      logDate: dateKey,
+      kind: "water",
+      subtype: "water",
+      name: "water",
+      amountMl,
+    })
+    .returning({ id: dayLogEntries.id });
+
+  return { id: row.id, amountMl };
 }
 
 // Deletes one entry, always scoped to the signed-in user so a user can never

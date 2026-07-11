@@ -114,7 +114,7 @@ export const dayLogEntries = pgTable(
     userKey: text("user_key").notNull(),
     // Day this entry belongs to (YYYY-MM-DD).
     logDate: date("log_date").notNull(),
-    // "meal" | "activity" | "supplement".
+    // "meal" | "activity" | "supplement" | "water".
     kind: varchar("kind", { length: 20 }).notNull(),
     // Meal/activity/supplement subtype (e.g. "breakfast", "cardio", "protein").
     subtype: varchar("subtype", { length: 20 }).notNull(),
@@ -123,6 +123,8 @@ export const dayLogEntries = pgTable(
     calories: integer("calories"),
     // Supplement dose (free text); null otherwise.
     dose: text("dose"),
+    // Water amount in milliliters for kind="water"; null otherwise.
+    amountMl: integer("amount_ml"),
     // Optional macros for meals (grams).
     protein: integer("protein"),
     carbs: integer("carbs"),

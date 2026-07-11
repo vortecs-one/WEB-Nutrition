@@ -14,12 +14,14 @@ import {
   addMealEntries,
   addActivityEntry,
   addSupplementEntry,
+  addWaterEntry,
   removeEntry,
 } from "./actions";
 import type {
   Meal,
   Activity,
   Supplement,
+  WaterEntry,
   DayData,
   DayLog,
 } from "./types";
@@ -39,6 +41,7 @@ const emptyDay = (): DayData => ({
   meals: [],
   activities: [],
   supplements: [],
+  water: [],
 });
 
 type DayLogValue = {
@@ -52,6 +55,9 @@ type DayLogValue = {
   removeActivity: (dateKey: string, id: number) => void;
   addSupplement: (dateKey: string, supplement: Omit<Supplement, "id">) => void;
   removeSupplement: (dateKey: string, id: number) => void;
+  waterFor: (dateKey: string) => number;
+  addWater: (dateKey: string, amountMl: number) => void;
+  removeWater: (dateKey: string, id: number) => void;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
@@ -89,6 +95,13 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
   const burnedFor = useCallback(
     (dateKey: string) =>
       (log[dateKey]?.activities ?? []).reduce((s, a) => s + a.calories, 0),
+    [log],
+  );
+
+  // Total water logged for a day, in milliliters.
+  const waterFor = useCallback(
+    (dateKey: string) =>
+      (log[dateKey]?.water ?? []).reduce((s, w) => s + w.amountMl, 0),
     [log],
   );
 
@@ -220,6 +233,35 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [runMutation],
   );
 
+  const addWater = useCallback(
+    (dateKey: string, amountMl: number) => {
+      const optimisticWater: WaterEntry = { id: -Date.now(), amountMl };
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            water: [optimisticWater, ...d.water],
+          })),
+        () => addWaterEntry(dateKey, amountMl),
+      );
+    },
+    [runMutation],
+  );
+
+  const removeWater = useCallback(
+    (dateKey: string, id: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            water: d.water.filter((w) => w.id !== id),
+          })),
+        () => removeEntry(id),
+      );
+    },
+    [runMutation],
+  );
+
   const value = useMemo<DayLogValue>(
     () => ({
       dayData,
@@ -232,6 +274,9 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       removeActivity,
       addSupplement,
       removeSupplement,
+      waterFor,
+      addWater,
+      removeWater,
     }),
     [
       dayData,
@@ -244,6 +289,9 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       removeActivity,
       addSupplement,
       removeSupplement,
+      waterFor,
+      addWater,
+      removeWater,
     ],
   );
 

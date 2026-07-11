@@ -13,6 +13,7 @@ import {
   useDayLog,
   CONSUMED_GOAL,
   BURNED_GOAL,
+  WATER_GOAL_ML,
 } from "@/lib/day-log/provider";
 import { Modal } from "@/components/ui/modal";
 import CalorieGauge from "../nutrition/CalorieGauge";
@@ -20,6 +21,7 @@ import NutritionChart from "../nutrition/NutritionChart";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
 import ActivityLog from "../nutrition/ActivityLog";
 import DietLog from "../nutrition/DietLog";
+import WaterLog, { NitroBottle } from "./WaterLog";
 
 const GAUGE_RANGE = 1000;
 
@@ -33,12 +35,14 @@ export default function CaloriesTracker() {
   const { dict, locale } = useI18n();
   const t = dict.caloriesUser;
 
-  const { consumedFor, burnedFor } = useDayLog();
+  const { consumedFor, burnedFor, waterFor } = useDayLog();
 
   // Quick-add food popup (barcode / saved foods, same flow as the Log view).
   const [showAddFood, setShowAddFood] = useState(false);
   // Quick-add activity popup (burned-calorie logging, same flow as the Log view).
   const [showAddActivity, setShowAddActivity] = useState(false);
+  // Water popup (nitro hydration gauge + quick add).
+  const [showAddWater, setShowAddWater] = useState(false);
 
   // Initialized after mount to avoid SSR/client hydration mismatch.
   const [date, setDate] = useState<Date | null>(null);
@@ -57,6 +61,10 @@ export default function CaloriesTracker() {
   const burned = useMemo(
     () => (dateKey ? burnedFor(dateKey) : 0),
     [burnedFor, dateKey],
+  );
+  const waterMl = useMemo(
+    () => (dateKey ? waterFor(dateKey) : 0),
+    [waterFor, dateKey],
   );
 
   const net = burned - consumed;
@@ -121,8 +129,29 @@ export default function CaloriesTracker() {
             />
           </div>
 
-          {/* Consumed / Burned — two big tappable icons with their totals below */}
-          <div className="grid grid-cols-2 gap-2 mt-2">
+          {/* Water / Consumed / Burned — big tappable icons with totals below */}
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => setShowAddWater(true)}
+              aria-label={dict.hydration.title}
+              className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
+            >
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
+                <NitroBottle variant="mono" className="h-7 w-5 sm:h-9 sm:w-6" />
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                </span>
+              </span>
+              <div className="text-center leading-tight">
+                <div className="text-base sm:text-lg font-semibold tabular-nums">
+                  {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-[11px] sm:text-xs text-sidebar-foreground/60 tabular-nums">
+                  / {WATER_GOAL_ML / 1000} {dict.hydration.liters}
+                </div>
+              </div>
+            </button>
             <button
               type="button"
               onClick={() => setShowAddFood(true)}
@@ -194,6 +223,15 @@ export default function CaloriesTracker() {
         title={dict.nutritionUser.activityLog}
       >
         {dateKey && <ActivityLog todayKey={dateKey} embedded />}
+      </Modal>
+
+      {/* Water popup — nitro hydration gauge + quick-add for the selected day */}
+      <Modal
+        isOpen={showAddWater}
+        onClose={() => setShowAddWater(false)}
+        title={dict.hydration.title}
+      >
+        {dateKey && <WaterLog todayKey={dateKey} />}
       </Modal>
     </div>
   );
