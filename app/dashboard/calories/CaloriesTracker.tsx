@@ -19,6 +19,7 @@ import CalorieGauge from "../nutrition/CalorieGauge";
 import NutritionChart from "../nutrition/NutritionChart";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
 import ActivityLog from "../nutrition/ActivityLog";
+import DietLog from "../nutrition/DietLog";
 
 const GAUGE_RANGE = 1000;
 
@@ -177,13 +178,19 @@ export default function CaloriesTracker() {
         )}
       </div>
 
-      {/* Quick-add food popup — logs to the day selected in the navigator */}
+      {/* Quick-add food popup — barcode lookup + meal/supplement quick-add */}
       <Modal
         isOpen={showAddFood}
         onClose={() => setShowAddFood(false)}
         title={dict.nutritionUser.barcodeTitle}
       >
-        {dateKey && <BarcodeLookup todayKey={dateKey} embedded />}
+        {dateKey && (
+          <div className="space-y-5">
+            <BarcodeLookup todayKey={dateKey} embedded />
+            {/* Diet log — meal and supplement quick-add, below the scanner */}
+            <DietLog todayKey={dateKey} />
+          </div>
+        )}
       </Modal>
 
       {/* Quick-add activity popup — logs burned calories for the selected day */}

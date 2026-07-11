@@ -13,7 +13,7 @@ export default function MobileTabBar() {
   const pathname = usePathname();
   const { dict } = useI18n();
   const role = useRole();
-  const items = getNavItems(role, dict);
+  const items = getNavItems(role, dict).filter((item) => item.key !== "myNutrition");
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
