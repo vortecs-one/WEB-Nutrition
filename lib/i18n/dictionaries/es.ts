@@ -223,8 +223,7 @@ const es = {
     currentReading: "Glucosa",
     lastUpdated: "hace {min} min",
     justNow: "ahora mismo",
-    staleWarning:
-      "Sin lecturas recientes. Revisa tu sensor o la app de LibreLink.",
+    staleWarning: "Revisa tu sensor o la app de LibreLink.",
     noData: "No hay lecturas disponibles en este período.",
     chartTitle: "Historial",
     range3h: "3 h",

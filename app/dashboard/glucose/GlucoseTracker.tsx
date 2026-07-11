@@ -11,6 +11,8 @@ import { Settings2, AlertTriangle, Activity, Users, Maximize2 } from "lucide-rea
 import {
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   ReferenceLine,
@@ -291,6 +293,87 @@ export default function GlucoseTracker({
       </ResponsiveContainer>
     );
 
+  // Compact "mountain" chart for the card: a short panoramic area chart with a
+  // tight y-domain so the curve fills the height, colored by zone via a vertical
+  // gradient — green inside the target range, red above/below it. The detailed
+  // popup keeps the full chart (axes, target band, threshold lines).
+  const values = chartData.map((d) => d.value);
+  const pad = unit === "mmol" ? 1 : 15;
+  const vMin = values.length ? Math.min(...values) - pad : yDomain[0];
+  const vMax = values.length ? Math.max(...values) + pad : yDomain[1];
+  // Map a glucose value to a 0..1 offset from the top of the plot area.
+  const gradOffset = (mgdl: number) => {
+    const v = (vMax - cv(mgdl)) / (vMax - vMin);
+    return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+  };
+  const offHigh = gradOffset(settings.targetHigh);
+  const offLow = gradOffset(settings.targetLow);
+  const zoneStops = (opacity: number) => (
+    <>
+      <stop offset={0} stopColor="#ef4444" stopOpacity={opacity} />
+      <stop offset={offHigh} stopColor="#ef4444" stopOpacity={opacity} />
+      <stop offset={offHigh} stopColor="var(--color-chart-2)" stopOpacity={opacity} />
+      <stop offset={offLow} stopColor="var(--color-chart-2)" stopOpacity={opacity} />
+      <stop offset={offLow} stopColor="#ef4444" stopOpacity={opacity} />
+      <stop offset={1} stopColor="#ef4444" stopOpacity={opacity} />
+    </>
+  );
+
+  const compactChart =
+    loading && chartData.length === 0 ? (
+      <div className="flex h-full items-center justify-center text-sm text-sidebar-foreground/60">
+        {t.loading}
+      </div>
+    ) : chartData.length === 0 ? (
+      <div className="flex h-full items-center justify-center text-sm text-sidebar-foreground/60">
+        {t.noData}
+      </div>
+    ) : (
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+          <defs>
+            <linearGradient id="glucose-zone-stroke" x1="0" y1="0" x2="0" y2="1">
+              {zoneStops(1)}
+            </linearGradient>
+            <linearGradient id="glucose-zone-fill" x1="0" y1="0" x2="0" y2="1">
+              {zoneStops(0.25)}
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="date"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            tickFormatter={timeFormatter}
+            tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={60}
+          />
+          <YAxis domain={[vMin, vMax]} hide />
+          <Tooltip
+            formatter={(value) => [`${value} ${unitLabel(unit)}`, ""]}
+            labelFormatter={(ms) => timeFormatter(ms as number)}
+            contentStyle={{
+              background: "var(--color-sidebar)",
+              border: "1px solid var(--color-sidebar-border)",
+              borderRadius: "0.75rem",
+              fontSize: "12px",
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="url(#glucose-zone-stroke)"
+            strokeWidth={2.5}
+            fill="url(#glucose-zone-fill)"
+            dot={false}
+            activeDot={{ r: 4 }}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3">
       {/* Merged card: current reading (colored pill) + settings + history chart,
@@ -327,10 +410,18 @@ export default function GlucoseTracker({
                   <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
                     {statusLabel[currentStatus]}
                   </div>
-                  <div className="text-[10px] sm:text-xs text-sidebar-foreground/60">
-                    {currentMins === 0
-                      ? t.justNow
-                      : t.lastUpdated.replace("{min}", String(currentMins))}
+                  <div className="flex min-w-0 items-center gap-1.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                    <span>
+                      {currentMins === 0
+                        ? t.justNow
+                        : t.lastUpdated.replace("{min}", String(currentMins))}
+                    </span>
+                    {isStale && (
+                      <span className="flex shrink-0 items-center gap-1 text-destructive">
+                        <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                        <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
+                      </span>
+                    )}
                   </div>
                 </>
               )}
@@ -358,15 +449,8 @@ export default function GlucoseTracker({
           </div>
         </div>
 
-        {isStale && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl bg-sidebar-accent/60 px-3 py-2 text-xs sm:text-sm">
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{t.staleWarning}</span>
-          </div>
-        )}
-
-        <div className="mt-3 flex">{rangeSelector}</div>
-        <div className="mt-3 h-64 sm:h-72 w-full">{chartContent}</div>
+        {/* Panoramic simplified chart — full detail + range selector in the expand popup */}
+        <div className="mt-3 h-32 sm:h-40 w-full">{compactChart}</div>
       </section>
 
       {/* Patient switcher (LibreLinkUp: main sensor + followed patients) */}

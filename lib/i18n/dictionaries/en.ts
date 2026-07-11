@@ -224,7 +224,7 @@ const en: Dictionary = {
     currentReading: "Glucose",
     lastUpdated: "{min} min ago",
     justNow: "just now",
-    staleWarning: "No recent readings. Check your sensor or the LibreLink app.",
+    staleWarning: "Check your sensor or the LibreLink app.",
     noData: "No readings available for this period.",
     chartTitle: "History",
     range3h: "3 h",
