@@ -101,7 +101,7 @@ export default function CaloriesTracker() {
           </div>
 
           {/* Gauge */}
-          <div className="mt-1">
+          <div className="mt-0">
             <CalorieGauge
               value={net}
               range={GAUGE_RANGE}
@@ -112,7 +112,7 @@ export default function CaloriesTracker() {
           </div>
 
           {/* Consumed / Burned stats — stacked so each stays legible at half width */}
-          <div className="flex flex-col gap-2 mt-2">
+          <div className="flex flex-col gap-2 mt-1">
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-chart-2 text-white shrink-0">
                 <Salad className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />

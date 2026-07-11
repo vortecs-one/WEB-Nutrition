@@ -119,12 +119,12 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
           {t.noComposition}
         </p>
       ) : (
-        <div className="mt-3 sm:mt-4 flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           {/* Donut — on top so it stays readable at half card width */}
           {total > 0 && (
             <ChartContainer
               config={chartConfig}
-              className="aspect-square h-28 w-28 sm:h-40 sm:w-40 shrink-0"
+              className="aspect-square h-24 w-24 sm:h-32 sm:w-32 shrink-0"
             >
               <PieChart>
                 <ChartTooltip
