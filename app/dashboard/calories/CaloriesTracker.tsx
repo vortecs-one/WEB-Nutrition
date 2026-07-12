@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Droplet,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
@@ -21,7 +22,7 @@ import NutritionChart from "../nutrition/NutritionChart";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
 import ActivityLog from "../nutrition/ActivityLog";
 import DietLog from "../nutrition/DietLog";
-import WaterLog, { NitroBottle } from "./WaterLog";
+import WaterLog from "./WaterLog";
 
 const GAUGE_RANGE = 1000;
 
@@ -138,7 +139,7 @@ export default function CaloriesTracker() {
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
-                <NitroBottle variant="mono" className="h-7 w-5 sm:h-9 sm:w-6" />
+                <Droplet className="h-6 w-6 sm:h-8 sm:w-8" />
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
