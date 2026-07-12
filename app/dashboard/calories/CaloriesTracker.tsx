@@ -124,8 +124,10 @@ export default function CaloriesTracker() {
             {net >= 0 ? t.calorieDeficit : t.calorieSurplus}
           </div>
 
-          {/* Gauge with nitro bottles nested in the dial's bottom gap */}
-          <div className="relative mt-0">
+          {/* Gauge with nitro bottles nested in the dial's bottom gap.
+              max-w-sm + @container makes this wrapper track the SVG's real
+              width, so the bottles below can size themselves relative to it. */}
+          <div className="relative mt-0 max-w-sm mx-auto @container">
             <CalorieGauge
               value={net}
               range={GAUGE_RANGE}
@@ -134,27 +136,30 @@ export default function CaloriesTracker() {
               goalLabel={t.goalLabel}
               hideLabel
             />
-            {/* Nitro bottles — one per completed liter of water drunk today */}
+            {/* Nitro bottles — one per completed liter of water drunk today.
+                Sized in cqi (fraction of the gauge width) with clamp() min/max
+                so they scale down when the gauge is narrow and never overlap
+                the center readout, but stay legible on wide screens. */}
             {(() => {
               const bottles = Math.floor(waterMl / 1000);
               const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
               const slots = Math.min(Math.max(bottles, goalBottles), 6);
               return (
-                <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center gap-1">
-                  <div className="flex items-center justify-center gap-1.5">
+                <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center gap-[1cqi]">
+                  <div className="flex items-center justify-center gap-[1.5cqi]">
                     {Array.from({ length: slots }, (_, i) => (
                       <NitroBottle
                         key={i}
                         variant={i < bottles ? "filled" : "ghost"}
-                        className="h-8 w-[1.35rem]"
+                        className="h-[clamp(1rem,8cqi,2rem)] w-[clamp(0.7rem,5.4cqi,1.35rem)]"
                       />
                     ))}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-semibold tabular-nums">
+                  <div className="flex items-center gap-[1.5cqi]">
+                    <span className="font-semibold tabular-nums text-[clamp(0.7rem,3.6cqi,0.875rem)]">
                       × {bottles}
                     </span>
-                    <span className="text-xs text-sidebar-foreground/60">
+                    <span className="text-sidebar-foreground/60 text-[clamp(0.6rem,3.1cqi,0.75rem)]">
                       {dict.hydration.fullLiters}
                     </span>
                   </div>
