@@ -93,8 +93,9 @@ export default function CaloriesTracker() {
   return (
     <div className="mx-auto w-full max-w-4xl">
       <div className="flex flex-row items-start gap-3">
-        {/* Hero: date navigator + calorie balance gauge */}
-        <section className="min-w-0 flex-1 bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
+        {/* Hero: date navigator + calorie balance gauge.
+            flex-[1.4] gives the meter a bit more of the row than the chart. */}
+        <section className="min-w-0 flex-[1.4] bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
           {/* Date navigator */}
           <div className="flex items-center justify-between">
             <button
@@ -127,7 +128,7 @@ export default function CaloriesTracker() {
           {/* Gauge with nitro bottles nested in the dial's bottom gap.
               max-w-sm + @container makes this wrapper track the SVG's real
               width, so the bottles below can size themselves relative to it. */}
-          <div className="relative mt-0 max-w-sm mx-auto @container">
+          <div className="relative mt-0 max-w-md mx-auto @container">
             <CalorieGauge
               value={net}
               range={GAUGE_RANGE}
@@ -145,7 +146,7 @@ export default function CaloriesTracker() {
               const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
               const slots = Math.min(Math.max(bottles, goalBottles), 6);
               return (
-                <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center gap-[1cqi]">
+                <div className="absolute inset-x-0 bottom-[3%] flex flex-col items-center gap-[1cqi]">
                   <div className="flex items-center justify-center gap-[1.5cqi]">
                     {Array.from({ length: slots }, (_, i) => (
                       <NitroBottle
@@ -160,7 +161,7 @@ export default function CaloriesTracker() {
                       × {bottles}
                     </span>
                     <span className="text-sidebar-foreground/60 text-[clamp(0.6rem,3.1cqi,0.75rem)]">
-                      {dict.hydration.fullLiters}
+                      {dict.hydration.waterLiters}
                     </span>
                   </div>
                 </div>

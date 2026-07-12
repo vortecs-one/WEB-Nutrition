@@ -225,6 +225,7 @@ const en: Dictionary = {
     liters: "L",
     ml: "ml",
     fullLiters: "full liters",
+    waterLiters: "water liters",
     todayEntries: "Today's entries",
     noEntries: "You haven't logged any water today yet.",
   },

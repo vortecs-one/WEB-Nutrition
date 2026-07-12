@@ -224,6 +224,7 @@ const es = {
     liters: "L",
     ml: "ml",
     fullLiters: "litros completos",
+    waterLiters: "litros de agua",
     todayEntries: "Registros del día",
     noEntries: "Aún no has registrado agua hoy.",
   },

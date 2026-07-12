@@ -120,7 +120,7 @@ export default function CalorieGauge({
   return (
     <svg
       viewBox="0 0 300 264"
-      className="w-full max-w-sm mx-auto"
+      className="w-full max-w-md mx-auto"
       role="img"
       aria-label={`${label}: ${value}`}
     >
