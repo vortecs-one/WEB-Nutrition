@@ -119,40 +119,49 @@ export default function CaloriesTracker() {
             </button>
           </div>
 
-          {/* Gauge */}
-          <div className="mt-0">
+          {/* Deficit/surplus label — moved above the meter */}
+          <div className="text-center text-sm text-sidebar-foreground/70 mt-1">
+            {net >= 0 ? t.calorieDeficit : t.calorieSurplus}
+          </div>
+
+          {/* Gauge with nitro bottles nested in the dial's bottom gap */}
+          <div className="relative mt-0">
             <CalorieGauge
               value={net}
               range={GAUGE_RANGE}
               goal={goalNet}
               label={net >= 0 ? t.calorieDeficit : t.calorieSurplus}
               goalLabel={t.goalLabel}
+              hideLabel
             />
+            {/* Nitro bottles — one per completed liter of water drunk today */}
+            {(() => {
+              const bottles = Math.floor(waterMl / 1000);
+              const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
+              const slots = Math.min(Math.max(bottles, goalBottles), 6);
+              return (
+                <div className="absolute inset-x-0 bottom-[6%] flex flex-col items-center gap-1">
+                  <div className="flex items-center justify-center gap-1.5">
+                    {Array.from({ length: slots }, (_, i) => (
+                      <NitroBottle
+                        key={i}
+                        variant={i < bottles ? "filled" : "ghost"}
+                        className="h-8 w-[1.35rem]"
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold tabular-nums">
+                      × {bottles}
+                    </span>
+                    <span className="text-xs text-sidebar-foreground/60">
+                      {dict.hydration.fullLiters}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
-
-          {/* Nitro bottles — one per completed liter of water drunk today */}
-          {(() => {
-            const bottles = Math.floor(waterMl / 1000);
-            const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
-            const slots = Math.min(Math.max(bottles, goalBottles), 6);
-            return (
-              <div className="flex items-center justify-center gap-1.5 mt-3">
-                {Array.from({ length: slots }, (_, i) => (
-                  <NitroBottle
-                    key={i}
-                    variant={i < bottles ? "filled" : "ghost"}
-                    className="h-8 w-[1.35rem]"
-                  />
-                ))}
-                <span className="ml-2 text-sm font-semibold tabular-nums">
-                  × {bottles}
-                </span>
-                <span className="text-xs text-sidebar-foreground/60">
-                  {dict.hydration.fullLiters}
-                </span>
-              </div>
-            );
-          })()}
 
           {/* Water / Consumed / Burned — big tappable icons with totals below */}
           <div className="grid grid-cols-3 gap-2 mt-2">
@@ -164,8 +173,8 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
                 <Droplet className="h-6 w-6 sm:h-8 sm:w-8" />
-                <span className="absolute -bottom-1 -left-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-sky-600 text-white text-[10px] sm:text-xs font-bold">
-                  {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}
+                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-sky-600 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                  {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
                 </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
@@ -180,8 +189,8 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-2 text-white">
                 <Salad className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
-                <span className="absolute -bottom-1 -left-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-cyan-600 text-white text-[10px] sm:text-xs font-bold">
-                  {consumed}
+                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-cyan-600 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                  {consumed} {t.kcal}
                 </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
@@ -196,8 +205,8 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-3 text-white">
                 <Flame className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
-                <span className="absolute -bottom-1 -left-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-orange-600 text-white text-[10px] sm:text-xs font-bold">
-                  {burned}
+                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-orange-600 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                  {burned} {t.kcal}
                 </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />

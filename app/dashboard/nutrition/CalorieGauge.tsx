@@ -17,6 +17,8 @@ type Props = {
   label: string;
   /** Optional small "Goal" caption rendered near the marker. */
   goalLabel?: string;
+  /** Hide the visible label in the dial's bottom gap (still used for aria). */
+  hideLabel?: boolean;
 };
 
 const CX = 150;
@@ -68,6 +70,7 @@ export default function CalorieGauge({
   goal,
   label,
   goalLabel,
+  hideLabel,
 }: Props) {
   const blueArc = arcPath(0, RED_START, R);
   const redArc = arcPath(RED_START, 1, R);
@@ -250,15 +253,17 @@ export default function CalorieGauge({
       </text>
 
       {/* Deficit/surplus label in the bottom gap of the dial */}
-      <text
-        x={CX}
-        y={CY + 78}
-        fill="rgba(255,255,255,0.7)"
-        fontSize={12}
-        textAnchor="middle"
-      >
-        {label}
-      </text>
+      {!hideLabel && (
+        <text
+          x={CX}
+          y={CY + 78}
+          fill="rgba(255,255,255,0.7)"
+          fontSize={12}
+          textAnchor="middle"
+        >
+          {label}
+        </text>
+      )}
     </svg>
   );
 }
