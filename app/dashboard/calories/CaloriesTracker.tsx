@@ -22,7 +22,7 @@ import NutritionChart from "../nutrition/NutritionChart";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
 import ActivityLog from "../nutrition/ActivityLog";
 import DietLog from "../nutrition/DietLog";
-import WaterLog from "./WaterLog";
+import WaterLog, { NitroBottle } from "./WaterLog";
 
 const GAUGE_RANGE = 1000;
 
@@ -130,6 +130,30 @@ export default function CaloriesTracker() {
             />
           </div>
 
+          {/* Nitro bottles — one per completed liter of water drunk today */}
+          {(() => {
+            const bottles = Math.floor(waterMl / 1000);
+            const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
+            const slots = Math.min(Math.max(bottles, goalBottles), 6);
+            return (
+              <div className="flex items-center justify-center gap-1.5 mt-3">
+                {Array.from({ length: slots }, (_, i) => (
+                  <NitroBottle
+                    key={i}
+                    variant={i < bottles ? "filled" : "ghost"}
+                    className="h-8 w-[1.35rem]"
+                  />
+                ))}
+                <span className="ml-2 text-sm font-semibold tabular-nums">
+                  × {bottles}
+                </span>
+                <span className="text-xs text-sidebar-foreground/60">
+                  {dict.hydration.fullLiters}
+                </span>
+              </div>
+            );
+          })()}
+
           {/* Water / Consumed / Burned — big tappable icons with totals below */}
           <div className="grid grid-cols-3 gap-2 mt-2">
             <button
@@ -140,18 +164,13 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
                 <Droplet className="h-6 w-6 sm:h-8 sm:w-8" />
+                <span className="absolute -bottom-1 -left-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-sky-600 text-white text-[10px] sm:text-xs font-bold">
+                  {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}
+                </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
               </span>
-              <div className="text-center leading-tight">
-                <div className="text-base sm:text-lg font-semibold tabular-nums">
-                  {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-[11px] sm:text-xs text-sidebar-foreground/60 tabular-nums">
-                  / {WATER_GOAL_ML / 1000} {dict.hydration.liters}
-                </div>
-              </div>
             </button>
             <button
               type="button"
@@ -161,16 +180,13 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-2 text-white">
                 <Salad className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+                <span className="absolute -bottom-1 -left-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-cyan-600 text-white text-[10px] sm:text-xs font-bold">
+                  {consumed}
+                </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
               </span>
-              <div className="text-center leading-tight">
-                <div className="text-base sm:text-lg font-semibold tabular-nums">{consumed}</div>
-                <div className="text-[11px] sm:text-xs text-sidebar-foreground/60 tabular-nums">
-                  / {CONSUMED_GOAL.toLocaleString(locale)} {t.kcal}
-                </div>
-              </div>
             </button>
             <button
               type="button"
@@ -180,16 +196,13 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-3 text-white">
                 <Flame className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+                <span className="absolute -bottom-1 -left-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-orange-600 text-white text-[10px] sm:text-xs font-bold">
+                  {burned}
+                </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
               </span>
-              <div className="text-center leading-tight">
-                <div className="text-base sm:text-lg font-semibold tabular-nums">{burned}</div>
-                <div className="text-[11px] sm:text-xs text-sidebar-foreground/60 tabular-nums">
-                  / {BURNED_GOAL.toLocaleString(locale)} {t.kcal}
-                </div>
-              </div>
             </button>
           </div>
         </section>
