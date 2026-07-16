@@ -134,14 +134,9 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   return (
     <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3">
       {/* Header */}
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
-          {t.composition}
-        </h2>
-        <p className="text-[11px] text-sidebar-foreground/50 leading-tight">
-          {t.compositionSubtitle}
-        </p>
-      </div>
+      <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
+        {t.composition}
+      </h2>
 
       {total === 0 && extraNutrients.length === 0 ? (
         <p className="py-6 text-center text-sm text-sidebar-foreground/50">
