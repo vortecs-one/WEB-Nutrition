@@ -35,7 +35,11 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       }
       return any ? Math.round(total) : null;
     };
+    const totalCalories = meals.length > 0
+      ? Math.round(meals.reduce((s, m) => s + m.calories, 0))
+      : null;
     return {
+      calories: totalCalories,
       protein: sum("protein"),
       carbs: sum("carbs"),
       fat: sum("fat"),
@@ -207,6 +211,22 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
 
           {/* Macro rows — with color dot swatches */}
           <ul className="flex w-full flex-col gap-1 sm:gap-1.5">
+            {/* Calories row — always first */}
+            {nutrientTotals.calories != null && (
+              <li className="flex items-center gap-2 text-[11px] sm:text-sm mb-0.5">
+                <span className="size-2 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+                  {t.caloriesConsumed}
+                </span>
+                <span className="tabular-nums font-bold text-sidebar-foreground">
+                  {nutrientTotals.calories} {t.kcal}
+                </span>
+              </li>
+            )}
+            {/* Divider after calories */}
+            {nutrientTotals.calories != null && data.length > 0 && (
+              <li role="separator" className="mb-0.5 border-t border-sidebar-foreground/10" />
+            )}
             {data.map((d) => {
               const pct = Math.round((d.value / total) * 100);
               const grams =

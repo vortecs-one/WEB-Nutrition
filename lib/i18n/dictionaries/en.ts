@@ -176,6 +176,7 @@ const en: Dictionary = {
     carbsG: "Carbs (g)",
     fatG: "Fat (g)",
     optional: "optional",
+    kcal: "kcal",
     composition: "Daily composition",
     compositionSubtitle: "Distribution of daily nutrients and supplements.",
     macroProtein: "Protein",
