@@ -175,7 +175,6 @@ const es = {
     carbsG: "Carbohidratos (g)",
     fatG: "Grasas (g)",
     optional: "opcional",
-    kcal: "kcal",
     composition: "Composición del día",
     compositionSubtitle: "Distribución de nutrientes y suplementos de hoy.",
     macroProtein: "Proteína",
