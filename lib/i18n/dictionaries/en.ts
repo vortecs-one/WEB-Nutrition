@@ -79,6 +79,7 @@ const en: Dictionary = {
     subtitle: "Log your meals and review your calories for the day.",
     today: "Today",
     caloriesConsumed: "Consumed",
+    caloriesBurned: "Burned",
     caloriesGoal: "Goal",
     caloriesRemaining: "Remaining",
     addMeal: "Add meal",

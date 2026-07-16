@@ -19,7 +19,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   const t = dict.nutritionUser;
   const { dayData } = useDayLog();
 
-  const { meals, supplements } = useMemo(
+  const { meals, activities, supplements } = useMemo(
     () => dayData(dateKey),
     [dayData, dateKey],
   );
@@ -38,8 +38,12 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     const totalCalories = meals.length > 0
       ? Math.round(meals.reduce((s, m) => s + m.calories, 0))
       : null;
+    const totalBurned = activities.length > 0
+      ? Math.round(activities.reduce((s, a) => s + a.calories, 0))
+      : null;
     return {
       calories: totalCalories,
+      burned: totalBurned,
       protein: sum("protein"),
       carbs: sum("carbs"),
       fat: sum("fat"),
@@ -48,7 +52,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       fiber: sum("fiber"),
       sodium: sum("sodium"),
     };
-  }, [meals]);
+  }, [meals, activities]);
 
   // Nutrients without a natural "share of composition" %, shown against
   // standard 2000-kcal-diet daily value reference amounts instead.
@@ -223,9 +227,21 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
                 </span>
               </li>
             )}
-            {/* Divider after calories */}
-            {nutrientTotals.calories != null && data.length > 0 && (
-              <li role="separator" className="mb-0.5 border-t border-sidebar-foreground/10" />
+            {/* Burned calories row */}
+            {nutrientTotals.burned != null && (
+              <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                <span className="size-2 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+                  {t.caloriesBurned}
+                </span>
+                <span className="tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
+                  -{nutrientTotals.burned} {t.kcal}
+                </span>
+              </li>
+            )}
+            {/* Divider after calories block */}
+            {(nutrientTotals.calories != null || nutrientTotals.burned != null) && data.length > 0 && (
+              <li role="separator" className="my-0.5 border-t border-sidebar-foreground/10" />
             )}
             {data.map((d) => {
               const pct = Math.round((d.value / total) * 100);

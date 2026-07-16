@@ -78,6 +78,7 @@ const es = {
     subtitle: "Registra tus comidas y revisa tus calorías del día.",
     today: "Hoy",
     caloriesConsumed: "Consumidas",
+    caloriesBurned: "Quemadas",
     caloriesGoal: "Meta",
     caloriesRemaining: "Restantes",
     addMeal: "Agregar comida",
