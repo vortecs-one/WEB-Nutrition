@@ -112,19 +112,40 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     otherSupp: { label: t.chartOtherSupp,color: "var(--chart-7)" },
   } satisfies ChartConfig;
 
+  // Map each chart key to its CSS variable color so we can draw dot swatches
+  const colorMap: Record<string, string> = {
+    protein:   "var(--chart-1)",
+    carbs:     "var(--chart-2)",
+    fat:       "var(--chart-3)",
+    vitamin:   "var(--chart-4)",
+    creatine:  "var(--chart-5)",
+    omega3:    "var(--chart-6)",
+    otherSupp: "var(--chart-7)",
+  };
+
   return (
-    <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
+    <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
+          {t.composition}
+        </h2>
+        <p className="text-[11px] text-sidebar-foreground/50 leading-tight">
+          {t.compositionSubtitle}
+        </p>
+      </div>
+
       {total === 0 && extraNutrients.length === 0 ? (
-        <p className="py-10 text-center text-sm text-sidebar-foreground/50">
+        <p className="py-6 text-center text-sm text-sidebar-foreground/50">
           {t.noComposition}
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-2">
-          {/* Donut — on top so it stays readable at half card width */}
+        <div className="flex flex-col items-center gap-3">
+          {/* Donut chart — enlarged for better readability */}
           {total > 0 && (
             <ChartContainer
               config={chartConfig}
-              className="aspect-square h-24 w-24 sm:h-32 sm:w-32 shrink-0"
+              className="aspect-square h-32 w-32 sm:h-40 sm:w-40 shrink-0"
             >
               <PieChart>
                 <ChartTooltip
@@ -146,8 +167,10 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
                   data={data}
                   dataKey="value"
                   nameKey="key"
-                  innerRadius="58%"
-                  strokeWidth={3}
+                  innerRadius="56%"
+                  outerRadius="82%"
+                  paddingAngle={2}
+                  strokeWidth={0}
                   isAnimationActive={false}
                 >
                   {data.map((d) => (
@@ -161,15 +184,15 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
                         <text x={cx} y={cy} textAnchor="middle">
                           <tspan
                             x={cx}
-                            y={cy - 3}
-                            className="fill-foreground text-base sm:text-2xl font-bold"
+                            y={cy - 4}
+                            className="fill-foreground text-xl sm:text-2xl font-bold"
                           >
                             {topPct}%
                           </tspan>
                           <tspan
                             x={cx}
-                            y={cy + 11}
-                            className="fill-muted-foreground text-[8px] sm:text-[11px]"
+                            y={cy + 13}
+                            className="fill-muted-foreground text-[9px] sm:text-[11px]"
                           >
                             {top.label}
                           </tspan>
@@ -182,38 +205,54 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
             </ChartContainer>
           )}
 
-          {/* Unified nutrient list — every daily nutrient with its % and amount beside it */}
-          <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
+          {/* Macro rows — with color dot swatches */}
+          <ul className="flex w-full flex-col gap-1 sm:gap-1.5">
             {data.map((d) => {
               const pct = Math.round((d.value / total) * 100);
               const grams =
                 d.key === "protein" ? nutrientTotals.protein :
-                d.key === "carbs" ? nutrientTotals.carbs :
-                d.key === "fat" ? nutrientTotals.fat :
+                d.key === "carbs"   ? nutrientTotals.carbs :
+                d.key === "fat"     ? nutrientTotals.fat :
                 null;
               return (
-                <li key={d.key} className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-sm">
+                <li key={d.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
+                  {/* Color swatch dot */}
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: colorMap[d.key] ?? d.fill }}
+                    aria-hidden="true"
+                  />
                   <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
                     {d.label}
                   </span>
                   {grams != null && (
-                    <span className="tabular-nums text-sidebar-foreground/60">
+                    <span className="tabular-nums text-sidebar-foreground/50 text-[11px]">
                       {grams}{t.unitG}
                     </span>
                   )}
-                  <span className="font-semibold tabular-nums w-9 text-right">{pct}%</span>
+                  <span className="font-bold tabular-nums w-10 text-right" style={{ color: colorMap[d.key] ?? "inherit" }}>
+                    {pct}%
+                  </span>
                 </li>
               );
             })}
+
+            {/* Divider before extra nutrients */}
+            {extraNutrients.length > 0 && (
+              <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
+            )}
+
             {extraNutrients.map((n) => (
-              <li key={n.key} className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-sm">
+              <li key={n.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
+                {/* Plain spacer to align with rows that have a dot */}
+                <span className="size-2 shrink-0" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
                   {n.label}
                 </span>
-                <span className="tabular-nums text-sidebar-foreground/60">
+                <span className="tabular-nums text-sidebar-foreground/50 text-[11px]">
                   {n.value}{n.unit}
                 </span>
-                <span className="font-semibold tabular-nums w-9 text-right">
+                <span className="font-semibold tabular-nums w-10 text-right text-sidebar-foreground/70">
                   {n.pct != null ? `${n.pct}%` : ""}
                 </span>
               </li>
