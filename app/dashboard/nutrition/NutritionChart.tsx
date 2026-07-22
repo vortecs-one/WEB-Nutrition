@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { Cell, Label, Pie, PieChart } from "recharts";
 import {
   ChartConfig,
@@ -8,6 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
 
@@ -18,6 +20,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { dayData } = useDayLog();
+  const [showDetail, setShowDetail] = useState(false);
 
   const { meals, activities, supplements } = useMemo(
     () => dayData(dateKey),
@@ -131,166 +134,214 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     otherSupp: "var(--chart-7)",
   };
 
+  const hasData = total > 0 || extraNutrients.length > 0;
+
+  // Donut chart, reused at two sizes (compact card vs. detail popup) — only
+  // the container's size classes differ, the chart itself is identical.
+  const renderDonut = (containerClassName: string) => (
+    <ChartContainer config={chartConfig} className={containerClassName}>
+      <PieChart>
+        <ChartTooltip
+          cursor={false}
+          content={
+            <ChartTooltipContent
+              nameKey="key"
+              formatter={(value, name) => {
+                const pct = Math.round((Number(value) / total) * 100);
+                const label =
+                  chartConfig[name as keyof typeof chartConfig]?.label ??
+                  name;
+                return `${label}: ${pct}%`;
+              }}
+            />
+          }
+        />
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="key"
+          innerRadius="56%"
+          outerRadius="82%"
+          paddingAngle={2}
+          strokeWidth={0}
+          isAnimationActive={false}
+        >
+          {data.map((d) => (
+            <Cell key={d.key} fill={d.fill} />
+          ))}
+          <Label
+            content={({ viewBox }) => {
+              if (!viewBox || !("cx" in viewBox)) return null;
+              const { cx, cy } = viewBox as { cx: number; cy: number };
+              return (
+                <text x={cx} y={cy} textAnchor="middle">
+                  <tspan
+                    x={cx}
+                    y={cy - 4}
+                    className="fill-foreground text-xl sm:text-2xl font-bold"
+                  >
+                    {topPct}%
+                  </tspan>
+                  <tspan
+                    x={cx}
+                    y={cy + 13}
+                    className="fill-muted-foreground text-[9px] sm:text-[11px]"
+                  >
+                    {top.label}
+                  </tspan>
+                </text>
+              );
+            }}
+          />
+        </Pie>
+      </PieChart>
+    </ChartContainer>
+  );
+
+  // Calorie summary rows — identical in the card and the detail popup.
+  const calorieRows = (
+    <>
+      {nutrientTotals.calories != null && (
+        <li className="flex items-center gap-2 text-[11px] sm:text-sm mb-0.5">
+          <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+            {t.caloriesConsumed}
+          </span>
+          <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
+            {nutrientTotals.calories} {t.kcal}
+          </span>
+        </li>
+      )}
+      {nutrientTotals.burned != null && (
+        <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+          <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+            {t.caloriesBurned}
+          </span>
+          <span className="shrink-0 tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
+            -{nutrientTotals.burned} {t.kcal}
+          </span>
+        </li>
+      )}
+      {(nutrientTotals.calories != null || nutrientTotals.burned != null) && data.length > 0 && (
+        <li role="separator" className="my-0.5 border-t border-sidebar-foreground/10" />
+      )}
+    </>
+  );
+
+  // Macro row — dashboard card shows percentage only; detail popup adds grams.
+  const renderMacroRow = (d: (typeof data)[number], detailed: boolean) => {
+    const pct = Math.round((d.value / total) * 100);
+    const grams =
+      d.key === "protein" ? nutrientTotals.protein :
+      d.key === "carbs"   ? nutrientTotals.carbs :
+      d.key === "fat"     ? nutrientTotals.fat :
+      null;
+    return (
+      <li key={d.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
+        <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+          {d.label}
+        </span>
+        {detailed && grams != null && (
+          <span className="shrink-0 tabular-nums text-sidebar-foreground/50 text-[11px]">
+            {grams}{t.unitG}
+          </span>
+        )}
+        <span className="shrink-0 font-bold tabular-nums w-10 text-right" style={{ color: colorMap[d.key] ?? "inherit" }}>
+          {pct}%
+        </span>
+      </li>
+    );
+  };
+
+  // Extra-nutrient row — percentage only on the card, except sugars (no daily
+  // value defined, so no percentage) which keeps its gram value there instead.
+  const renderExtraRow = (n: (typeof extraNutrients)[number], detailed: boolean) => (
+    <li key={n.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
+      <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+        {n.label}
+      </span>
+      {(detailed || n.pct == null) && (
+        <span className="shrink-0 tabular-nums text-sidebar-foreground/50 text-[11px]">
+          {n.value}{n.unit}
+        </span>
+      )}
+      <span className="shrink-0 font-semibold tabular-nums w-10 text-right text-sidebar-foreground/70">
+        {n.pct != null ? `${n.pct}%` : ""}
+      </span>
+    </li>
+  );
+
   return (
     <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3">
       {/* Header */}
-      <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
-        {t.composition}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
+          {t.composition}
+        </h2>
+        {hasData && (
+          <button
+            type="button"
+            onClick={() => setShowDetail(true)}
+            aria-label={t.viewDetails}
+            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+          >
+            <Maximize2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
-      {total === 0 && extraNutrients.length === 0 ? (
+      {!hasData ? (
         <p className="py-6 text-center text-sm text-sidebar-foreground/50">
           {t.noComposition}
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-3">
-          {/* Donut chart — enlarged for better readability */}
-          {total > 0 && (
-            <ChartContainer
-              config={chartConfig}
-              className="aspect-square h-32 w-32 sm:h-40 sm:w-40 shrink-0"
-            >
-              <PieChart>
-                <ChartTooltip
-                  cursor={false}
-                  content={
-                    <ChartTooltipContent
-                      nameKey="key"
-                      formatter={(value, name) => {
-                        const pct = Math.round((Number(value) / total) * 100);
-                        const label =
-                          chartConfig[name as keyof typeof chartConfig]?.label ??
-                          name;
-                        return `${label}: ${pct}%`;
-                      }}
-                    />
-                  }
-                />
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="key"
-                  innerRadius="56%"
-                  outerRadius="82%"
-                  paddingAngle={2}
-                  strokeWidth={0}
-                  isAnimationActive={false}
-                >
-                  {data.map((d) => (
-                    <Cell key={d.key} fill={d.fill} />
-                  ))}
-                  <Label
-                    content={({ viewBox }) => {
-                      if (!viewBox || !("cx" in viewBox)) return null;
-                      const { cx, cy } = viewBox as { cx: number; cy: number };
-                      return (
-                        <text x={cx} y={cy} textAnchor="middle">
-                          <tspan
-                            x={cx}
-                            y={cy - 4}
-                            className="fill-foreground text-xl sm:text-2xl font-bold"
-                          >
-                            {topPct}%
-                          </tspan>
-                          <tspan
-                            x={cx}
-                            y={cy + 13}
-                            className="fill-muted-foreground text-[9px] sm:text-[11px]"
-                          >
-                            {top.label}
-                          </tspan>
-                        </text>
-                      );
-                    }}
-                  />
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-          )}
+        // @container on this wrapper (not the section) so the modal below —
+        // which is position:fixed — isn't captured by container-type.
+        <div className="@container">
+          <div className="flex flex-col items-center gap-3 @2xs:flex-row @2xs:items-center @2xs:gap-4">
+            {/* Donut chart — sits left of the nutrient list once the card is wide */}
+            {total > 0 && renderDonut("aspect-square h-28 w-28 @sm:h-40 @sm:w-40 shrink-0")}
 
-          {/* Macro rows — with color dot swatches */}
-          <ul className="flex w-full flex-col gap-1 sm:gap-1.5">
-            {/* Calories row — always first */}
-            {nutrientTotals.calories != null && (
-              <li className="flex items-center gap-2 text-[11px] sm:text-sm mb-0.5">
-                <span className="size-2 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-                  {t.caloriesConsumed}
-                </span>
-                <span className="tabular-nums font-bold text-sidebar-foreground">
-                  {nutrientTotals.calories} {t.kcal}
-                </span>
-              </li>
-            )}
-            {/* Burned calories row */}
-            {nutrientTotals.burned != null && (
-              <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                <span className="size-2 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-                  {t.caloriesBurned}
-                </span>
-                <span className="tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
-                  -{nutrientTotals.burned} {t.kcal}
-                </span>
-              </li>
-            )}
-            {/* Divider after calories block */}
-            {(nutrientTotals.calories != null || nutrientTotals.burned != null) && data.length > 0 && (
-              <li role="separator" className="my-0.5 border-t border-sidebar-foreground/10" />
-            )}
-            {data.map((d) => {
-              const pct = Math.round((d.value / total) * 100);
-              const grams =
-                d.key === "protein" ? nutrientTotals.protein :
-                d.key === "carbs"   ? nutrientTotals.carbs :
-                d.key === "fat"     ? nutrientTotals.fat :
-                null;
-              return (
-                <li key={d.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
-                  {/* Color swatch dot */}
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: colorMap[d.key] ?? d.fill }}
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
-                    {d.label}
-                  </span>
-                  {grams != null && (
-                    <span className="tabular-nums text-sidebar-foreground/50 text-[11px]">
-                      {grams}{t.unitG}
-                    </span>
-                  )}
-                  <span className="font-bold tabular-nums w-10 text-right" style={{ color: colorMap[d.key] ?? "inherit" }}>
-                    {pct}%
-                  </span>
-                </li>
-              );
-            })}
+            {/* Macro rows — with color dot swatches. Dashboard card: percentage only. */}
+            <ul className="flex w-full @2xs:w-auto @2xs:flex-1 @2xs:min-w-0 flex-col gap-1 sm:gap-1.5">
+              {calorieRows}
+              {data.map((d) => renderMacroRow(d, false))}
 
-            {/* Divider before extra nutrients */}
+              {/* Divider before extra nutrients */}
+              {extraNutrients.length > 0 && (
+                <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
+              )}
+
+              {extraNutrients.map((n) => renderExtraRow(n, false))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Detail popup — same data, with quantities shown alongside percentages */}
+      <Modal
+        isOpen={showDetail}
+        onClose={() => setShowDetail(false)}
+        title={t.composition}
+        size="md"
+      >
+        <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">
+          {t.compositionSubtitle}
+        </p>
+        <div className="flex flex-col items-center gap-4">
+          {total > 0 && renderDonut("aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0")}
+
+          <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
+            {calorieRows}
+            {data.map((d) => renderMacroRow(d, true))}
+
             {extraNutrients.length > 0 && (
               <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
             )}
 
-            {extraNutrients.map((n) => (
-              <li key={n.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
-                {/* Plain spacer to align with rows that have a dot */}
-                <span className="size-2 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
-                  {n.label}
-                </span>
-                <span className="tabular-nums text-sidebar-foreground/50 text-[11px]">
-                  {n.value}{n.unit}
-                </span>
-                <span className="font-semibold tabular-nums w-10 text-right text-sidebar-foreground/70">
-                  {n.pct != null ? `${n.pct}%` : ""}
-                </span>
-              </li>
-            ))}
+            {extraNutrients.map((n) => renderExtraRow(n, true))}
           </ul>
         </div>
-      )}
+      </Modal>
     </section>
   );
 }
