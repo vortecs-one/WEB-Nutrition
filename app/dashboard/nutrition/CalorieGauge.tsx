@@ -107,19 +107,15 @@ export default function CalorieGauge({
   const needleTip = polar(needleAngle, 93);
 
   const goalAngle = goal != null ? valueToAngle(goal, range) : null;
-  // The dot sits on the glowing ring; the label sits clearly outside it.
-  const goalPos = goalAngle != null ? polar(goalAngle, R) : null;
-  const goalCap = goalAngle != null ? polar(goalAngle, R + 16) : null;
-  // Anchor the text to whichever side of the dial the goal marker is on.
-  const goalCos = goalAngle != null ? Math.cos((goalAngle * Math.PI) / 180) : 0;
-  const goalAnchor = goalCos < -0.25 ? "end" : goalCos > 0.25 ? "start" : "middle";
+  // Badge floats just outside the glowing ring, label centered inside it.
+  const goalBadge = goalAngle != null ? polar(goalAngle, R + 8) : null;
 
   const valueText = String(Math.abs(value));
   const valueSize = valueText.length >= 4 ? 32 : 40;
 
   return (
     <svg
-      viewBox="0 0 300 264"
+      viewBox="28 0 244 264"
       className="w-full max-w-md mx-auto"
       role="img"
       aria-label={`${label}: ${value}`}
@@ -186,24 +182,24 @@ export default function CalorieGauge({
         </text>
       ))}
 
-      {/* Goal marker */}
-      {goalPos && goalCap && (
+      {/* Goal marker — badge floating on the rim, label inside it */}
+      {goalBadge && (
         <>
           <circle
-            cx={goalPos.x}
-            cy={goalPos.y}
-            r={5}
+            cx={goalBadge.x}
+            cy={goalBadge.y}
+            r={14}
             fill="#e5e7eb"
             stroke="#0f172a"
             strokeWidth={2}
           />
           <text
-            x={goalCap.x}
-            y={goalCap.y}
-            fill="rgba(255,255,255,0.85)"
-            fontSize={10}
-            fontWeight={600}
-            textAnchor={goalAnchor}
+            x={goalBadge.x}
+            y={goalBadge.y}
+            fill="#0f172a"
+            fontSize={8}
+            fontWeight={700}
+            textAnchor="middle"
             dominantBaseline="middle"
           >
             {goalLabel}

@@ -228,7 +228,7 @@ export default function GlucoseTracker({
         {t.noData}
       </div>
     ) : (
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 256 }}>
         <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
           <XAxis
             dataKey="date"
@@ -329,7 +329,7 @@ export default function GlucoseTracker({
         {t.noData}
       </div>
     ) : (
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 128 }}>
         <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
           <defs>
             <linearGradient id="glucose-zone-stroke" x1="0" y1="0" x2="0" y2="1">

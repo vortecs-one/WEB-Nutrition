@@ -179,7 +179,7 @@ export default function CaloriesTracker() {
             >
               <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
                 <Droplet className="h-6 w-6 sm:h-8 sm:w-8" />
-                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-sky-600 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-sky-400 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
                 </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -193,9 +193,9 @@ export default function CaloriesTracker() {
               aria-label={dict.nutritionUser.barcodeTitle}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-2 text-white">
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
                 <Salad className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
-                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-cyan-600 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-green-400 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   {consumed} {t.kcal}
                 </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -209,9 +209,9 @@ export default function CaloriesTracker() {
               aria-label={dict.nutritionUser.activityLog}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-chart-3 text-white">
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
                 <Flame className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
-                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-orange-600 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-orange-400 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   {burned} {t.kcal}
                 </span>
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
