@@ -184,8 +184,8 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
                 </span>
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-3 w-3" aria-hidden="true" />
                 </span>
               </span>
             </button>
@@ -200,8 +200,8 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{consumed} {t.kcal}
                 </span>
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-3 w-3" aria-hidden="true" />
                 </span>
               </span>
             </button>
@@ -216,8 +216,8 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   -{burned} {t.kcal}
                 </span>
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Plus className="h-3 w-3" aria-hidden="true" />
                 </span>
               </span>
             </button>
