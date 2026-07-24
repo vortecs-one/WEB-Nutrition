@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Maximize2 } from "lucide-react";
 import { Cell, Label, Pie, PieChart } from "recharts";
 import {
@@ -12,6 +12,28 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
+
+// Light-gray palette for this card. All descendants are styled with the
+// `sidebar-*` tokens, so overriding the CSS variables in one place recolors
+// the background, every text opacity, borders, hover states and the donut
+// center label at once — no per-element class changes needed.
+const LIGHT_GRAY_CARD: CSSProperties = {
+  "--sidebar": "#00e0ff",
+  "--sidebar-foreground": "#1f2937",
+  "--sidebar-accent": "#d1d5db",
+  "--foreground": "#1f2937",
+  "--muted-foreground": "#6b7280",
+} as CSSProperties;
+
+// Restores the app's dark palette for the detail modal, which lives inside
+// this card in the DOM and would otherwise inherit the light-gray override.
+const DARK_MODAL_RESET: CSSProperties = {
+  "--sidebar": "#121419",
+  "--sidebar-foreground": "#f5f6f7",
+  "--sidebar-accent": "#24272e",
+  "--foreground": "#f5f6f7",
+  "--muted-foreground": "#a2a6b0",
+} as CSSProperties;
 
 // Accepts an ISO date key so the Calories view can drive it by the
 // date selected in the navigator. If no dateKey is supplied it falls
@@ -271,7 +293,10 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   );
 
   return (
-    <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3">
+    <section
+      style={LIGHT_GRAY_CARD}
+      className="h-full bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
@@ -317,7 +342,11 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
         </div>
       )}
 
-      {/* Detail popup — same data, with quantities shown alongside percentages */}
+      {/* Detail popup — same data, with quantities shown alongside percentages.
+          The wrapper resets the palette back to dark so the popup keeps the
+          app's standard modal look; display:contents means no layout box, so
+          it adds no flex gap to the card. */}
+      <div style={{ ...DARK_MODAL_RESET, display: "contents" }}>
       <Modal
         isOpen={showDetail}
         onClose={() => setShowDetail(false)}
@@ -342,6 +371,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
           </ul>
         </div>
       </Modal>
+      </div>
     </section>
   );
 }

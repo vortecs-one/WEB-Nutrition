@@ -312,8 +312,8 @@ export default function GlucoseTracker({
     <>
       <stop offset={0} stopColor="#ef4444" stopOpacity={opacity} />
       <stop offset={offHigh} stopColor="#ef4444" stopOpacity={opacity} />
-      <stop offset={offHigh} stopColor="var(--color-chart-2)" stopOpacity={opacity} />
-      <stop offset={offLow} stopColor="var(--color-chart-2)" stopOpacity={opacity} />
+      <stop offset={offHigh} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
+      <stop offset={offLow} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
       <stop offset={offLow} stopColor="#ef4444" stopOpacity={opacity} />
       <stop offset={1} stopColor="#ef4444" stopOpacity={opacity} />
     </>

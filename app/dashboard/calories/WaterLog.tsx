@@ -354,7 +354,7 @@ export default function WaterLog({ todayKey }: { todayKey: string }) {
         <span className="ml-2 text-sm font-semibold tabular-nums">
           × {bottles}
         </span>
-        <span className="text-xs text-sidebar-foreground/60">{t.fullLiters}</span>
+        <span className="text-xs text-sidebar-foreground/60">{bottles === 1 ? t.fullLiter : t.fullLiters}</span>
       </div>
 
       {/* Quick add */}

@@ -1,13 +1,14 @@
 "use client";
 
 // Tachometer-style calorie-balance gauge (car dashboard look).
-// 270° dial: left end = -range (surplus), right end = +range (deficit).
-// Neon-glow ring with a "redline" zone at the deficit extreme, red needle,
+// 270° dial: left end = -range (deficit), right end = +range (surplus).
+// Neon-glow ring with a "redline" zone at the surplus extreme, red needle,
 // and the big value centered like a digital speedometer.
 // Pure SVG so it scales crisply and needs no chart dependency.
 
 type Props = {
-  /** Net value to point at: burned - consumed. Positive = deficit. */
+  /** Signed balance the needle points at and the center shows: consumed - burned.
+   *  Negative = deficit (left), positive = surplus (right). */
   value: number;
   /** Symmetric range of the dial, e.g. 800 means -800..+800. */
   range: number;
@@ -110,7 +111,8 @@ export default function CalorieGauge({
   // Badge floats just outside the glowing ring, label centered inside it.
   const goalBadge = goalAngle != null ? polar(goalAngle, R + 8) : null;
 
-  const valueText = String(Math.abs(value));
+  // Shown signed: + for a surplus, - for a deficit.
+  const valueText = `${value > 0 ? "+" : ""}${value}`;
   const valueSize = valueText.length >= 4 ? 32 : 40;
 
   return (

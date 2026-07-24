@@ -68,8 +68,11 @@ export default function CaloriesTracker() {
     [waterFor, dateKey],
   );
 
-  const net = burned - consumed;
-  const goalNet = BURNED_GOAL - CONSUMED_GOAL;
+  // Signed calorie balance from the food perspective: eaten minus burned.
+  // Negative = deficit (burned more than eaten), positive = surplus. Drives
+  // both the needle and the center readout so they always point to the same value.
+  const balance = consumed - burned;
+  const goalBalance = CONSUMED_GOAL - BURNED_GOAL;
 
   // Today's date key — used to cap forward navigation.
   const [todayKey] = useState(() => toDateKey(new Date()));
@@ -92,10 +95,10 @@ export default function CaloriesTracker() {
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <div className="flex flex-row items-start gap-3">
+      <div className="flex flex-row items-stretch gap-3">
         {/* Hero: date navigator + calorie balance gauge.
             flex-[1.5] : flex-1 gives a 60/40 split (meter/composition). */}
-        <section className="min-w-0 flex-[1.5] bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
+        <section className="min-w-0 flex-[1.5] flex flex-col bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
           {/* Date navigator */}
           <div className="flex items-center justify-between">
             <button
@@ -122,18 +125,18 @@ export default function CaloriesTracker() {
 
           {/* Deficit/surplus label — moved above the meter */}
           <div className="text-center text-sm text-sidebar-foreground/70 mt-1">
-            {net >= 0 ? t.calorieDeficit : t.calorieSurplus}
+            {balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
           </div>
 
           {/* Gauge with nitro bottles nested in the dial's bottom gap.
               max-w-sm + @container makes this wrapper track the SVG's real
               width, so the bottles below can size themselves relative to it. */}
-          <div className="relative mt-0 max-w-md mx-auto @container">
+          <div className="relative mt-0 w-full max-w-md mx-auto @container">
             <CalorieGauge
-              value={net}
+              value={balance}
               range={GAUGE_RANGE}
-              goal={goalNet}
-              label={net >= 0 ? t.calorieDeficit : t.calorieSurplus}
+              goal={goalBalance}
+              label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
               goalLabel={t.goalLabel}
               hideLabel
             />
@@ -152,7 +155,7 @@ export default function CaloriesTracker() {
                       <NitroBottle
                         key={i}
                         variant={i < bottles ? "filled" : "ghost"}
-                        className="h-[clamp(1rem,8cqi,2rem)] w-[clamp(0.7rem,5.4cqi,1.35rem)]"
+                        className="h-[clamp(1.4rem,11cqi,2.75rem)] w-[clamp(0.95rem,7.4cqi,1.85rem)]"
                       />
                     ))}
                   </div>
@@ -161,7 +164,7 @@ export default function CaloriesTracker() {
                       × {bottles}
                     </span>
                     <span className="text-sidebar-foreground/60 text-[clamp(0.6rem,3.1cqi,0.75rem)]">
-                      {dict.hydration.waterLiters}
+                      {bottles === 1 ? dict.hydration.waterLiter : dict.hydration.waterLiters}
                     </span>
                   </div>
                 </div>
@@ -169,22 +172,24 @@ export default function CaloriesTracker() {
             })()}
           </div>
 
-          {/* Water / Consumed / Burned — big tappable icons with totals below */}
-          <div className="grid grid-cols-3 gap-2 mt-2">
+          {/* Water / Consumed / Burned — big tappable icons with totals below.
+              mt-auto pins the row to the card's bottom so it aligns with the
+              composition card beside it. */}
+          <div className="grid grid-cols-3 gap-2 mt-auto pt-6">
             <button
               type="button"
               onClick={() => setShowAddWater(true)}
               aria-label={dict.hydration.title}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white">
                 <Droplet className="h-6 w-6 sm:h-8 sm:w-8" />
-                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-sky-400 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                  {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
-                </span>
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
+              </span>
+              <span className="text-[10px] sm:text-xs font-bold tabular-nums text-cyan-500 whitespace-nowrap">
+                +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
               </span>
             </button>
             <button
@@ -193,14 +198,14 @@ export default function CaloriesTracker() {
               aria-label={dict.nutritionUser.barcodeTitle}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-lime-500 text-white">
                 <Salad className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
-                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-green-400 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                  {consumed} {t.kcal}
-                </span>
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
+              </span>
+              <span className="text-[10px] sm:text-xs font-bold tabular-nums text-lime-500 whitespace-nowrap">
+                +{consumed} {t.kcal}
               </span>
             </button>
             <button
@@ -209,14 +214,14 @@ export default function CaloriesTracker() {
               aria-label={dict.nutritionUser.activityLog}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
+              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-red-500 text-white">
                 <Flame className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
-                <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 flex h-5 sm:h-6 min-w-5 sm:min-w-6 px-1.5 items-center justify-center rounded-full bg-orange-400 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                  {burned} {t.kcal}
-                </span>
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
+              </span>
+              <span className="text-[10px] sm:text-xs font-bold tabular-nums text-red-500 whitespace-nowrap">
+                -{burned} {t.kcal}
               </span>
             </button>
           </div>
