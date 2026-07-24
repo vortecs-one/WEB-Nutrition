@@ -174,16 +174,16 @@ export default function CaloriesTracker() {
           <div className="flex shrink-0 flex-col gap-2">
             <button
               type="button"
-              onClick={() => setShowAddWater(true)}
-              aria-label={dict.hydration.title}
+              onClick={() => setShowAddActivity(true)}
+              aria-label={dict.nutritionUser.activityLog}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white">
-                <Droplet className="h-7 w-7 sm:h-8 sm:w-8 -translate-y-1" />
+              <span className="relative flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-red-500 text-white">
+                <Flame className="h-7 w-7 sm:h-8 sm:w-8 -translate-y-1" aria-hidden="true" />
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
-                  +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
+                  -{burned} {t.kcal}
                 </span>
-                <span className="absolute top-1 right-1.5 text-sm font-black text-white leading-none" aria-hidden="true">+</span>
+                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
             <button
@@ -197,21 +197,21 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{consumed} {t.kcal}
                 </span>
-                <span className="absolute top-1 right-1.5 text-sm font-black text-white leading-none" aria-hidden="true">+</span>
+                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
             <button
               type="button"
-              onClick={() => setShowAddActivity(true)}
-              aria-label={dict.nutritionUser.activityLog}
+              onClick={() => setShowAddWater(true)}
+              aria-label={dict.hydration.title}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-red-500 text-white">
-                <Flame className="h-7 w-7 sm:h-8 sm:w-8 -translate-y-1" aria-hidden="true" />
+              <span className="relative flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white">
+                <Droplet className="h-7 w-7 sm:h-8 sm:w-8 -translate-y-1" />
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
-                  -{burned} {t.kcal}
+                  +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
                 </span>
-                <span className="absolute top-1 right-1.5 text-sm font-black text-white leading-none" aria-hidden="true">+</span>
+                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
           </div>
