@@ -97,8 +97,8 @@ export default function CaloriesTracker() {
     <div className="mx-auto w-full max-w-4xl">
       <div className="flex flex-row items-stretch gap-3">
         {/* Hero: date navigator + calorie balance gauge.
-            flex-[1.5] : flex-1 gives a 60/40 split (meter/composition). */}
-        <section className="min-w-0 flex-[1.5] flex flex-col bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
+            flex-[1.3] : flex-1 gives a ~57/43 split (meter/composition). */}
+        <section className="min-w-0 flex-[1.3] flex flex-col bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
           {/* Date navigator */}
           <div className="flex items-center justify-between">
             <button

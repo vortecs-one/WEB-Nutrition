@@ -241,9 +241,9 @@ export default function CalorieGauge({
       <text
         x={CX}
         y={CY + 32}
-        fill={BLUE_CORE}
+        fill="#ffffff"
         fontSize={12}
-        fontWeight={600}
+        fontWeight={700}
         letterSpacing={1}
         textAnchor="middle"
       >

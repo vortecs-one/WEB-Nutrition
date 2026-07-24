@@ -7,7 +7,21 @@
 // (same data as the LibreLink app) or Nightscout.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Settings2, AlertTriangle, Activity, Users, Maximize2 } from "lucide-react";
+import {
+  Settings2,
+  AlertTriangle,
+  Activity,
+  Users,
+  Maximize2,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronsUp,
+  ChevronsDown,
+  type LucideIcon,
+} from "lucide-react";
 import {
   LineChart,
   Line,
@@ -26,11 +40,11 @@ import {
   type GlucoseData,
   type GlucoseSettings,
   type GlucoseStatus,
+  type TrendDirection,
   formatGlucose,
   glucoseStatus,
   minutesAgo,
   mgdlToMmol,
-  trendArrow,
   unitLabel,
   STALE_MINUTES,
 } from "@/lib/glucose/types";
@@ -41,6 +55,22 @@ const RANGES = [3, 6, 12, 24] as const;
 type RangeHours = (typeof RANGES)[number];
 
 const REFRESH_MS = 60_000;
+
+// Trend direction → lucide arrow icon. Double arrows use chevrons, 45° trends
+// use the diagonal arrows, flat uses a straight right arrow. Non-computable /
+// none directions render no icon.
+const TREND_ICON: Record<TrendDirection, LucideIcon | null> = {
+  DoubleUp: ChevronsUp,
+  SingleUp: ArrowUp,
+  FortyFiveUp: ArrowUpRight,
+  Flat: ArrowRight,
+  FortyFiveDown: ArrowDownRight,
+  SingleDown: ArrowDown,
+  DoubleDown: ChevronsDown,
+  "NOT COMPUTABLE": null,
+  "RATE OUT OF RANGE": null,
+  NONE: null,
+};
 
 // Status → card accent classes (background + text pairs kept together for
 // contrast, per design guidelines).
@@ -138,6 +168,7 @@ export default function GlucoseTracker({
     current && settings ? glucoseStatus(current.sgv, settings) : "in-range";
   const currentMins = current ? minutesAgo(current.date) : null;
   const isStale = currentMins !== null && currentMins > STALE_MINUTES;
+  const TrendIcon = current ? TREND_ICON[current.direction] : null;
 
   const statusLabel: Record<GlucoseStatus, string> = {
     "in-range": t.statusInRange,
@@ -386,17 +417,20 @@ export default function GlucoseTracker({
             <div
               className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
             >
-              <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-none">
-                {current ? formatGlucose(current.sgv, unit) : "--"}
-              </span>
               <div className="flex flex-col items-center leading-none">
-                {current && (
-                  <span className="text-lg sm:text-xl font-semibold" aria-label={current.direction}>
-                    {trendArrow(current.direction)}
-                  </span>
-                )}
-                <span className="mt-0.5 text-[10px] sm:text-xs opacity-90">{unitLabel(unit)}</span>
+                <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-none">
+                  {current ? formatGlucose(current.sgv, unit) : "--"}
+                </span>
+                <span className="mt-0.5 text-xs sm:text-sm font-bold opacity-90">{unitLabel(unit)}</span>
               </div>
+              {TrendIcon && (
+                <TrendIcon
+                  className="h-8 w-8 sm:h-10 sm:w-10 shrink-0"
+                  strokeWidth={2.75}
+                  role="img"
+                  aria-label={current?.direction}
+                />
+              )}
             </div>
             {/* Meta: patient, status, freshness */}
             <div className="min-w-0">

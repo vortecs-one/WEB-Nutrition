@@ -18,7 +18,7 @@ import { useDayLog } from "@/lib/day-log/provider";
 // the background, every text opacity, borders, hover states and the donut
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
-  "--sidebar": "#00e0ff",
+  "--sidebar": "#51ff00",
   "--sidebar-foreground": "#1f2937",
   "--sidebar-accent": "#d1d5db",
   "--foreground": "#1f2937",
@@ -113,8 +113,8 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     const otherSupp = countSupp("protein") + countSupp("other");
 
     return [
-      { key: "protein",   label: t.macroProtein,   value: protein,   fill: "var(--color-protein)" },
       { key: "carbs",     label: t.macroCarbs,      value: carbs,     fill: "var(--color-carbs)" },
+      { key: "protein",   label: t.macroProtein,   value: protein,   fill: "var(--color-protein)" },
       { key: "fat",       label: t.macroFat,        value: fat,       fill: "var(--color-fat)" },
       { key: "vitamin",   label: t.chartVitamin,    value: vitamins,  fill: "var(--color-vitamin)" },
       { key: "creatine",  label: t.chartCreatine,   value: creatine,  fill: "var(--color-creatine)" },
@@ -292,43 +292,55 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     </li>
   );
 
+  // Card title — rendered below the donut in the populated state, and above the
+  // empty-state message otherwise.
+  const titleHeading = (
+    <h2 className="w-full text-center text-xs font-semibold tracking-wide text-sidebar-foreground uppercase whitespace-nowrap">
+      {t.composition}
+    </h2>
+  );
+
   return (
     <section
       style={LIGHT_GRAY_CARD}
       className="h-full bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-sidebar-foreground uppercase">
-          {t.composition}
-        </h2>
-        {hasData && (
+      {/* Expand-to-detail control, pinned to the top-right */}
+      {hasData && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => setShowDetail(true)}
             aria-label={t.viewDetails}
-            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+            className="-mr-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
           >
             <Maximize2 className="h-4 w-4" aria-hidden="true" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {!hasData ? (
-        <p className="py-6 text-center text-sm text-sidebar-foreground/50">
-          {t.noComposition}
-        </p>
+        <>
+          {titleHeading}
+          <p className="py-6 text-center text-sm text-sidebar-foreground/50">
+            {t.noComposition}
+          </p>
+        </>
       ) : (
         // @container on this wrapper (not the section) so the modal below —
         // which is position:fixed — isn't captured by container-type.
+        // Vertical stack: chart on top, title below it, then the macro list.
         <div className="@container">
-          <div className="flex flex-col items-center gap-3 @2xs:flex-row @2xs:items-center @2xs:gap-4">
-            {/* Donut chart — sits left of the nutrient list once the card is wide */}
-            {total > 0 && renderDonut("aspect-square h-28 w-28 @sm:h-40 @sm:w-40 shrink-0")}
+          <div className="flex flex-col items-center gap-3">
+            {/* Donut chart — the card's hero, centered at the top */}
+            {total > 0 && renderDonut("aspect-square h-36 w-36 @sm:h-48 @sm:w-48 shrink-0")}
 
-            {/* Macro rows — with color dot swatches. Dashboard card: percentage only. */}
-            <ul className="flex w-full @2xs:w-auto @2xs:flex-1 @2xs:min-w-0 flex-col gap-1 sm:gap-1.5">
-              {calorieRows}
+            {titleHeading}
+
+            {/* Macro rows — with color dot swatches. Dashboard card: percentage only.
+                Consumed/burned totals (calorieRows) are shown only in the detail
+                popup, not on the compact card. */}
+            <ul className="flex w-full flex-col gap-1 sm:gap-1.5">
               {data.map((d) => renderMacroRow(d, false))}
 
               {/* Divider before extra nutrients */}
