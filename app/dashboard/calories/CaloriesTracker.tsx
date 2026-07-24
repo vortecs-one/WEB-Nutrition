@@ -6,7 +6,6 @@ import {
   Salad,
   ChevronLeft,
   ChevronRight,
-  Plus,
   Droplet,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
@@ -184,9 +183,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
                 </span>
-                <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-2.5 w-2.5" aria-hidden="true" />
-                </span>
+                <span className="absolute top-1 right-1.5 text-sm font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
             <button
@@ -200,9 +197,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{consumed} {t.kcal}
                 </span>
-                <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-2.5 w-2.5" aria-hidden="true" />
-                </span>
+                <span className="absolute top-1 right-1.5 text-sm font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
             <button
@@ -216,9 +211,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   -{burned} {t.kcal}
                 </span>
-                <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Plus className="h-2.5 w-2.5" aria-hidden="true" />
-                </span>
+                <span className="absolute top-1 right-1.5 text-sm font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
           </div>
