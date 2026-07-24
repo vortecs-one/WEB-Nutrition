@@ -113,11 +113,11 @@ export default function CalorieGauge({
 
   // Shown signed: + for a surplus, - for a deficit.
   const valueText = `${value > 0 ? "+" : ""}${value}`;
-  const valueSize = valueText.length >= 4 ? 32 : 40;
+  const valueSize = valueText.length >= 4 ? 22 : 27;
 
   return (
     <svg
-      viewBox="28 0 244 264"
+      viewBox="28 22 244 242"
       className="w-full max-w-md mx-auto"
       role="img"
       aria-label={`${label}: ${value}`}
@@ -227,27 +227,55 @@ export default function CalorieGauge({
         />
       ))}
 
-      {/* Center readout: big value + unit, speedometer style */}
-      <text
-        x={CX}
-        y={CY + 10}
-        fill="#ffffff"
-        fontSize={valueSize}
-        fontWeight={700}
-        textAnchor="middle"
-      >
-        {valueText}
-      </text>
-      <text
-        x={CX}
-        y={CY + 32}
-        fill="#ffffff"
-        fontSize={12}
-        fontWeight={700}
-        letterSpacing={1}
-        textAnchor="middle"
-      >
-        kcal
+      {/* Status label just below the readout — red, with a warning triangle.
+          The [icon + text] pair is centered on CX using an estimated text
+          width (SVG can't measure text at build time). */}
+      {label && (() => {
+        const labelSize = 9;
+        const iconBox = 10;
+        const gap = 3;
+        const textW = label.length * labelSize * 0.5;
+        const startX = CX - (iconBox + gap + textW) / 2;
+        const baseY = CY + 20;
+        const iconY = baseY - iconBox + 1;
+        const s = iconBox / 24; // lucide AlertTriangle is a 24×24 icon
+        return (
+          <g>
+            <g
+              transform={`translate(${round(startX)} ${round(iconY)}) scale(${round(s)})`}
+              stroke={RED_CORE}
+              strokeWidth={2.5}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </g>
+            <text
+              x={round(startX + iconBox + gap)}
+              y={baseY}
+              fill={RED_CORE}
+              fontSize={labelSize}
+              fontWeight={700}
+              textAnchor="start"
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })()}
+
+      {/* Center readout: big value with the "kcal" unit to its right. Both live
+          in one <text> so textAnchor="middle" centers the pair as a unit. */}
+      <text x={CX} y={CY + 2} fill="#ffffff" textAnchor="middle">
+        <tspan fontSize={valueSize} fontWeight={700}>
+          {valueText}
+        </tspan>
+        <tspan fontSize={10} fontWeight={700} dx={6} letterSpacing={1}>
+          kcal
+        </tspan>
       </text>
 
       {/* Deficit/surplus label in the bottom gap of the dial */}

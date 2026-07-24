@@ -95,7 +95,7 @@ export default function CaloriesTracker() {
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <div className="flex flex-row items-stretch gap-3">
+      <div className="flex flex-col md:flex-row items-stretch gap-3">
         {/* Hero: date navigator + calorie balance gauge.
             flex-[1.3] : flex-1 gives a ~57/43 split (meter/composition). */}
         <section className="min-w-0 flex-[1.3] flex flex-col bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
@@ -123,15 +123,13 @@ export default function CaloriesTracker() {
             </button>
           </div>
 
-          {/* Deficit/surplus label — moved above the meter */}
-          <div className="text-center text-sm text-sidebar-foreground/70 mt-1">
-            {balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
-          </div>
+          {/* Gauge (left) + quick-add icon column (right), side by side. */}
+          <div className="flex flex-row items-center justify-center gap-2 sm:gap-3">
 
           {/* Gauge with nitro bottles nested in the dial's bottom gap.
-              max-w-sm + @container makes this wrapper track the SVG's real
-              width, so the bottles below can size themselves relative to it. */}
-          <div className="relative mt-0 w-full max-w-md mx-auto @container">
+              flex-1 + max-w-md keeps this wrapper's width tracking the SVG so the
+              bottles (sized in cqi of this @container) stay proportioned. */}
+          <div className="relative flex-1 min-w-0 max-w-md @container">
             <CalorieGauge
               value={balance}
               range={GAUGE_RANGE}
@@ -172,24 +170,23 @@ export default function CaloriesTracker() {
             })()}
           </div>
 
-          {/* Water / Consumed / Burned — big tappable icons with totals below.
-              mt-auto pins the row to the card's bottom so it aligns with the
-              composition card beside it. */}
-          <div className="grid grid-cols-3 gap-2 mt-auto pt-6">
+          {/* Water / Consumed / Burned — quick-add icons stacked vertically,
+              to the right of the gauge. */}
+          <div className="flex shrink-0 flex-col gap-2">
             <button
               type="button"
               onClick={() => setShowAddWater(true)}
               aria-label={dict.hydration.title}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white">
-                <Droplet className="h-6 w-6 sm:h-8 sm:w-8" />
+              <span className="relative flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white">
+                <Droplet className="h-7 w-7 sm:h-9 sm:w-9 -translate-y-1" />
+                <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
+                  +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
+                </span>
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold tabular-nums text-cyan-500 whitespace-nowrap">
-                +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
               </span>
             </button>
             <button
@@ -198,14 +195,14 @@ export default function CaloriesTracker() {
               aria-label={dict.nutritionUser.barcodeTitle}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-lime-500 text-white">
-                <Salad className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+              <span className="relative flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl bg-lime-500 text-white">
+                <Salad className="h-7 w-7 sm:h-9 sm:w-9 -translate-y-1" aria-hidden="true" />
+                <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
+                  +{consumed} {t.kcal}
+                </span>
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold tabular-nums text-lime-500 whitespace-nowrap">
-                +{consumed} {t.kcal}
               </span>
             </button>
             <button
@@ -214,16 +211,17 @@ export default function CaloriesTracker() {
               aria-label={dict.nutritionUser.activityLog}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
-              <span className="relative flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-red-500 text-white">
-                <Flame className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+              <span className="relative flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl bg-red-500 text-white">
+                <Flame className="h-7 w-7 sm:h-9 sm:w-9 -translate-y-1" aria-hidden="true" />
+                <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
+                  -{burned} {t.kcal}
+                </span>
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                 </span>
               </span>
-              <span className="text-[10px] sm:text-xs font-bold tabular-nums text-red-500 whitespace-nowrap">
-                -{burned} {t.kcal}
-              </span>
             </button>
+          </div>
           </div>
         </section>
 

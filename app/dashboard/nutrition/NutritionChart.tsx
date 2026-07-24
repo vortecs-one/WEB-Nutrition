@@ -18,7 +18,7 @@ import { useDayLog } from "@/lib/day-log/provider";
 // the background, every text opacity, borders, hover states and the donut
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
-  "--sidebar": "#51ff00",
+  "--sidebar": "#c8c9c7",
   "--sidebar-foreground": "#1f2937",
   "--sidebar-accent": "#d1d5db",
   "--foreground": "#1f2937",
@@ -292,27 +292,28 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     </li>
   );
 
-  // Card title — rendered below the donut in the populated state, and above the
-  // empty-state message otherwise.
-  const titleHeading = (
-    <h2 className="w-full text-center text-xs font-semibold tracking-wide text-sidebar-foreground uppercase whitespace-nowrap">
-      {t.composition}
-    </h2>
-  );
+  // Shared title typography. Alignment/width differ per placement: left on the
+  // mobile header row, centered for the desktop stack and the empty state.
+  const titleClasses =
+    "text-xs font-semibold tracking-wide text-sidebar-foreground " +
+    "uppercase whitespace-nowrap";
 
   return (
     <section
       style={LIGHT_GRAY_CARD}
-      className="h-full bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4 sm:p-5 flex flex-col gap-3"
+      className="h-full bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm px-4 py-3 md:p-5 flex flex-col gap-2 md:gap-3"
     >
-      {/* Expand-to-detail control, pinned to the top-right */}
+      {/* Header — on mobile the title sits on the left of this row; on desktop
+          only the expand icon shows here (the title lives in the stack below).
+          ml-auto keeps the icon right in both cases. */}
       {hasData && (
-        <div className="flex justify-end">
+        <div className="flex items-center">
+          <h2 className={`md:hidden ${titleClasses}`}>{t.composition}</h2>
           <button
             type="button"
             onClick={() => setShowDetail(true)}
             aria-label={t.viewDetails}
-            className="-mr-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+            className="ml-auto -mr-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
           >
             <Maximize2 className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -321,7 +322,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
 
       {!hasData ? (
         <>
-          {titleHeading}
+          <h2 className={`w-full text-center ${titleClasses}`}>{t.composition}</h2>
           <p className="py-6 text-center text-sm text-sidebar-foreground/50">
             {t.noComposition}
           </p>
@@ -329,18 +330,22 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       ) : (
         // @container on this wrapper (not the section) so the modal below —
         // which is position:fixed — isn't captured by container-type.
-        // Vertical stack: chart on top, title below it, then the macro list.
+        // Mobile: donut (left) + macro list (right); the title is up in the
+        // header row. Desktop (md+): vertical stack — donut, title, list.
         <div className="@container">
-          <div className="flex flex-col items-center gap-3">
-            {/* Donut chart — the card's hero, centered at the top */}
-            {total > 0 && renderDonut("aspect-square h-36 w-36 @sm:h-48 @sm:w-48 shrink-0")}
+          <div className="flex flex-row items-center gap-4 md:flex-col md:gap-3">
+            {/* Donut chart — left half on mobile (flex-1, squared, so it grows
+                with the card), fixed size on the desktop stack. */}
+            {total > 0 && renderDonut("aspect-square min-w-0 flex-1 md:h-36 md:w-36 md:flex-none")}
 
-            {titleHeading}
+            {/* Desktop title — between donut and list; hidden below md */}
+            <h2 className={`hidden md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>
 
             {/* Macro rows — with color dot swatches. Dashboard card: percentage only.
                 Consumed/burned totals (calorieRows) are shown only in the detail
-                popup, not on the compact card. */}
-            <ul className="flex w-full flex-col gap-1 sm:gap-1.5">
+                popup, not on the compact card. On mobile this fills the space to
+                the right of the donut; on desktop it spans the full width. */}
+            <ul className="flex min-w-0 flex-1 flex-col gap-1 sm:gap-1.5 md:w-full md:flex-none">
               {data.map((d) => renderMacroRow(d, false))}
 
               {/* Divider before extra nutrients */}
