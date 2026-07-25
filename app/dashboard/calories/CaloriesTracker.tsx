@@ -24,7 +24,8 @@ import ActivityLog from "../nutrition/ActivityLog";
 import DietLog from "../nutrition/DietLog";
 import WaterLog, { NitroBottle } from "./WaterLog";
 
-const GAUGE_RANGE = 1000;
+const GAUGE_RANGE = 3000;
+const GAUGE_STEP = 500;
 
 // Derive a stable YYYY-MM-DD key from a Date so both the gauge stats and the
 // composition chart always read the same day's data.
@@ -156,7 +157,10 @@ export default function CaloriesTracker() {
             <CalorieGauge
                 value={balance}
                 range={GAUGE_RANGE}
+                step={GAUGE_STEP}
                 goal={goalBalance}
+                consumed={consumed}
+                burned={burned}
                 label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
                 goalLabel={t.goalLabel}
                 hideLabel
@@ -298,7 +302,10 @@ export default function CaloriesTracker() {
             <CalorieGauge
               value={balance}
               range={GAUGE_RANGE}
+              step={GAUGE_STEP}
               goal={goalBalance}
+              consumed={consumed}
+              burned={burned}
               label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
               goalLabel={t.goalLabel}
               hideLabel

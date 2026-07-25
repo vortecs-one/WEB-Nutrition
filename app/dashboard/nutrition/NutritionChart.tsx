@@ -18,7 +18,7 @@ import { useDayLog } from "@/lib/day-log/provider";
 // the background, every text opacity, borders, hover states and the donut
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
-  "--sidebar": "#37ff00",
+  "--sidebar": "#44ff00",
   "--sidebar-foreground": "#1f2937",
   "--sidebar-accent": "#d1d5db",
   "--foreground": "#1f2937",
