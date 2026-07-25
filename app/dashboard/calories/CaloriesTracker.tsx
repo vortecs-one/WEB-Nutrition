@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Droplet,
+  Maximize2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
@@ -43,6 +44,8 @@ export default function CaloriesTracker() {
   const [showAddActivity, setShowAddActivity] = useState(false);
   // Water popup (nitro hydration gauge + quick add).
   const [showAddWater, setShowAddWater] = useState(false);
+  // Detail popup — expanded balance breakdown (consumed/burned/net/goal).
+  const [showDetail, setShowDetail] = useState(false);
 
   // Initialized after mount to avoid SSR/client hydration mismatch.
   const [date, setDate] = useState<Date | null>(null);
@@ -98,28 +101,49 @@ export default function CaloriesTracker() {
         {/* Hero: date navigator + calorie balance gauge.
             flex-[1.3] : flex-1 gives a ~57/43 split (meter/composition). */}
         <section className="min-w-0 flex-[1.3] flex flex-col bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
-          {/* Date navigator */}
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => shiftDay(-1)}
-              aria-label="previous day"
-              className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition shrink-0"
-            >
-              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </button>
-            <span className="text-xs sm:text-base font-medium text-center truncate px-1">
-              {dateLabel}
-            </span>
-            <button
-              type="button"
-              onClick={() => shiftDay(1)}
-              aria-label="next day"
-              disabled={isToday}
-              className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition disabled:opacity-30 disabled:pointer-events-none shrink-0"
-            >
-              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </button>
+          {/* Header row: date navigator (left, scoped to the gauge's width)
+              + expand-to-detail icon (right, above the button column below) —
+              mirrors the two-column layout of the row underneath so both
+              rows line up horizontally. */}
+          <div className="flex flex-row items-center gap-2 sm:gap-3">
+            <div className="flex-1 min-w-0 max-w-md flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => shiftDay(-1)}
+                aria-label="previous day"
+                className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition shrink-0"
+              >
+                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </button>
+              <span className="text-xs sm:text-base font-medium text-center truncate px-1">
+                {dateLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => shiftDay(1)}
+                aria-label="next day"
+                disabled={isToday}
+                className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition disabled:opacity-30 disabled:pointer-events-none shrink-0"
+              >
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </button>
+            </div>
+            {/* Fixed to the same rendered width as the quick-add button column
+                below (h-16 w-16 span + p-1.5 button padding = 4.75rem; sm:4.5rem
+                span + sm:p-3 padding = 6rem) so both rows' flex-1 column — this
+                date nav and the gauge — resolve to the same width and stay aligned.
+                justify-end (not center) so the icon itself sits flush on the same
+                right edge as the buttons below, instead of floating mid-column. */}
+            <div className="shrink-0 w-[4.75rem] sm:w-24 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDetail(true)}
+                aria-label={t.viewDetails}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+              >
+                <Maximize2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           {/* Gauge (left) + quick-add icon column (right), side by side. */}
@@ -130,44 +154,44 @@ export default function CaloriesTracker() {
               bottles (sized in cqi of this @container) stay proportioned. */}
           <div className="relative flex-1 min-w-0 max-w-md @container">
             <CalorieGauge
-              value={balance}
-              range={GAUGE_RANGE}
-              goal={goalBalance}
-              label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
-              goalLabel={t.goalLabel}
-              hideLabel
-            />
-            {/* Nitro bottles — one per completed liter of water drunk today.
-                Sized in cqi (fraction of the gauge width) with clamp() min/max
-                so they scale down when the gauge is narrow and never overlap
-                the center readout, but stay legible on wide screens. */}
-            {(() => {
-              const bottles = Math.floor(waterMl / 1000);
-              const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
-              const slots = Math.min(Math.max(bottles, goalBottles), 6);
-              return (
-                <div className="absolute inset-x-0 bottom-[3%] flex flex-col items-center gap-[1cqi]">
-                  <div className="flex items-center justify-center gap-[1.5cqi]">
-                    {Array.from({ length: slots }, (_, i) => (
-                      <NitroBottle
-                        key={i}
-                        variant={i < bottles ? "filled" : "ghost"}
-                        className="h-[clamp(1.4rem,11cqi,2.75rem)] w-[clamp(0.95rem,7.4cqi,1.85rem)]"
-                      />
-                    ))}
+                value={balance}
+                range={GAUGE_RANGE}
+                goal={goalBalance}
+                label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
+                goalLabel={t.goalLabel}
+                hideLabel
+              />
+              {/* Nitro bottles — one per completed liter of water drunk today.
+                  Sized in cqi (fraction of the gauge width) with clamp() min/max
+                  so they scale down when the gauge is narrow and never overlap
+                  the center readout, but stay legible on wide screens. */}
+              {(() => {
+                const bottles = Math.floor(waterMl / 1000);
+                const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
+                const slots = Math.min(Math.max(bottles, goalBottles), 6);
+                return (
+                  <div className="absolute inset-x-0 bottom-[3%] flex flex-col items-center gap-[1cqi]">
+                    <div className="flex items-center justify-center gap-[1.5cqi]">
+                      {Array.from({ length: slots }, (_, i) => (
+                        <NitroBottle
+                          key={i}
+                          variant={i < bottles ? "filled" : "ghost"}
+                          className="h-[clamp(1.4rem,11cqi,2.75rem)] w-[clamp(0.95rem,7.4cqi,1.85rem)]"
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-[1.5cqi]">
+                      <span className="font-semibold tabular-nums text-[clamp(0.7rem,3.6cqi,0.875rem)]">
+                        × {bottles}
+                      </span>
+                      <span className="text-sidebar-foreground/60 text-[clamp(0.6rem,3.1cqi,0.75rem)]">
+                        {bottles === 1 ? dict.hydration.waterLiter : dict.hydration.waterLiters}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-[1.5cqi]">
-                    <span className="font-semibold tabular-nums text-[clamp(0.7rem,3.6cqi,0.875rem)]">
-                      × {bottles}
-                    </span>
-                    <span className="text-sidebar-foreground/60 text-[clamp(0.6rem,3.1cqi,0.75rem)]">
-                      {bottles === 1 ? dict.hydration.waterLiter : dict.hydration.waterLiters}
-                    </span>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+                );
+              })()}
+            </div>
 
           {/* Water / Consumed / Burned — quick-add icons stacked vertically,
               to the right of the gauge. */}
@@ -183,7 +207,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   -{burned} {t.kcal}
                 </span>
-                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
+                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">-</span>
               </span>
             </button>
             <button
@@ -257,6 +281,72 @@ export default function CaloriesTracker() {
         title={dict.hydration.title}
       >
         {dateKey && <WaterLog todayKey={dateKey} />}
+      </Modal>
+
+      {/* Detail popup — expanded calorie-balance breakdown for the selected day */}
+      <Modal
+        isOpen={showDetail}
+        onClose={() => setShowDetail(false)}
+        title={t.balance}
+        size="md"
+      >
+        <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">
+          {t.netHint}
+        </p>
+        <div className="flex flex-col items-center gap-4">
+          <div className="aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0">
+            <CalorieGauge
+              value={balance}
+              range={GAUGE_RANGE}
+              goal={goalBalance}
+              label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
+              goalLabel={t.goalLabel}
+              hideLabel
+            />
+          </div>
+
+          <p className="text-sm font-medium text-center text-sidebar-foreground/80">
+            {balance <= 0 ? t.deficit : t.surplus}
+          </p>
+
+          <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
+            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+              <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+                {t.consumed}
+              </span>
+              <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
+                +{consumed} {t.kcal}
+              </span>
+            </li>
+            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+              <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+                {t.burned}
+              </span>
+              <span className="shrink-0 tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
+                -{burned} {t.kcal}
+              </span>
+            </li>
+
+            <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
+
+            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+              <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+                {t.net}
+              </span>
+              <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
+                {balance > 0 ? "+" : ""}{balance} {t.kcal}
+              </span>
+            </li>
+            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+              <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                {t.goal}
+              </span>
+              <span className="shrink-0 tabular-nums text-sidebar-foreground/70">
+                {goalBalance > 0 ? "+" : ""}{goalBalance} {t.kcal}
+              </span>
+            </li>
+          </ul>
+        </div>
       </Modal>
     </div>
   );

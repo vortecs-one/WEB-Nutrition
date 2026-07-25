@@ -105,7 +105,7 @@ export default function CalorieGauge({
 
   const needleAngle = valueToAngle(value, range);
   const needleInner = polar(needleAngle, 50);
-  const needleTip = polar(needleAngle, 93);
+  const needleTip = polar(needleAngle, 90);
 
   const goalAngle = goal != null ? valueToAngle(goal, range) : null;
   // Badge floats just outside the glowing ring, label centered inside it.
@@ -231,10 +231,12 @@ export default function CalorieGauge({
           fit the longest localized label ("Superávit calórico" / "Calorie surplus"). */}
       <circle
         cx={CX}
-        cy={CY + 2}
+        cy={CY}
         r={46}
         fill="#9ca3af"
         fillOpacity={0.14}
+        stroke={NEEDLE}
+        strokeWidth={1}
       />
 
       {/* Status label just below the readout — red, centered on CX. */}

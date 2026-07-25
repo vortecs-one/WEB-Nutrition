@@ -192,6 +192,7 @@ const en: Dictionary = {
   caloriesUser: {
     title: "Calories",
     subtitle: "Track the balance between calories consumed and burned.",
+    viewDetails: "View details",
     balance: "Today's balance",
     consumed: "Consumed",
     burned: "Burned",

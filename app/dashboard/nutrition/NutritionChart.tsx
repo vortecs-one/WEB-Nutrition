@@ -18,7 +18,7 @@ import { useDayLog } from "@/lib/day-log/provider";
 // the background, every text opacity, borders, hover states and the donut
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
-  "--sidebar": "#c8c9c7",
+  "--sidebar": "#37ff00",
   "--sidebar-foreground": "#1f2937",
   "--sidebar-accent": "#d1d5db",
   "--foreground": "#1f2937",
@@ -334,18 +334,21 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
         // header row. Desktop (md+): vertical stack — donut, title, list.
         <div className="@container">
           <div className="flex flex-row items-center gap-4 md:flex-col md:gap-3">
-            {/* Donut chart — left half on mobile (flex-1, squared, so it grows
-                with the card), fixed size on the desktop stack. */}
-            {total > 0 && renderDonut("aspect-square min-w-0 flex-1 md:h-36 md:w-36 md:flex-none")}
+            {/* Donut chart — right half on mobile (flex-1, squared, so it grows
+                with the card), fixed size on the desktop stack. order-* swaps
+                its position only on the mobile row; md:order-1 restores its
+                natural (first) place in the desktop vertical stack. */}
+            {total > 0 && renderDonut("order-2 md:order-1 aspect-square min-w-0 flex-1 md:h-36 md:w-36 md:flex-none")}
 
             {/* Desktop title — between donut and list; hidden below md */}
-            <h2 className={`hidden md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>
+            <h2 className={`hidden md:order-2 md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>
 
             {/* Macro rows — with color dot swatches. Dashboard card: percentage only.
                 Consumed/burned totals (calorieRows) are shown only in the detail
                 popup, not on the compact card. On mobile this fills the space to
-                the right of the donut; on desktop it spans the full width. */}
-            <ul className="flex min-w-0 flex-1 flex-col gap-1 sm:gap-1.5 md:w-full md:flex-none">
+                the left of the donut (order-1); on desktop it spans the full
+                width as the last item in the stack (md:order-3). */}
+            <ul className="order-1 md:order-3 flex min-w-0 flex-1 flex-col gap-1 sm:gap-1.5 md:w-full md:flex-none">
               {data.map((d) => renderMacroRow(d, false))}
 
               {/* Divider before extra nutrients */}

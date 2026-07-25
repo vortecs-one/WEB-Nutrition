@@ -191,6 +191,7 @@ const es = {
   caloriesUser: {
     title: "Calorías",
     subtitle: "Controla tu balance entre calorías consumidas y gastadas.",
+    viewDetails: "Ver detalles",
     balance: "Balance del día",
     consumed: "Consumidas",
     burned: "Gastadas",
