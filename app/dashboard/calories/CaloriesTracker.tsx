@@ -211,7 +211,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   -{burned} {t.kcal}
                 </span>
-                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">-</span>
+                <span className="absolute top-0.5 left-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">-</span>
               </span>
             </button>
             <button
@@ -225,7 +225,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{consumed} {t.kcal}
                 </span>
-                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
+                <span className="absolute top-0.5 left-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
             <button
@@ -239,7 +239,7 @@ export default function CaloriesTracker() {
                 <span className="absolute inset-x-0 bottom-1.5 text-center text-[10px] sm:text-xs font-bold text-white leading-none whitespace-nowrap">
                   +{(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {dict.hydration.liters}
                 </span>
-                <span className="absolute top-0.5 right-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
+                <span className="absolute top-0.5 left-1 text-xl sm:text-2xl font-black text-white leading-none" aria-hidden="true">+</span>
               </span>
             </button>
           </div>

@@ -158,6 +158,12 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
 
   const hasData = total > 0 || extraNutrients.length > 0;
 
+  // Card view omits saturated fat and fiber; they're shown in the detail popup only.
+  const cardExtraNutrients = useMemo(
+    () => extraNutrients.filter((n) => n.key !== "saturatedFat" && n.key !== "fiber"),
+    [extraNutrients],
+  );
+
   // Donut chart, reused at two sizes (compact card vs. detail popup) — only
   // the container's size classes differ, the chart itself is identical.
   const renderDonut = (containerClassName: string) => (
@@ -275,19 +281,20 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   };
 
   // Extra-nutrient row — percentage only on the card, except sugars (no daily
-  // value defined, so no percentage) which keeps its gram value there instead.
+  // value defined) which shows its gram value in that same trailing column
+  // instead, so it right-aligns flush with the percentages above it.
   const renderExtraRow = (n: (typeof extraNutrients)[number], detailed: boolean) => (
     <li key={n.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
       <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
         {n.label}
       </span>
-      {(detailed || n.pct == null) && (
+      {detailed && (
         <span className="shrink-0 tabular-nums text-sidebar-foreground/50 text-[11px]">
           {n.value}{n.unit}
         </span>
       )}
       <span className="shrink-0 font-semibold tabular-nums w-10 text-right text-sidebar-foreground/70">
-        {n.pct != null ? `${n.pct}%` : ""}
+        {n.pct != null ? `${n.pct}%` : !detailed ? `${n.value}${n.unit}` : ""}
       </span>
     </li>
   );
@@ -301,7 +308,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   return (
     <section
       style={LIGHT_GRAY_CARD}
-      className="h-full bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm px-4 py-3 md:p-5 flex flex-col gap-2 md:gap-3"
+      className="h-full bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm px-4 py-3 md:p-5 flex flex-col gap-0"
     >
       {/* Header — on mobile the title sits on the left of this row; on desktop
           only the expand icon shows here (the title lives in the stack below).
@@ -333,12 +340,14 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
         // Mobile: donut (left) + macro list (right); the title is up in the
         // header row. Desktop (md+): vertical stack — donut, title, list.
         <div className="@container">
-          <div className="flex flex-row items-center gap-4 md:flex-col md:gap-3">
-            {/* Donut chart — right half on mobile (flex-1, squared, so it grows
-                with the card), fixed size on the desktop stack. order-* swaps
-                its position only on the mobile row; md:order-1 restores its
-                natural (first) place in the desktop vertical stack. */}
-            {total > 0 && renderDonut("order-2 md:order-1 aspect-square min-w-0 flex-1 md:h-36 md:w-36 md:flex-none")}
+          <div className="flex flex-row items-start gap-4 md:flex-col md:gap-3">
+            {/* Donut chart — right half on mobile, sized in cqi (fraction of
+                the card width) so it stays close to the compact list's height
+                instead of stretching to fill the row; fixed size on the
+                desktop stack. order-* swaps its position only on the mobile
+                row; md:order-1 restores its natural (first) place in the
+                desktop vertical stack. */}
+            {total > 0 && renderDonut("order-2 md:order-1 shrink-0 aspect-square w-[clamp(4.75rem,30cqi,6.75rem)] md:h-36 md:w-36 md:flex-none")}
 
             {/* Desktop title — between donut and list; hidden below md */}
             <h2 className={`hidden md:order-2 md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>
@@ -352,11 +361,11 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
               {data.map((d) => renderMacroRow(d, false))}
 
               {/* Divider before extra nutrients */}
-              {extraNutrients.length > 0 && (
-                <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
+              {cardExtraNutrients.length > 0 && (
+                <li role="separator" className="border-t border-sidebar-foreground/10" />
               )}
 
-              {extraNutrients.map((n) => renderExtraRow(n, false))}
+              {cardExtraNutrients.map((n) => renderExtraRow(n, false))}
             </ul>
           </div>
         </div>
