@@ -412,7 +412,7 @@ export default function GlucoseTracker({
       <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
         {/* Header: reading pill + meta on the left, actions on the right */}
         <div className="flex items-start justify-between gap-2" aria-live="polite">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-start gap-2 sm:gap-3">
             {/* Reading pill — keeps the status color (in-range/high/low/urgent) */}
             <div
               className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
@@ -432,32 +432,27 @@ export default function GlucoseTracker({
                 />
               )}
             </div>
-            {/* Meta: patient, status, freshness */}
+            {/* Meta: label + status on one line, then freshness (patient name
+                lives in the detail view) */}
             <div className="min-w-0">
-              <div className="truncate text-xs sm:text-sm font-medium text-sidebar-foreground/80">
-                {settings.source === "librelinkup" && data?.patientName
-                  ? data.patientName
-                  : t.currentReading}
+              <div className="truncate text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80">
+                {t.currentReading}
+                {current ? `: ${statusLabel[currentStatus]}` : ""}
               </div>
               {current && (
-                <>
-                  <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
-                    {statusLabel[currentStatus]}
+                <div className="mt-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                  <div className="truncate">
+                    {currentMins === 0
+                      ? t.justNow
+                      : t.lastUpdated.replace("{min}", String(currentMins))}
                   </div>
-                  <div className="flex min-w-0 items-center gap-1.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
-                    <span>
-                      {currentMins === 0
-                        ? t.justNow
-                        : t.lastUpdated.replace("{min}", String(currentMins))}
-                    </span>
-                    {isStale && (
-                      <span className="flex shrink-0 items-center gap-1 text-destructive">
-                        <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                        <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
-                      </span>
-                    )}
-                  </div>
-                </>
+                  {isStale && (
+                    <div className="mt-0.5 flex items-start gap-1 text-destructive">
+                      <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -578,7 +573,20 @@ export default function GlucoseTracker({
         title={t.chartTitle}
         size="lg"
       >
-        <div className="mb-3 flex justify-end">{rangeSelector}</div>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {settings.source === "librelinkup" && data?.patientName ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <Users
+                className="h-4 w-4 shrink-0 text-sidebar-foreground/60"
+                aria-hidden="true"
+              />
+              <span className="truncate text-sm font-medium">{data.patientName}</span>
+            </div>
+          ) : (
+            <span />
+          )}
+          {rangeSelector}
+        </div>
         <div className="h-[60vh] w-full">{chartContent}</div>
       </Modal>
     </div>

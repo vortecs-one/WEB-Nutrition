@@ -18,7 +18,7 @@ import { useDayLog } from "@/lib/day-log/provider";
 // the background, every text opacity, borders, hover states and the donut
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
-  "--sidebar": "#44ff00",
+  "--sidebar": "#9700bd",
   "--sidebar-foreground": "#1f2937",
   "--sidebar-accent": "#d1d5db",
   "--foreground": "#1f2937",
@@ -342,12 +342,18 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
         <div className="@container">
           <div className="flex flex-row items-start gap-4 md:flex-col md:gap-3">
             {/* Donut chart — right half on mobile, sized in cqi (fraction of
-                the card width) so it stays close to the compact list's height
-                instead of stretching to fill the row; fixed size on the
-                desktop stack. order-* swaps its position only on the mobile
-                row; md:order-1 restores its natural (first) place in the
-                desktop vertical stack. */}
-            {total > 0 && renderDonut("order-2 md:order-1 shrink-0 aspect-square w-[clamp(4.75rem,30cqi,6.75rem)] md:h-36 md:w-36 md:flex-none")}
+                the card width) to track the macro list's height (≈list height
+                at both the base and sm row sizes, via the clamp floor/ceiling),
+                then self-center'd so it's vertically centered beside the
+                top-aligned list (any small height difference splits
+                symmetrically); fixed size on the desktop stack. Kept
+                aspect-square (definite width → derived height) — do NOT size via
+                self-stretch/aspect-ratio off the row's own auto height, which
+                makes width and height mutually dependent and collapses the chart
+                to 0 width. order-* swaps its position only on the mobile row;
+                md:order-1 restores its natural (first) place in the desktop
+                vertical stack. */}
+            {total > 0 && renderDonut("order-2 md:order-1 shrink-0 self-center md:self-auto aspect-square w-[clamp(6rem,27cqi,8.5rem)] md:h-36 md:w-36 md:flex-none")}
 
             {/* Desktop title — between donut and list; hidden below md */}
             <h2 className={`hidden md:order-2 md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>

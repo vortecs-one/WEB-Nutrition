@@ -106,7 +106,7 @@ export default function CaloriesTracker() {
               + expand-to-detail icon (right, above the button column below) —
               mirrors the two-column layout of the row underneath so both
               rows line up horizontally. */}
-          <div className="flex flex-row items-center gap-2 sm:gap-3">
+          <div className="flex flex-row items-center justify-between gap-2 sm:gap-3">
             <div className="flex-1 min-w-0 max-w-[246px] sm:max-w-[306px] flex items-center justify-between">
               <button
                 type="button"
@@ -148,7 +148,7 @@ export default function CaloriesTracker() {
           </div>
 
           {/* Gauge (left) + quick-add icon column (right), side by side. */}
-          <div className="flex flex-row items-center justify-center gap-2 sm:gap-3">
+          <div className="flex flex-row items-center justify-between gap-2 sm:gap-3">
 
           {/* Gauge with nitro bottles nested in the dial's bottom gap.
               flex-1 + a max-width capped to the icon column's height keeps this
