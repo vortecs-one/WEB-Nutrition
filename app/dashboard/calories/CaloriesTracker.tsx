@@ -107,7 +107,7 @@ export default function CaloriesTracker() {
               mirrors the two-column layout of the row underneath so both
               rows line up horizontally. */}
           <div className="flex flex-row items-center gap-2 sm:gap-3">
-            <div className="flex-1 min-w-0 max-w-md flex items-center justify-between">
+            <div className="flex-1 min-w-0 max-w-[246px] sm:max-w-[306px] flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => shiftDay(-1)}
@@ -151,9 +151,12 @@ export default function CaloriesTracker() {
           <div className="flex flex-row items-center justify-center gap-2 sm:gap-3">
 
           {/* Gauge with nitro bottles nested in the dial's bottom gap.
-              flex-1 + max-w-md keeps this wrapper's width tracking the SVG so the
-              bottles (sized in cqi of this @container) stay proportioned. */}
-          <div className="relative flex-1 min-w-0 max-w-md @container">
+              flex-1 + a max-width capped to the icon column's height keeps this
+              wrapper's width tracking the SVG (which is ~square, so width ≈
+              height) — so the gauge box lands at the same height as the three
+              quick-add buttons on the right. The bottles (sized in cqi of this
+              @container) stay proportioned as it scales. */}
+          <div className="relative flex-1 min-w-0 max-w-[246px] sm:max-w-[306px] @container">
             <CalorieGauge
                 value={balance}
                 range={GAUGE_RANGE}
