@@ -337,13 +337,15 @@ const es = {
     sensorWarmingUp: "Calentando",
     sensorWarmUpEnds: "Las lecturas empiezan a las {time}",
     // --- Rango objetivo y alarmas leídos de la app LibreLink (solo lectura) ---
-    libreAppSettingsTitle: "Ajustes de LibreLink",
+    // Nombre de marca de la fuente conectada — igual en todos los idiomas.
+    libreAppName: "LibreLink",
     libreTargetRange: "Rango objetivo",
     libreHighAlarm: "Alarma alta",
     libreLowAlarm: "Alarma baja",
     alarmOff: "Desactivada",
     libreSettingsHint:
-      "Leído de la app LibreLink. Estos rangos determinan cuándo una lectura está en rango, alta o baja.",
+      "Rangos configurados en la app LibreLink. Definen cuándo una lectura está en rango, alta o baja.",
+    moreInfo: "Más información",
     thresholdsFromSource:
       "Los límites de alerta y el rango objetivo se leen de tu fuente de glucosa, así que no hay nada que configurar aquí.",
     // --- Configuración inicial (independiente de la fuente) ---

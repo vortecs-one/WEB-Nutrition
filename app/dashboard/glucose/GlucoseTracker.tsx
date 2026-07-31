@@ -14,6 +14,7 @@ import {
   Cpu,
   BellRing,
   Settings2,
+  Info,
   Maximize2,
   ArrowUp,
   ArrowDown,
@@ -59,6 +60,7 @@ import {
   splitDuration,
 } from "@/lib/glucose/types";
 import { Modal } from "@/components/ui/modal";
+import { Toast } from "@/components/ui/toast";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
 
 const RANGES = [3, 6, 12, 24] as const;
@@ -103,6 +105,8 @@ export default function GlucoseTracker({
   const [showChart, setShowChart] = useState(false);
   // Connection form inside the settings panel — collapsed until the gear is used.
   const [showConnection, setShowConnection] = useState(false);
+  // Toast explaining where the target range / alarms come from.
+  const [showRangesInfo, setShowRangesInfo] = useState(false);
   const [rangeHours, setRangeHours] = useState<RangeHours>(12);
   const [data, setData] = useState<GlucoseData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -809,9 +813,11 @@ export default function GlucoseTracker({
         {/* The two info panels sit side by side — settings left, sensor right.
             Visual order is set with `order-*`; the DOM keeps sensor first so
             screen readers still get the read-only status before the controls.
+            Grid items stretch by default, so both cards share the row's height
+            and their top and bottom edges line up regardless of content.
             Either panel spans the full row when the connection form is open
             (it needs the width) or when it would otherwise be alone. */}
-        <div className="mt-4 grid grid-cols-2 items-start gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3">
         {/* Sensor panel — activation, expiry and remaining life. Only rendered
             when the source actually reported a sensor block (LibreLinkUp). */}
         {sensor && (
@@ -820,7 +826,10 @@ export default function GlucoseTracker({
               showConnection ? "col-span-2" : ""
             }`}
           >
-            <div className="flex items-center gap-2">
+            {/* h-8 matches the settings panel's header (whose height is set by
+                its icon buttons) so both titles — and the content under them —
+                line up across the two columns. */}
+            <div className="flex h-8 items-center gap-2">
               <Cpu className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
               <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
                 {t.sensorTitle}
@@ -900,16 +909,16 @@ export default function GlucoseTracker({
             libreThresholds (null for Nightscout) would leave Nightscout users
             with no way to reach their settings at all. */}
         <section
-          className={`@container order-1 rounded-2xl bg-sidebar-accent/40 p-4 ${
+          className={`@container order-1 flex flex-col rounded-2xl bg-sidebar-accent/40 p-4 ${
             showConnection || !sensor ? "col-span-2" : ""
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex h-8 items-center gap-2">
             {libreThresholds && (
               <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
             )}
             <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
-              {settings.source === "librelinkup" ? t.libreAppSettingsTitle : t.settings}
+              {settings.source === "librelinkup" ? t.libreAppName : t.sourceNightscout}
             </h3>
             <button
               type="button"
@@ -970,8 +979,21 @@ export default function GlucoseTracker({
             </ul>
           )}
 
+          {/* Where these ranges come from — behind an icon rather than four
+              lines of small print in a half-width column. mt-auto parks it in
+              the panel's bottom-right corner once the panel is stretched to
+              match its neighbour. */}
           {libreThresholds && (
-            <p className="mt-2 text-[11px] text-sidebar-foreground/60">{t.libreSettingsHint}</p>
+            <div className="mt-auto flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowRangesInfo(true)}
+                aria-label={t.moreInfo}
+                className="-mr-1 -mb-1 flex h-7 w-7 items-center justify-center rounded-full text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-95 transition"
+              >
+                <Info className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           )}
 
           {/* Source connection form — revealed by the gear above */}
@@ -991,6 +1013,13 @@ export default function GlucoseTracker({
         </section>
         </div>
       </Modal>
+
+      {/* Portals to <body>, so it clears the modal's stacking context */}
+      <Toast
+        open={showRangesInfo}
+        message={t.libreSettingsHint}
+        onClose={() => setShowRangesInfo(false)}
+      />
     </div>
   );
 }

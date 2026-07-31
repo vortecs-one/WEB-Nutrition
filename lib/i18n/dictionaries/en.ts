@@ -331,13 +331,15 @@ const en: Dictionary = {
     sensorWarmingUp: "Warming up",
     sensorWarmUpEnds: "Readings start at {time}",
     // --- Target range + alarms read from the LibreLink app (read-only) ---
-    libreAppSettingsTitle: "LibreLink settings",
+    // Brand name of the connected source — same in every locale.
+    libreAppName: "LibreLink",
     libreTargetRange: "Target range",
     libreHighAlarm: "High alarm",
     libreLowAlarm: "Low alarm",
     alarmOff: "Off",
     libreSettingsHint:
-      "Read from the LibreLink app. These ranges decide when a reading counts as in range, high or low.",
+      "Ranges set in the LibreLink app. They decide when a reading is in range, high or low.",
+    moreInfo: "More info",
     thresholdsFromSource:
       "Alert limits and the target range are read from your glucose source, so there's nothing to set here.",
     // --- Setup (source-agnostic) ---
