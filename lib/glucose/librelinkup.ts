@@ -16,7 +16,7 @@
 
 import "server-only";
 
-import type { GlucoseReading, TrendDirection } from "./types";
+import type { GlucoseReading, SensorInfo, TrendDirection } from "./types";
 
 // --- Constants ---------------------------------------------------------------
 
@@ -62,6 +62,8 @@ export type LibreGraphResult = {
   current: GlucoseReading | null;
   readings: GlucoseReading[];
   patientName: string;
+  /** Worn sensor metadata, or null when the payload doesn't carry it. */
+  sensor: SensorInfo | null;
 };
 
 export class LibreError extends Error {
@@ -159,6 +161,39 @@ function toReading(m: RawMeasurement | null | undefined): GlucoseReading | null 
   const date = parseFactoryTimestamp(m.FactoryTimestamp);
   if (sgv <= 0 || date <= 0) return null;
   return { sgv, date, direction: mapTrend(m.TrendArrow) };
+}
+
+// The sensor block Abbott attaches to a connection. The keys are abbreviated:
+//   sn = serial number, a = activation timestamp (epoch SECONDS),
+//   w  = warm-up minutes, pt = product type.
+type RawSensor = {
+  sn?: string;
+  a?: number;
+  w?: number;
+  pt?: number;
+};
+
+// Libre sensors warm up for an hour before producing readings; used when the
+// payload omits `w`.
+const DEFAULT_WARMUP_MINUTES = 60;
+
+// Sensors can't have been activated before Libre existed, nor in the future.
+// This rejects a payload whose `a` isn't the epoch-seconds field we expect
+// (e.g. already-ms, or a different unit) rather than rendering a wrong date.
+const MIN_PLAUSIBLE_ACTIVATION = Date.UTC(2015, 0, 1);
+
+function toSensor(s: RawSensor | null | undefined): SensorInfo | null {
+  if (!s?.a) return null;
+  const activatedAt = s.a * 1000;
+  if (!Number.isFinite(activatedAt)) return null;
+  if (activatedAt < MIN_PLAUSIBLE_ACTIVATION) return null;
+  if (activatedAt > Date.now() + 24 * 3600_000) return null;
+  return {
+    serialNumber: s.sn?.trim() || null,
+    activatedAt,
+    warmUpMinutes:
+      typeof s.w === "number" && s.w >= 0 && s.w < 24 * 60 ? s.w : DEFAULT_WARMUP_MINUTES,
+  };
 }
 
 // --- API calls ---------------------------------------------------------------
@@ -373,7 +408,10 @@ type GraphResponse = {
       firstName?: string;
       lastName?: string;
       glucoseMeasurement?: RawMeasurement | null;
+      sensor?: RawSensor | null;
     };
+    /** Alternate placement for the same sensor block in some payloads. */
+    activeSensors?: Array<{ sensor?: RawSensor | null }>;
     graphData?: RawMeasurement[];
   };
 };
@@ -425,6 +463,12 @@ export async function libreGetGraph(
     readings.push(current);
   }
 
+  // Sensor metadata rides along on the connection; activeSensors is the
+  // fallback placement. Null when neither carries a usable block, so callers
+  // simply hide the sensor UI rather than showing guessed values.
+  const sensor =
+    toSensor(connection?.sensor) ?? toSensor(body.data?.activeSensors?.[0]?.sensor);
+
   const patientName = [connection?.firstName, connection?.lastName].filter(Boolean).join(" ");
-  return { current, readings, patientName };
+  return { current, readings, patientName, sensor };
 }

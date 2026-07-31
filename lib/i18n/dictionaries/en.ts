@@ -319,6 +319,17 @@ const en: Dictionary = {
     patientOwn: "Main reading",
     patientRemote: "Remote reading",
     patientSwitchError: "Could not switch patient. Please try again.",
+    // --- Sensor metadata (LibreLinkUp only) ---
+    sensorTitle: "Sensor",
+    sensorLifeRemaining: "Life remaining",
+    sensorActivated: "Activated",
+    sensorExpires: "Expires",
+    sensorSerial: "Serial number",
+    sensorRemainingDays: "{d}d {h}h left",
+    sensorRemainingHours: "{h}h {m}m left",
+    sensorExpired: "Sensor expired",
+    sensorWarmingUp: "Warming up",
+    sensorWarmUpEnds: "Readings start at {time}",
     // --- Setup (source-agnostic) ---
     setupTitleGeneric: "Connect your glucose source",
     setupBodyGeneric:

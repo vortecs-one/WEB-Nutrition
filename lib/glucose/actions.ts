@@ -509,6 +509,8 @@ async function fetchFromNightscout(
         settings: toClientSettings(row),
         patientName: null,
         patients: [],
+        // Nightscout entries carry no sensor block.
+        sensor: null,
       },
     };
   } catch {
@@ -586,6 +588,7 @@ async function fetchFromLibre(
           name: [p.firstName, p.lastName].filter(Boolean).join(" "),
           currentMgdl: p.currentMgdl,
         })),
+        sensor: result.graph.sensor,
       },
     };
   } catch (err) {

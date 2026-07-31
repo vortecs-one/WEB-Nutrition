@@ -42,6 +42,17 @@ export type LibrePatientInfo = {
   currentMgdl: number | null;
 };
 
+// Metadata about the physical sensor currently worn by the selected patient.
+// LibreLinkUp only — Nightscout entries carry no sensor block.
+export type SensorInfo = {
+  /** Sensor serial number, if reported. */
+  serialNumber: string | null;
+  /** Epoch ms when the sensor was activated (applied to the skin). */
+  activatedAt: number;
+  /** Warm-up period in minutes; no readings are produced until it elapses. */
+  warmUpMinutes: number;
+};
+
 // Client-safe settings (secrets intentionally excluded — Nightscout tokens
 // and LibreLinkUp passwords never leave the server; we only tell the client
 // whether they are stored).
@@ -74,6 +85,8 @@ export type GlucoseData = {
   patientName: string | null;
   /** All patient connections on the account (LibreLinkUp only). */
   patients: LibrePatientInfo[];
+  /** Worn sensor's activation/expiry metadata (LibreLinkUp only). */
+  sensor: SensorInfo | null;
 };
 
 export type GlucoseFetchError =
@@ -150,3 +163,43 @@ export function minutesAgo(dateMs: number): number {
 
 /** A reading older than this is considered stale (sensor/upload gap). */
 export const STALE_MINUTES = 15;
+
+// --- Sensor lifecycle helpers -----------------------------------------------
+
+/** Every current FreeStyle Libre sensor (2 / 3 / 14-day) runs for 14 days. */
+export const SENSOR_LIFETIME_MS = 14 * 24 * 3600_000;
+
+/** Epoch ms at which the sensor stops producing readings. */
+export function sensorExpiresAt(sensor: SensorInfo): number {
+  return sensor.activatedAt + SENSOR_LIFETIME_MS;
+}
+
+/** Epoch ms at which warm-up ends and the first reading becomes available. */
+export function sensorWarmUpEndsAt(sensor: SensorInfo): number {
+  return sensor.activatedAt + sensor.warmUpMinutes * 60_000;
+}
+
+/** Sensor life left in ms; 0 once expired. */
+export function sensorRemainingMs(sensor: SensorInfo, now: number = Date.now()): number {
+  return Math.max(0, sensorExpiresAt(sensor) - now);
+}
+
+/** Fraction of the sensor's life still remaining, 0..1. */
+export function sensorRemainingFraction(sensor: SensorInfo, now: number = Date.now()): number {
+  return sensorRemainingMs(sensor, now) / SENSOR_LIFETIME_MS;
+}
+
+/** True while the sensor is still warming up (worn, but not yet reading). */
+export function sensorIsWarmingUp(sensor: SensorInfo, now: number = Date.now()): boolean {
+  return now < sensorWarmUpEndsAt(sensor);
+}
+
+/** Break a duration into whole days / hours / minutes for display. */
+export function splitDuration(ms: number): { days: number; hours: number; minutes: number } {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
+  return {
+    days: Math.floor(totalMinutes / (24 * 60)),
+    hours: Math.floor((totalMinutes % (24 * 60)) / 60),
+    minutes: totalMinutes % 60,
+  };
+}

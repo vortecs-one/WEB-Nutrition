@@ -325,6 +325,17 @@ const es = {
     patientOwn: "Lectura principal",
     patientRemote: "Lectura remota",
     patientSwitchError: "No se pudo cambiar de paciente. Inténtalo de nuevo.",
+    // --- Datos del sensor (solo LibreLinkUp) ---
+    sensorTitle: "Sensor",
+    sensorLifeRemaining: "Vida restante",
+    sensorActivated: "Activado",
+    sensorExpires: "Caduca",
+    sensorSerial: "Número de serie",
+    sensorRemainingDays: "Quedan {d} d {h} h",
+    sensorRemainingHours: "Quedan {h} h {m} min",
+    sensorExpired: "Sensor caducado",
+    sensorWarmingUp: "Calentando",
+    sensorWarmUpEnds: "Las lecturas empiezan a las {time}",
     // --- Configuración inicial (independiente de la fuente) ---
     setupTitleGeneric: "Conecta tu fuente de glucosa",
     setupBodyGeneric:

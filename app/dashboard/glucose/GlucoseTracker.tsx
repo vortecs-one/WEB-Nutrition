@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Activity,
   Users,
+  Cpu,
   Maximize2,
   ArrowUp,
   ArrowDown,
@@ -47,6 +48,12 @@ import {
   mgdlToMmol,
   unitLabel,
   STALE_MINUTES,
+  sensorExpiresAt,
+  sensorIsWarmingUp,
+  sensorRemainingFraction,
+  sensorRemainingMs,
+  sensorWarmUpEndsAt,
+  splitDuration,
 } from "@/lib/glucose/types";
 import { Modal } from "@/components/ui/modal";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
@@ -86,7 +93,7 @@ export default function GlucoseTracker({
 }: {
   initialSettings: GlucoseSettings | null;
 }) {
-  const { dict } = useI18n();
+  const { dict, locale } = useI18n();
   const t = dict.glucose;
 
   const [settings, setSettings] = useState<GlucoseSettings | null>(initialSettings);
@@ -176,6 +183,41 @@ export default function GlucoseTracker({
     low: t.statusLow,
     urgent: t.statusUrgent,
   };
+
+  // Sensor lifecycle (LibreLinkUp only; null hides the whole panel). These
+  // recompute on every render, and the 30s clock tick keeps them ticking down
+  // between polls just like the "X min ago" label.
+  const sensor = data?.sensor ?? null;
+  const sensorRemaining = sensor ? sensorRemainingMs(sensor) : 0;
+  const sensorExpired = sensor !== null && sensorRemaining <= 0;
+  const sensorWarmUp = sensor !== null && sensorIsWarmingUp(sensor);
+  const sensorLeft = splitDuration(sensorRemaining);
+  const sensorPct = sensor ? Math.round(sensorRemainingFraction(sensor) * 100) : 0;
+
+  const formatDateTime = (ms: number) =>
+    new Date(ms).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
+  const formatTime = (ms: number) =>
+    new Date(ms).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+
+  // Remaining-life copy: days+hours normally, hours+minutes on the last day.
+  const sensorRemainingLabel = sensorExpired
+    ? t.sensorExpired
+    : sensorLeft.days > 0
+      ? t.sensorRemainingDays
+          .replace("{d}", String(sensorLeft.days))
+          .replace("{h}", String(sensorLeft.hours))
+      : t.sensorRemainingHours
+          .replace("{h}", String(sensorLeft.hours))
+          .replace("{m}", String(sensorLeft.minutes));
+
+  // Bar color tracks urgency: healthy → running out → expired/critical.
+  const sensorBarClass = sensorExpired
+    ? "bg-destructive"
+    : sensorPct <= 10
+      ? "bg-destructive"
+      : sensorPct <= 25
+        ? "bg-amber-500"
+        : "bg-chart-2";
 
   // Convert readings for the chart (respecting the display unit).
   const chartData = useMemo(() => {
@@ -588,6 +630,85 @@ export default function GlucoseTracker({
           {rangeSelector}
         </div>
         <div className="h-[60vh] w-full">{chartContent}</div>
+
+        {/* Sensor panel — activation, expiry and remaining life. Only rendered
+            when the source actually reported a sensor block (LibreLinkUp). */}
+        {sensor && (
+          <section className="mt-4 rounded-2xl bg-sidebar-accent/40 p-4">
+            <div className="flex items-center gap-2">
+              <Cpu className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
+                {t.sensorTitle}
+              </h3>
+              {sensorWarmUp && (
+                <span className="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-amber-950">
+                  {t.sensorWarmingUp}
+                </span>
+              )}
+            </div>
+
+            {/* Remaining life — headline + progress bar */}
+            <div className="mt-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className={`text-sm font-semibold ${sensorExpired ? "text-destructive" : ""}`}
+                >
+                  {sensorRemainingLabel}
+                </span>
+                <span className="shrink-0 text-[10px] tabular-nums text-sidebar-foreground/60">
+                  {sensorPct}%
+                </span>
+              </div>
+              <div
+                className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-sidebar-foreground/10"
+                role="progressbar"
+                aria-valuenow={sensorPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={t.sensorLifeRemaining}
+              >
+                <div
+                  className={`h-full rounded-full transition-all ${sensorBarClass}`}
+                  style={{ width: `${sensorPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Details */}
+            <ul className="mt-3 flex flex-col gap-1.5">
+              <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                  {t.sensorActivated}
+                </span>
+                <span className="shrink-0 tabular-nums font-medium">
+                  {formatDateTime(sensor.activatedAt)}
+                </span>
+              </li>
+              <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                  {t.sensorExpires}
+                </span>
+                <span className="shrink-0 tabular-nums font-medium">
+                  {formatDateTime(sensorExpiresAt(sensor))}
+                </span>
+              </li>
+              {sensor.serialNumber && (
+                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                    {t.sensorSerial}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px]">{sensor.serialNumber}</span>
+                </li>
+              )}
+            </ul>
+
+            {sensorWarmUp && (
+              <p className="mt-2 text-[11px] text-sidebar-foreground/60">
+                {t.sensorWarmUpEnds.replace("{time}", formatTime(sensorWarmUpEndsAt(sensor)))}
+              </p>
+            )}
+          </section>
+        )}
       </Modal>
     </div>
   );
