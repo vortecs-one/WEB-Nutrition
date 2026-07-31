@@ -257,6 +257,17 @@ export default function GlucoseTracker({
     ? t.sensorExpired
     : `${t.sensorTitle}: ${sensorRemainingLabel}`;
 
+  // Label/value rows inside the two side-by-side detail panels. They stack
+  // (label over value) while the panel is narrow — which is the case at two
+  // columns on a phone, where "Activado" + a full timestamp can't share a
+  // line — and go back to label + right-aligned value once it has room.
+  // Keyed off the panel's own width via @container, not the viewport, so it
+  // stays correct however the panels are laid out.
+  const infoRow =
+    "flex flex-col gap-0.5 text-[11px] sm:text-sm @[15rem]:flex-row @[15rem]:items-center @[15rem]:gap-2";
+  const infoLabel = "min-w-0 truncate text-sidebar-foreground/70 @[15rem]:flex-1";
+  const infoValue = "shrink-0 tabular-nums font-medium";
+
   // Convert readings for the chart (respecting the display unit).
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -361,6 +372,29 @@ export default function GlucoseTracker({
           {h === 3 ? t.range3h : h === 6 ? t.range6h : h === 12 ? t.range12h : t.range24h}
         </button>
       ))}
+    </div>
+  );
+
+  // Current-reading pill — big value + unit + trend arrow, tinted by status.
+  // Shared by the compact card header and the detail view header.
+  const readingPill = (
+    <div
+      className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
+    >
+      <div className="flex flex-col items-center leading-none">
+        <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-none">
+          {current ? formatGlucose(current.sgv, unit) : "--"}
+        </span>
+        <span className="mt-0.5 text-xs sm:text-sm font-bold opacity-90">{unitLabel(unit)}</span>
+      </div>
+      {TrendIcon && (
+        <TrendIcon
+          className="h-8 w-8 sm:h-10 sm:w-10 shrink-0"
+          strokeWidth={2.75}
+          role="img"
+          aria-label={current?.direction}
+        />
+      )}
     </div>
   );
 
@@ -597,25 +631,7 @@ export default function GlucoseTracker({
         {/* Header: reading pill + meta on the left, actions on the right */}
         <div className="flex items-start justify-between gap-2" aria-live="polite">
           <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-            {/* Reading pill — keeps the status color (in-range/high/low/urgent) */}
-            <div
-              className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
-            >
-              <div className="flex flex-col items-center leading-none">
-                <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-none">
-                  {current ? formatGlucose(current.sgv, unit) : "--"}
-                </span>
-                <span className="mt-0.5 text-xs sm:text-sm font-bold opacity-90">{unitLabel(unit)}</span>
-              </div>
-              {TrendIcon && (
-                <TrendIcon
-                  className="h-8 w-8 sm:h-10 sm:w-10 shrink-0"
-                  strokeWidth={2.75}
-                  role="img"
-                  aria-label={current?.direction}
-                />
-              )}
-            </div>
+            {readingPill}
             {/* Meta: label + status on one line, then freshness (patient name
                 lives in the detail view) */}
             <div className="min-w-0">
@@ -747,18 +763,40 @@ export default function GlucoseTracker({
         title={t.title}
         size="lg"
       >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {settings.source === "librelinkup" && data?.patientName ? (
-            <div className="flex min-w-0 items-center gap-2">
-              <Users
-                className="h-4 w-4 shrink-0 text-sidebar-foreground/60"
-                aria-hidden="true"
-              />
-              <span className="truncate text-sm font-medium">{data.patientName}</span>
+        {/* Current reading + who/when, then the chart controls. No aria-live
+            here: the card header already announces this value, and a second
+            live region would double-announce while the modal is open. */}
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+            {readingPill}
+            <div className="min-w-0">
+              <div className="truncate text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80">
+                {t.currentReading}
+                {current ? `: ${statusLabel[currentStatus]}` : ""}
+              </div>
+              {current && (
+                <div className="mt-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                  <div className="truncate">
+                    {currentMins === 0
+                      ? t.justNow
+                      : t.lastUpdated.replace("{min}", String(currentMins))}
+                  </div>
+                  {isStale && (
+                    <div className="mt-0.5 flex items-start gap-1 text-destructive">
+                      <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {settings.source === "librelinkup" && data?.patientName && (
+                <div className="mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                  <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{data.patientName}</span>
+                </div>
+              )}
             </div>
-          ) : (
-            <span />
-          )}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {unitSelector}
             {rangeSelector}
@@ -768,10 +806,20 @@ export default function GlucoseTracker({
             band, so the axis labels never spill into a nested scroll. */}
         <div className="aspect-[16/9] max-h-[360px] w-full">{chartContent}</div>
 
+        {/* The two info panels sit side by side — settings left, sensor right.
+            Visual order is set with `order-*`; the DOM keeps sensor first so
+            screen readers still get the read-only status before the controls.
+            Either panel spans the full row when the connection form is open
+            (it needs the width) or when it would otherwise be alone. */}
+        <div className="mt-4 grid grid-cols-2 items-start gap-3">
         {/* Sensor panel — activation, expiry and remaining life. Only rendered
             when the source actually reported a sensor block (LibreLinkUp). */}
         {sensor && (
-          <section className="mt-4 rounded-2xl bg-sidebar-accent/40 p-4">
+          <section
+            className={`@container order-2 rounded-2xl bg-sidebar-accent/40 p-4 ${
+              showConnection ? "col-span-2" : ""
+            }`}
+          >
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
               <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
@@ -786,7 +834,7 @@ export default function GlucoseTracker({
 
             {/* Remaining life — headline + progress bar */}
             <div className="mt-3">
-              <div className="flex items-baseline justify-between gap-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2">
                 <span
                   className={`text-sm font-semibold ${sensorExpired ? "text-destructive" : ""}`}
                 >
@@ -813,25 +861,25 @@ export default function GlucoseTracker({
 
             {/* Details */}
             <ul className="mt-3 flex flex-col gap-1.5">
-              <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+              <li className={infoRow}>
+                <span className={infoLabel}>
                   {t.sensorActivated}
                 </span>
-                <span className="shrink-0 tabular-nums font-medium">
+                <span className={infoValue}>
                   {formatDateTime(sensor.activatedAt)}
                 </span>
               </li>
-              <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+              <li className={infoRow}>
+                <span className={infoLabel}>
                   {t.sensorExpires}
                 </span>
-                <span className="shrink-0 tabular-nums font-medium">
+                <span className={infoValue}>
                   {formatDateTime(sensorExpiresAt(sensor))}
                 </span>
               </li>
               {sensor.serialNumber && (
-                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                <li className={infoRow}>
+                  <span className={infoLabel}>
                     {t.sensorSerial}
                   </span>
                   <span className="shrink-0 font-mono text-[11px]">{sensor.serialNumber}</span>
@@ -851,7 +899,11 @@ export default function GlucoseTracker({
             connection form behind the gear. Always rendered — gating it on
             libreThresholds (null for Nightscout) would leave Nightscout users
             with no way to reach their settings at all. */}
-        <section className="mt-3 rounded-2xl bg-sidebar-accent/40 p-4">
+        <section
+          className={`@container order-1 rounded-2xl bg-sidebar-accent/40 p-4 ${
+            showConnection || !sensor ? "col-span-2" : ""
+          }`}
+        >
           <div className="flex items-center gap-2">
             {libreThresholds && (
               <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
@@ -873,22 +925,22 @@ export default function GlucoseTracker({
           {libreThresholds && (
             <ul className="mt-3 flex flex-col gap-1.5">
               {libreThresholds.targetLow !== null && libreThresholds.targetHigh !== null && (
-                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                <li className={infoRow}>
+                  <span className={infoLabel}>
                     {t.libreTargetRange}
                   </span>
-                  <span className="shrink-0 tabular-nums font-medium">
+                  <span className={infoValue}>
                     {formatGlucose(libreThresholds.targetLow, unit)}–
                     {formatGlucose(libreThresholds.targetHigh, unit)} {unitLabel(unit)}
                   </span>
                 </li>
               )}
               {libreThresholds.highAlarm && (
-                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                <li className={infoRow}>
+                  <span className={infoLabel}>
                     {t.libreHighAlarm}
                   </span>
-                  <span className="shrink-0 tabular-nums font-medium">
+                  <span className={infoValue}>
                     {libreThresholds.highAlarm.enabled ? (
                       <>
                         {formatGlucose(libreThresholds.highAlarm.threshold, unit)} {unitLabel(unit)}
@@ -900,11 +952,11 @@ export default function GlucoseTracker({
                 </li>
               )}
               {libreThresholds.lowAlarm && (
-                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                <li className={infoRow}>
+                  <span className={infoLabel}>
                     {t.libreLowAlarm}
                   </span>
-                  <span className="shrink-0 tabular-nums font-medium">
+                  <span className={infoValue}>
                     {libreThresholds.lowAlarm.enabled ? (
                       <>
                         {formatGlucose(libreThresholds.lowAlarm.threshold, unit)} {unitLabel(unit)}
@@ -937,6 +989,7 @@ export default function GlucoseTracker({
             </div>
           )}
         </section>
+        </div>
       </Modal>
     </div>
   );
