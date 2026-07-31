@@ -13,7 +13,7 @@ import {
   testLibreConnection,
   testNightscoutConnection,
 } from "@/lib/glucose/actions";
-import type { GlucoseSettings, GlucoseSource, GlucoseUnit } from "@/lib/glucose/types";
+import type { GlucoseSettings, GlucoseSource } from "@/lib/glucose/types";
 
 type TestState =
   | { kind: "idle" }
@@ -41,12 +41,9 @@ export default function GlucoseSettingsForm({
   const [libreEmail, setLibreEmail] = useState(settings?.libreEmail ?? "");
   const [librePassword, setLibrePassword] = useState("");
 
-  // Shared display settings
-  const [unit, setUnit] = useState<GlucoseUnit>(settings?.unit ?? "mgdl");
-  const [lowThreshold, setLowThreshold] = useState(settings?.lowThreshold ?? 70);
-  const [highThreshold, setHighThreshold] = useState(settings?.highThreshold ?? 240);
-  const [targetLow, setTargetLow] = useState(settings?.targetLow ?? 70);
-  const [targetHigh, setTargetHigh] = useState(settings?.targetHigh ?? 180);
+  // No display settings here: the unit is toggled from the chart header, and
+  // the alert limits / target range are read from the glucose source itself
+  // (the LibreLink app or the Nightscout site).
 
   const [test, setTest] = useState<TestState>({ kind: "idle" });
   const [saving, setSaving] = useState(false);
@@ -123,11 +120,8 @@ export default function GlucoseSettingsForm({
       nightscoutToken: token || undefined,
       libreEmail: libreEmail || undefined,
       librePassword: librePassword || undefined,
-      unit,
-      lowThreshold,
-      highThreshold,
-      targetLow,
-      targetHigh,
+      // Unit and thresholds intentionally omitted — the server keeps the
+      // stored values, and the source overrides thresholds on each fetch.
     });
     setSaving(false);
     if (result.ok) {
@@ -274,94 +268,11 @@ export default function GlucoseSettingsForm({
           </>
         )}
 
-        {/* Unit toggle */}
-        <fieldset>
-          <legend className={labelClass}>{t.unit}</legend>
-          <div className={pillGroupClass}>
-            {(["mgdl", "mmol"] as const).map((u) => (
-              <button
-                key={u}
-                type="button"
-                onClick={() => setUnit(u)}
-                aria-pressed={unit === u}
-                className={pillClass(unit === u)}
-              >
-                {u === "mgdl" ? t.unitMgdl : t.unitMmol}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* Thresholds */}
-        <div>
-          <div className={labelClass}>{t.thresholds}</div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="ns-low" className={labelClass}>
-                {t.lowThreshold}
-              </label>
-              <input
-                id="ns-low"
-                type="number"
-                min={40}
-                max={120}
-                value={lowThreshold}
-                onChange={(e) => setLowThreshold(Number(e.target.value))}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="ns-high" className={labelClass}>
-                {t.highThreshold}
-              </label>
-              <input
-                id="ns-high"
-                type="number"
-                min={140}
-                max={400}
-                value={highThreshold}
-                onChange={(e) => setHighThreshold(Number(e.target.value))}
-                className={inputClass}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Target range */}
-        <div>
-          <div className={labelClass}>{t.targetRange}</div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="ns-target-low" className={labelClass}>
-                {t.targetLow}
-              </label>
-              <input
-                id="ns-target-low"
-                type="number"
-                min={40}
-                max={150}
-                value={targetLow}
-                onChange={(e) => setTargetLow(Number(e.target.value))}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="ns-target-high" className={labelClass}>
-                {t.targetHigh}
-              </label>
-              <input
-                id="ns-target-high"
-                type="number"
-                min={100}
-                max={300}
-                value={targetHigh}
-                onChange={(e) => setTargetHigh(Number(e.target.value))}
-                className={inputClass}
-              />
-            </div>
-          </div>
-          <p className="mt-1 text-xs text-sidebar-foreground/60">{t.thresholdsHint}</p>
-        </div>
+        {/* Display unit lives in the chart header, and the alert/target ranges
+            come from the source — so this form is connection-only. */}
+        <p className="text-xs text-sidebar-foreground/60 text-pretty">
+          {t.thresholdsFromSource}
+        </p>
 
         {/* Connection test feedback */}
         {test.kind === "ok" && (

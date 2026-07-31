@@ -132,20 +132,56 @@ export async function fetchGlucoseSettings(): Promise<GlucoseSettings | null> {
   return row ? toClientSettings(row) : null;
 }
 
-// Clamp thresholds to sane mg/dL bounds and keep them ordered.
-function clampThresholds(input: {
+type Thresholds = {
   lowThreshold: number;
   highThreshold: number;
   targetLow: number;
   targetHigh: number;
-}) {
+};
+
+// Used only when neither the glucose source nor the stored row supplies a
+// value (e.g. a brand-new row before the first successful fetch).
+const DEFAULT_THRESHOLDS: Thresholds = {
+  lowThreshold: 70,
+  highThreshold: 240,
+  targetLow: 70,
+  targetHigh: 180,
+};
+
+// Clamp thresholds to sane mg/dL bounds and keep them ordered. Any field the
+// caller omits falls back to `fallback`, so this doubles as the merge step for
+// partial threshold sets coming from a glucose source.
+function clampThresholds(
+  input: Partial<Thresholds>,
+  fallback: Thresholds = DEFAULT_THRESHOLDS,
+): Thresholds {
+  const pick = (v: number | null | undefined, f: number) =>
+    typeof v === "number" && Number.isFinite(v) ? v : f;
   const clamp = (v: number, lo: number, hi: number) =>
-    Math.min(hi, Math.max(lo, Math.round(Number(v) || 0)));
-  const lowThreshold = clamp(input.lowThreshold, 40, 120);
-  const highThreshold = clamp(input.highThreshold, 140, 400);
-  const targetLow = clamp(input.targetLow, 40, 150);
-  const targetHigh = clamp(input.targetHigh, Math.max(targetLow + 10, 100), 300);
+    Math.min(hi, Math.max(lo, Math.round(v)));
+  const lowThreshold = clamp(pick(input.lowThreshold, fallback.lowThreshold), 40, 120);
+  const highThreshold = clamp(pick(input.highThreshold, fallback.highThreshold), 140, 400);
+  const targetLow = clamp(pick(input.targetLow, fallback.targetLow), 40, 150);
+  const targetHigh = clamp(
+    pick(input.targetHigh, fallback.targetHigh),
+    Math.max(targetLow + 10, 100),
+    300,
+  );
   return { lowThreshold, highThreshold, targetLow, targetHigh };
+}
+
+/**
+ * Overlays thresholds reported by the glucose source itself onto the stored
+ * ones. The source is authoritative — that's where the user actually
+ * configures their ranges (LibreLink app / Nightscout settings) — and the
+ * stored values only fill in whatever it doesn't report.
+ */
+function withSourceThresholds(
+  settings: GlucoseSettings,
+  source: Partial<Thresholds> | null,
+): GlucoseSettings {
+  if (!source) return settings;
+  return { ...settings, ...clampThresholds(source, settings) };
 }
 
 export type SaveGlucoseSettingsInput = {
@@ -158,12 +194,14 @@ export type SaveGlucoseSettingsInput = {
   // an empty/undefined password keeps the stored one)
   libreEmail?: string;
   librePassword?: string;
-  // Shared display settings
-  unit: GlucoseUnit;
-  lowThreshold: number;
-  highThreshold: number;
-  targetLow: number;
-  targetHigh: number;
+  // Shared display settings. The unit is toggled from the chart header (see
+  // setGlucoseUnit) and thresholds are read from the glucose source, so the
+  // settings form sends none of them. Omitted fields keep the stored value.
+  unit?: GlucoseUnit;
+  lowThreshold?: number;
+  highThreshold?: number;
+  targetLow?: number;
+  targetHigh?: number;
 };
 
 export type SaveGlucoseSettingsResult =
@@ -177,9 +215,16 @@ export async function saveGlucoseSettings(
   const userKey = await getUserKey();
   if (!userKey) return { ok: false, error: "unauthenticated" };
 
-  const thresholds = clampThresholds(input);
-  const unit: GlucoseUnit = input.unit === "mmol" ? "mmol" : "mgdl";
   const existing = await getSettingsRow(userKey);
+  // Omitted unit/thresholds keep whatever is already stored for this user —
+  // the unit is toggled from the chart header, not from this form.
+  const unit: GlucoseUnit =
+    input.unit === "mmol" || input.unit === "mgdl"
+      ? input.unit
+      : existing?.unit === "mmol"
+        ? "mmol"
+        : "mgdl";
+  const thresholds = clampThresholds(input, existing ?? DEFAULT_THRESHOLDS);
 
   const shared = {
     userKey,
@@ -373,6 +418,27 @@ export async function testLibreConnection(input: {
   }
 }
 
+/**
+ * Switches the display unit (mg/dL ↔ mmol/L). Kept separate from
+ * saveGlucoseSettings so the chart header can flip it without re-submitting
+ * credentials or re-validating the connection.
+ */
+export async function setGlucoseUnit(
+  unit: GlucoseUnit,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userKey = await getUserKey();
+  if (!userKey) return { ok: false, error: "unauthenticated" };
+
+  const row = await getSettingsRow(userKey);
+  if (!row) return { ok: false, error: "not-configured" };
+
+  await db
+    .update(glucoseSettings)
+    .set({ unit: unit === "mmol" ? "mmol" : "mgdl", updatedAt: new Date() })
+    .where(eq(glucoseSettings.id, row.id));
+  return { ok: true };
+}
+
 /** Switches the selected LibreLinkUp patient connection. */
 export async function setLibrePatient(
   patientId: string,
@@ -446,6 +512,46 @@ type NightscoutEntry = {
   direction?: string;
 };
 
+// Nightscout publishes the thresholds configured on the site under
+// settings.thresholds in status.json, always in mg/dL.
+type NightscoutStatus = {
+  name?: string;
+  settings?: {
+    thresholds?: {
+      bgHigh?: number;
+      bgTargetTop?: number;
+      bgTargetBottom?: number;
+      bgLow?: number;
+    };
+  };
+};
+
+/**
+ * Reads the site's own alert/target thresholds. Returns null on any failure —
+ * thresholds are a nicety, so a status.json problem must never break the
+ * readings fetch; the caller just falls back to the stored values.
+ */
+async function fetchNightscoutThresholds(
+  base: string,
+  token: string | null,
+): Promise<Partial<Thresholds> | null> {
+  try {
+    const res = await nsFetch(base, "/api/v1/status.json", token);
+    if (!res.ok) return null;
+    const status = (await res.json()) as NightscoutStatus;
+    const t = status.settings?.thresholds;
+    if (!t) return null;
+    return {
+      lowThreshold: t.bgLow,
+      targetLow: t.bgTargetBottom,
+      targetHigh: t.bgTargetTop,
+      highThreshold: t.bgHigh,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // --- Unified data fetch -------------------------------------------------------
 
 /**
@@ -479,10 +585,15 @@ async function fetchFromNightscout(
   const count = String(windowHours * 60);
 
   try {
-    const res = await nsFetch(row.nightscoutUrl, "/api/v1/entries/sgv.json", row.nightscoutToken, {
-      count,
-      "find[date][$gte]": String(since),
-    });
+    // Thresholds come from the site's own settings; fetched alongside the
+    // readings and never allowed to fail the request (see the helper).
+    const [res, sourceThresholds] = await Promise.all([
+      nsFetch(row.nightscoutUrl, "/api/v1/entries/sgv.json", row.nightscoutToken, {
+        count,
+        "find[date][$gte]": String(since),
+      }),
+      fetchNightscoutThresholds(row.nightscoutUrl, row.nightscoutToken),
+    ]);
 
     if (res.status === 401 || res.status === 403) {
       return { ok: false, error: "unauthorized" };
@@ -506,7 +617,7 @@ async function fetchFromNightscout(
       data: {
         current: readings.length > 0 ? readings[readings.length - 1] : null,
         readings,
-        settings: toClientSettings(row),
+        settings: withSourceThresholds(toClientSettings(row), sourceThresholds),
         patientName: null,
         patients: [],
         // Nightscout entries carry no sensor or LibreLink threshold data.
@@ -577,12 +688,29 @@ async function fetchFromLibre(
     const since = Date.now() - windowHours * 3600_000;
     const readings = result.graph.readings.filter((r) => r.date >= since);
 
+    // Abbott's own target range + alarm thresholds drive the in-range colors
+    // and chart bands. The alarm threshold is used whether or not the alarm is
+    // enabled — it's still the configured bound, and the detail view shows the
+    // on/off state separately.
+    const libre = result.graph.thresholds;
+    const sourceThresholds: Partial<Thresholds> | null = libre
+      ? {
+          targetLow: libre.targetLow ?? undefined,
+          targetHigh: libre.targetHigh ?? undefined,
+          lowThreshold: libre.lowAlarm?.threshold,
+          highThreshold: libre.highAlarm?.threshold,
+        }
+      : null;
+
     return {
       ok: true,
       data: {
         current: result.graph.current,
         readings,
-        settings: toClientSettings({ ...row, librePatientId: result.targetId }),
+        settings: withSourceThresholds(
+          toClientSettings({ ...row, librePatientId: result.targetId }),
+          sourceThresholds,
+        ),
         patientName: result.graph.patientName || null,
         patients: result.connections.map((p) => ({
           patientId: p.patientId,

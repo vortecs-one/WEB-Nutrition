@@ -343,7 +343,9 @@ const es = {
     libreLowAlarm: "Alarma baja",
     alarmOff: "Desactivada",
     libreSettingsHint:
-      "Según la configuración de la app LibreLink. Tus propios umbrales de visualización se configuran en Ajustes.",
+      "Leído de la app LibreLink. Estos rangos determinan cuándo una lectura está en rango, alta o baja.",
+    thresholdsFromSource:
+      "Los límites de alerta y el rango objetivo se leen de tu fuente de glucosa, así que no hay nada que configurar aquí.",
     // --- Configuración inicial (independiente de la fuente) ---
     setupTitleGeneric: "Conecta tu fuente de glucosa",
     setupBodyGeneric:

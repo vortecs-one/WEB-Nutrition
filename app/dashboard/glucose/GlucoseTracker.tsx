@@ -8,12 +8,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Settings2,
   AlertTriangle,
   Activity,
   Users,
   Cpu,
   BellRing,
+  Settings2,
   Maximize2,
   ArrowUp,
   ArrowDown,
@@ -25,10 +25,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
+  CartesianGrid,
+  LabelList,
   XAxis,
   YAxis,
   ReferenceLine,
@@ -37,11 +37,12 @@ import {
   Tooltip,
 } from "recharts";
 import { useI18n } from "@/lib/i18n/provider";
-import { fetchGlucoseData, setLibrePatient } from "@/lib/glucose/actions";
+import { fetchGlucoseData, setGlucoseUnit, setLibrePatient } from "@/lib/glucose/actions";
 import {
   type GlucoseData,
   type GlucoseSettings,
   type GlucoseStatus,
+  type GlucoseUnit,
   type TrendDirection,
   formatGlucose,
   glucoseStatus,
@@ -99,8 +100,9 @@ export default function GlucoseTracker({
   const t = dict.glucose;
 
   const [settings, setSettings] = useState<GlucoseSettings | null>(initialSettings);
-  const [showSettings, setShowSettings] = useState(false);
   const [showChart, setShowChart] = useState(false);
+  // Connection form inside the settings panel — collapsed until the gear is used.
+  const [showConnection, setShowConnection] = useState(false);
   const [rangeHours, setRangeHours] = useState<RangeHours>(12);
   const [data, setData] = useState<GlucoseData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +111,7 @@ export default function GlucoseTracker({
   const [, setClockTick] = useState(0);
 
   const [switchingPatient, setSwitchingPatient] = useState(false);
+  const [savingUnit, setSavingUnit] = useState(false);
 
   const rangeRef = useRef<RangeHours>(rangeHours);
   rangeRef.current = rangeHours;
@@ -145,6 +148,28 @@ export default function GlucoseTracker({
       setSwitchingPatient(false);
     },
     [load, switchingPatient],
+  );
+
+  // Switch the display unit. Applied optimistically so the chart and readout
+  // reformat instantly, then persisted; a failed save rolls the toggle back.
+  const handleUnitChange = useCallback(
+    async (next: GlucoseUnit) => {
+      if (savingUnit) return;
+      let previous: GlucoseUnit = "mgdl";
+      setSettings((s) => {
+        if (!s || s.unit === next) return s;
+        previous = s.unit;
+        return { ...s, unit: next };
+      });
+      setSavingUnit(true);
+      const result = await setGlucoseUnit(next);
+      if (!result.ok) {
+        setSettings((s) => (s ? { ...s, unit: previous } : s));
+        setError("unit-change");
+      }
+      setSavingUnit(false);
+    },
+    [savingUnit],
   );
 
   // Initial load + polling (only while the tab is visible).
@@ -242,12 +267,55 @@ export default function GlucoseTracker({
   }, [data, unit]);
 
   const cv = (mgdl: number) => (unit === "mmol" ? mgdlToMmol(mgdl) : mgdl);
-  const yDomain: [number, number] = unit === "mmol" ? [2, 20] : [40, 350];
-  const yTicks =
-    unit === "mmol" ? [4, 8, 12, 16, 20] : [50, 100, 150, 200, 250, 300, 350];
+
+  // Y scale: anchored to a familiar baseline so the curve's shape stays
+  // comparable between sessions, but only as tall as the data needs — a fixed
+  // 40-350 window leaves a third of the plot permanently empty.
+  const yScale = useMemo(() => {
+    const anchorLow = unit === "mmol" ? 2.5 : 40;
+    const anchorHigh = unit === "mmol" ? 14 : 250;
+    const step = unit === "mmol" ? 2 : 50;
+    const pad = unit === "mmol" ? 0.5 : 10;
+
+    const values = chartData.map((d) => d.value);
+    const dataMin = values.length ? Math.min(...values) : anchorLow;
+    const dataMax = values.length ? Math.max(...values) : anchorHigh;
+
+    // Snap outward to whole steps so the ticks stay round numbers.
+    const min = Math.min(anchorLow, Math.floor((dataMin - pad) / step) * step);
+    const max = Math.max(anchorHigh, Math.ceil((dataMax + pad) / step) * step);
+
+    const ticks: number[] = [];
+    for (let v = Math.ceil(min / step) * step; v <= max; v += step) ticks.push(v);
+
+    return { domain: [min, max] as [number, number], ticks };
+  }, [chartData, unit]);
 
   const timeFormatter = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  // Vertical zone gradient: green where the curve is inside the target range,
+  // red outside it. Shared by both charts, which have different y-domains — so
+  // the stops are computed per-domain and each chart gets its own gradient ids
+  // (identical ids would cross-contaminate, since both mount at once).
+  const zoneStopsFor = (min: number, max: number, opacity: number) => {
+    const offset = (mgdl: number) => {
+      const v = (max - cv(mgdl)) / (max - min);
+      return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+    };
+    const offHigh = offset(settings?.targetHigh ?? 180);
+    const offLow = offset(settings?.targetLow ?? 70);
+    return (
+      <>
+        <stop offset={0} stopColor="#ef4444" stopOpacity={opacity} />
+        <stop offset={offHigh} stopColor="#ef4444" stopOpacity={opacity} />
+        <stop offset={offHigh} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
+        <stop offset={offLow} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
+        <stop offset={offLow} stopColor="#ef4444" stopOpacity={opacity} />
+        <stop offset={1} stopColor="#ef4444" stopOpacity={opacity} />
+      </>
+    );
+  };
 
   // Not configured → onboarding card + settings form.
   if (!settings) {
@@ -262,13 +330,7 @@ export default function GlucoseTracker({
             {t.setupBodyGeneric}
           </p>
         </section>
-        <GlucoseSettingsForm
-          settings={null}
-          onSaved={(s) => {
-            setSettings(s);
-            setShowSettings(false);
-          }}
-        />
+        <GlucoseSettingsForm settings={null} onSaved={(s) => setSettings(s)} />
       </div>
     );
   }
@@ -302,6 +364,33 @@ export default function GlucoseTracker({
     </div>
   );
 
+  // Display-unit toggle — sits beside the range selector above the detail
+  // chart, styled to match it.
+  const unitSelector = (
+    <div
+      role="group"
+      aria-label={t.unit}
+      className="flex rounded-full bg-sidebar-accent p-1"
+    >
+      {(["mgdl", "mmol"] as const).map((u) => (
+        <button
+          key={u}
+          type="button"
+          onClick={() => handleUnitChange(u)}
+          aria-pressed={unit === u}
+          disabled={savingUnit}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition disabled:opacity-60 ${
+            unit === u
+              ? "bg-sidebar text-sidebar-foreground shadow-sm"
+              : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+          }`}
+        >
+          {u === "mgdl" ? t.unitMgdl : t.unitMmol}
+        </button>
+      ))}
+    </div>
+  );
+
   // Chart body — fills whatever height its wrapper provides, so the same JSX
   // renders in the compact card (h-64/72) and the expanded popup (h-[60vh]).
   const chartContent =
@@ -314,49 +403,68 @@ export default function GlucoseTracker({
         {t.noData}
       </div>
     ) : (
-      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 256 }}>
-        <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 320 }}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 44, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="glucose-detail-stroke" x1="0" y1="0" x2="0" y2="1">
+              {zoneStopsFor(yScale.domain[0], yScale.domain[1], 1)}
+            </linearGradient>
+            <linearGradient id="glucose-detail-fill" x1="0" y1="0" x2="0" y2="1">
+              {zoneStopsFor(yScale.domain[0], yScale.domain[1], 0.12)}
+            </linearGradient>
+          </defs>
+          {/* Recessive hairline grid — horizontal only, solid (dashes here are
+              reserved for the thresholds, which genuinely are thresholds). */}
+          <CartesianGrid
+            horizontal
+            vertical={false}
+            stroke="currentColor"
+            strokeOpacity={0.08}
+          />
           <XAxis
             dataKey="date"
             type="number"
             domain={["dataMin", "dataMax"]}
             tickFormatter={timeFormatter}
-            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.6 }}
+            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.55 }}
             tickLine={false}
-            axisLine={{ stroke: "currentColor", opacity: 0.2 }}
-            minTickGap={40}
+            axisLine={false}
+            minTickGap={48}
           />
           <YAxis
-            domain={yDomain}
-            ticks={yTicks}
-            width={36}
-            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.6 }}
+            domain={yScale.domain}
+            ticks={yScale.ticks}
+            width={38}
+            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.55 }}
             tickLine={false}
             axisLine={false}
           />
-          {/* Green target band */}
+          {/* Target range band */}
           <ReferenceArea
             y1={cv(settings.targetLow)}
             y2={cv(settings.targetHigh)}
-            fill="var(--color-chart-2)"
-            fillOpacity={0.15}
+            fill="var(--color-lime-500)"
+            fillOpacity={0.08}
             stroke="none"
           />
-          {/* High threshold (orange dashed) */}
+          {/* High threshold (amber dashed) */}
           <ReferenceLine
             y={cv(settings.highThreshold)}
             stroke="#f59e0b"
-            strokeDasharray="6 4"
-            strokeWidth={1.5}
+            strokeDasharray="5 5"
+            strokeOpacity={0.7}
+            strokeWidth={1}
           />
           {/* Low threshold (red dashed) */}
           <ReferenceLine
             y={cv(settings.lowThreshold)}
             stroke="#ef4444"
-            strokeDasharray="6 4"
-            strokeWidth={1.5}
+            strokeDasharray="5 5"
+            strokeOpacity={0.7}
+            strokeWidth={1}
           />
           <Tooltip
+            cursor={{ stroke: "currentColor", strokeOpacity: 0.25, strokeWidth: 1 }}
             formatter={(value) => [`${value} ${unitLabel(unit)}`, ""]}
             labelFormatter={(ms) => timeFormatter(ms as number)}
             contentStyle={{
@@ -366,44 +474,65 @@ export default function GlucoseTracker({
               fontSize: "12px",
             }}
           />
-          <Line
+          <Area
             type="monotone"
             dataKey="value"
-            stroke="currentColor"
-            strokeWidth={2.5}
+            stroke="url(#glucose-detail-stroke)"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="url(#glucose-detail-fill)"
             dot={false}
-            activeDot={{ r: 4 }}
+            activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--color-sidebar)" }}
             isAnimationActive={false}
-          />
-        </LineChart>
+          >
+            {/* Only the latest point is labelled — the axis and tooltip carry
+                the rest, and a value on every point would be unreadable. */}
+            <LabelList
+              dataKey="value"
+              content={(props) => {
+                const { x, y, value, index } = props as {
+                  x?: number; y?: number; value?: number; index?: number;
+                };
+                if (index !== chartData.length - 1) return null;
+                if (typeof x !== "number" || typeof y !== "number") return null;
+                return (
+                  <g>
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={4}
+                      fill="var(--color-sidebar-foreground)"
+                      stroke="var(--color-sidebar)"
+                      strokeWidth={2}
+                    />
+                    <text
+                      x={x + 9}
+                      y={y}
+                      fill="currentColor"
+                      fontSize={12}
+                      fontWeight={600}
+                      dominantBaseline="middle"
+                    >
+                      {value}
+                    </text>
+                  </g>
+                );
+              }}
+            />
+          </Area>
+        </AreaChart>
       </ResponsiveContainer>
     );
 
   // Compact "mountain" chart for the card: a short panoramic area chart with a
-  // tight y-domain so the curve fills the height, colored by zone via a vertical
-  // gradient — green inside the target range, red above/below it. The detailed
-  // popup keeps the full chart (axes, target band, threshold lines).
+  // tight y-domain so the curve fills the height, colored by zone via the same
+  // vertical gradient as the detail chart. The detail popup keeps the full
+  // chart (axes, grid, target band, threshold lines).
   const values = chartData.map((d) => d.value);
   const pad = unit === "mmol" ? 1 : 15;
-  const vMin = values.length ? Math.min(...values) - pad : yDomain[0];
-  const vMax = values.length ? Math.max(...values) + pad : yDomain[1];
-  // Map a glucose value to a 0..1 offset from the top of the plot area.
-  const gradOffset = (mgdl: number) => {
-    const v = (vMax - cv(mgdl)) / (vMax - vMin);
-    return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
-  };
-  const offHigh = gradOffset(settings.targetHigh);
-  const offLow = gradOffset(settings.targetLow);
-  const zoneStops = (opacity: number) => (
-    <>
-      <stop offset={0} stopColor="#ef4444" stopOpacity={opacity} />
-      <stop offset={offHigh} stopColor="#ef4444" stopOpacity={opacity} />
-      <stop offset={offHigh} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
-      <stop offset={offLow} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
-      <stop offset={offLow} stopColor="#ef4444" stopOpacity={opacity} />
-      <stop offset={1} stopColor="#ef4444" stopOpacity={opacity} />
-    </>
-  );
+  const vMin = values.length ? Math.min(...values) - pad : yScale.domain[0];
+  const vMax = values.length ? Math.max(...values) + pad : yScale.domain[1];
 
   const compactChart =
     loading && chartData.length === 0 ? (
@@ -418,11 +547,11 @@ export default function GlucoseTracker({
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 128 }}>
         <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
           <defs>
-            <linearGradient id="glucose-zone-stroke" x1="0" y1="0" x2="0" y2="1">
-              {zoneStops(1)}
+            <linearGradient id="glucose-compact-stroke" x1="0" y1="0" x2="0" y2="1">
+              {zoneStopsFor(vMin, vMax, 1)}
             </linearGradient>
-            <linearGradient id="glucose-zone-fill" x1="0" y1="0" x2="0" y2="1">
-              {zoneStops(0.25)}
+            <linearGradient id="glucose-compact-fill" x1="0" y1="0" x2="0" y2="1">
+              {zoneStopsFor(vMin, vMax, 0.25)}
             </linearGradient>
           </defs>
           <XAxis
@@ -449,9 +578,9 @@ export default function GlucoseTracker({
           <Area
             type="monotone"
             dataKey="value"
-            stroke="url(#glucose-zone-stroke)"
+            stroke="url(#glucose-compact-stroke)"
             strokeWidth={2.5}
-            fill="url(#glucose-zone-fill)"
+            fill="url(#glucose-compact-fill)"
             dot={false}
             activeDot={{ r: 4 }}
             isAnimationActive={false}
@@ -525,21 +654,12 @@ export default function GlucoseTracker({
               )}
             </div>
           </div>
-          {/* Actions: settings + expand chart */}
+          {/* Action: open the detail view (chart, sensor, settings) */}
           <div className="flex shrink-0 gap-1">
             <button
               type="button"
-              onClick={() => setShowSettings((v) => !v)}
-              aria-label={t.settings}
-              aria-expanded={showSettings}
-              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-            >
-              <Settings2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
               onClick={() => setShowChart(true)}
-              aria-label={t.chartTitle}
+              aria-label={t.title}
               className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
             >
               <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
@@ -618,31 +738,16 @@ export default function GlucoseTracker({
         </div>
       )}
 
-      {/* Settings modal */}
-      <Modal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        title={t.settings}
-      >
-        <GlucoseSettingsForm
-          settings={settings}
-          onSaved={(s) => {
-            setSettings(s);
-            setShowSettings(false);
-            setLoading(true);
-            load(rangeRef.current);
-          }}
-        />
-      </Modal>
-
-      {/* History detail popup — larger chart for a detailed view */}
+      {/* Detail popup — full chart, sensor status and all glucose settings.
+          This is the single entry point for the feature (there is no separate
+          settings modal). */}
       <Modal
         isOpen={showChart}
         onClose={() => setShowChart(false)}
-        title={t.chartTitle}
+        title={t.title}
         size="lg"
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           {settings.source === "librelinkup" && data?.patientName ? (
             <div className="flex min-w-0 items-center gap-2">
               <Users
@@ -654,9 +759,14 @@ export default function GlucoseTracker({
           ) : (
             <span />
           )}
-          {rangeSelector}
+          <div className="flex flex-wrap items-center gap-2">
+            {unitSelector}
+            {rangeSelector}
+          </div>
         </div>
-        <div className="h-[60vh] w-full">{chartContent}</div>
+        {/* Wide/rectangular plot box — the aspect ratio includes the x-axis
+            band, so the axis labels never spill into a nested scroll. */}
+        <div className="aspect-[16/9] max-h-[360px] w-full">{chartContent}</div>
 
         {/* Sensor panel — activation, expiry and remaining life. Only rendered
             when the source actually reported a sensor block (LibreLinkUp). */}
@@ -737,18 +847,30 @@ export default function GlucoseTracker({
           </section>
         )}
 
-        {/* Target range + alarms from the patient's LibreLink app. Reference
-            only — the card's in-range colors still follow the thresholds the
-            user sets in this app's own settings. */}
-        {libreThresholds && (
-          <section className="mt-3 rounded-2xl bg-sidebar-accent/40 p-4">
-            <div className="flex items-center gap-2">
+        {/* Settings panel: the ranges/alarms read from the source, plus the
+            connection form behind the gear. Always rendered — gating it on
+            libreThresholds (null for Nightscout) would leave Nightscout users
+            with no way to reach their settings at all. */}
+        <section className="mt-3 rounded-2xl bg-sidebar-accent/40 p-4">
+          <div className="flex items-center gap-2">
+            {libreThresholds && (
               <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
-                {t.libreAppSettingsTitle}
-              </h3>
-            </div>
+            )}
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
+              {settings.source === "librelinkup" ? t.libreAppSettingsTitle : t.settings}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowConnection((v) => !v)}
+              aria-label={t.settings}
+              aria-expanded={showConnection}
+              className="ml-auto -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+            >
+              <Settings2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
 
+          {libreThresholds && (
             <ul className="mt-3 flex flex-col gap-1.5">
               {libreThresholds.targetLow !== null && libreThresholds.targetHigh !== null && (
                 <li className="flex items-center gap-2 text-[11px] sm:text-sm">
@@ -794,10 +916,27 @@ export default function GlucoseTracker({
                 </li>
               )}
             </ul>
+          )}
 
+          {libreThresholds && (
             <p className="mt-2 text-[11px] text-sidebar-foreground/60">{t.libreSettingsHint}</p>
-          </section>
-        )}
+          )}
+
+          {/* Source connection form — revealed by the gear above */}
+          {showConnection && (
+            <div className="mt-3 border-t border-sidebar-foreground/10 pt-3">
+              <GlucoseSettingsForm
+                settings={settings}
+                onSaved={(s) => {
+                  setSettings(s);
+                  setShowConnection(false);
+                  setLoading(true);
+                  load(rangeRef.current);
+                }}
+              />
+            </div>
+          )}
+        </section>
       </Modal>
     </div>
   );

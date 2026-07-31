@@ -337,7 +337,9 @@ const en: Dictionary = {
     libreLowAlarm: "Low alarm",
     alarmOff: "Off",
     libreSettingsHint:
-      "As configured in the LibreLink app. Your own display thresholds are set in Settings.",
+      "Read from the LibreLink app. These ranges decide when a reading counts as in range, high or low.",
+    thresholdsFromSource:
+      "Alert limits and the target range are read from your glucose source, so there's nothing to set here.",
     // --- Setup (source-agnostic) ---
     setupTitleGeneric: "Connect your glucose source",
     setupBodyGeneric:
