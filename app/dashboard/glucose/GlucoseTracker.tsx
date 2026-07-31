@@ -13,6 +13,7 @@ import {
   Activity,
   Users,
   Cpu,
+  BellRing,
   Maximize2,
   ArrowUp,
   ArrowDown,
@@ -50,6 +51,7 @@ import {
   STALE_MINUTES,
   sensorExpiresAt,
   sensorIsWarmingUp,
+  sensorNeedsAttention,
   sensorRemainingFraction,
   sensorRemainingMs,
   sensorWarmUpEndsAt,
@@ -188,6 +190,9 @@ export default function GlucoseTracker({
   // recompute on every render, and the 30s clock tick keeps them ticking down
   // between polls just like the "X min ago" label.
   const sensor = data?.sensor ?? null;
+  // Target range + alarms as configured in the patient's LibreLink app; shown
+  // for reference only, never applied to glucoseStatus().
+  const libreThresholds = data?.libreThresholds ?? null;
   const sensorRemaining = sensor ? sensorRemainingMs(sensor) : 0;
   const sensorExpired = sensor !== null && sensorRemaining <= 0;
   const sensorWarmUp = sensor !== null && sensorIsWarmingUp(sensor);
@@ -218,6 +223,14 @@ export default function GlucoseTracker({
       : sensorPct <= 25
         ? "bg-amber-500"
         : "bg-chart-2";
+
+  // Compact-card warning: only once a sensor change is actually due, so the
+  // card stays quiet for most of the sensor's 14-day life. Distinct from
+  // `isStale` above, which is about reading freshness rather than sensor age.
+  const sensorWarn = sensor !== null && sensorNeedsAttention(sensor);
+  const sensorWarnLabel = sensorExpired
+    ? t.sensorExpired
+    : `${t.sensorTitle}: ${sensorRemainingLabel}`;
 
   // Convert readings for the chart (respecting the display unit).
   const chartData = useMemo(() => {
@@ -496,6 +509,20 @@ export default function GlucoseTracker({
                   )}
                 </div>
               )}
+              {/* Sensor change due — surfaced here so it's visible without
+                  opening the detail view. Deliberately outside the `current`
+                  branch: an expired sensor is exactly why readings stop, so
+                  this has to show when there is no current value either. */}
+              {sensorWarn && (
+                <div
+                  className={`mt-0.5 flex items-start gap-1 ${
+                    sensorExpired ? "text-destructive" : "text-amber-500"
+                  }`}
+                >
+                  <Cpu className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span className="text-[9px] sm:text-[10px]">{sensorWarnLabel}</span>
+                </div>
+              )}
             </div>
           </div>
           {/* Actions: settings + expand chart */}
@@ -707,6 +734,68 @@ export default function GlucoseTracker({
                 {t.sensorWarmUpEnds.replace("{time}", formatTime(sensorWarmUpEndsAt(sensor)))}
               </p>
             )}
+          </section>
+        )}
+
+        {/* Target range + alarms from the patient's LibreLink app. Reference
+            only — the card's in-range colors still follow the thresholds the
+            user sets in this app's own settings. */}
+        {libreThresholds && (
+          <section className="mt-3 rounded-2xl bg-sidebar-accent/40 p-4">
+            <div className="flex items-center gap-2">
+              <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
+                {t.libreAppSettingsTitle}
+              </h3>
+            </div>
+
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {libreThresholds.targetLow !== null && libreThresholds.targetHigh !== null && (
+                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                    {t.libreTargetRange}
+                  </span>
+                  <span className="shrink-0 tabular-nums font-medium">
+                    {formatGlucose(libreThresholds.targetLow, unit)}–
+                    {formatGlucose(libreThresholds.targetHigh, unit)} {unitLabel(unit)}
+                  </span>
+                </li>
+              )}
+              {libreThresholds.highAlarm && (
+                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                    {t.libreHighAlarm}
+                  </span>
+                  <span className="shrink-0 tabular-nums font-medium">
+                    {libreThresholds.highAlarm.enabled ? (
+                      <>
+                        {formatGlucose(libreThresholds.highAlarm.threshold, unit)} {unitLabel(unit)}
+                      </>
+                    ) : (
+                      <span className="text-sidebar-foreground/50">{t.alarmOff}</span>
+                    )}
+                  </span>
+                </li>
+              )}
+              {libreThresholds.lowAlarm && (
+                <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+                  <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+                    {t.libreLowAlarm}
+                  </span>
+                  <span className="shrink-0 tabular-nums font-medium">
+                    {libreThresholds.lowAlarm.enabled ? (
+                      <>
+                        {formatGlucose(libreThresholds.lowAlarm.threshold, unit)} {unitLabel(unit)}
+                      </>
+                    ) : (
+                      <span className="text-sidebar-foreground/50">{t.alarmOff}</span>
+                    )}
+                  </span>
+                </li>
+              )}
+            </ul>
+
+            <p className="mt-2 text-[11px] text-sidebar-foreground/60">{t.libreSettingsHint}</p>
           </section>
         )}
       </Modal>

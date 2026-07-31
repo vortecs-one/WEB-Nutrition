@@ -53,6 +53,24 @@ export type SensorInfo = {
   warmUpMinutes: number;
 };
 
+// A single glucose alarm as configured in the patient's LibreLink app.
+export type LibreAlarm = {
+  enabled: boolean;
+  /** Trigger threshold in mg/dL. */
+  threshold: number;
+};
+
+// Target range + alarm thresholds read from the patient's own LibreLink app.
+// Read-only reference data: these are shown alongside, and never silently
+// override, the display thresholds the user configures in GlucoseSettings.
+export type LibreThresholds = {
+  /** Target range in mg/dL, or null when not reported. */
+  targetLow: number | null;
+  targetHigh: number | null;
+  highAlarm: LibreAlarm | null;
+  lowAlarm: LibreAlarm | null;
+};
+
 // Client-safe settings (secrets intentionally excluded — Nightscout tokens
 // and LibreLinkUp passwords never leave the server; we only tell the client
 // whether they are stored).
@@ -87,6 +105,8 @@ export type GlucoseData = {
   patients: LibrePatientInfo[];
   /** Worn sensor's activation/expiry metadata (LibreLinkUp only). */
   sensor: SensorInfo | null;
+  /** Target range + alarms from the patient's LibreLink app (LibreLinkUp only). */
+  libreThresholds: LibreThresholds | null;
 };
 
 export type GlucoseFetchError =
@@ -192,6 +212,14 @@ export function sensorRemainingFraction(sensor: SensorInfo, now: number = Date.n
 /** True while the sensor is still warming up (worn, but not yet reading). */
 export function sensorIsWarmingUp(sensor: SensorInfo, now: number = Date.now()): boolean {
   return now < sensorWarmUpEndsAt(sensor);
+}
+
+/** Start warning about an upcoming sensor change this far ahead of expiry. */
+export const SENSOR_WARN_MS = 2 * 24 * 3600_000;
+
+/** True once the sensor is expired or close enough that a change is due. */
+export function sensorNeedsAttention(sensor: SensorInfo, now: number = Date.now()): boolean {
+  return sensorRemainingMs(sensor, now) <= SENSOR_WARN_MS;
 }
 
 /** Break a duration into whole days / hours / minutes for display. */

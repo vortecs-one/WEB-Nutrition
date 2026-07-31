@@ -336,6 +336,14 @@ const es = {
     sensorExpired: "Sensor caducado",
     sensorWarmingUp: "Calentando",
     sensorWarmUpEnds: "Las lecturas empiezan a las {time}",
+    // --- Rango objetivo y alarmas leídos de la app LibreLink (solo lectura) ---
+    libreAppSettingsTitle: "Ajustes de LibreLink",
+    libreTargetRange: "Rango objetivo",
+    libreHighAlarm: "Alarma alta",
+    libreLowAlarm: "Alarma baja",
+    alarmOff: "Desactivada",
+    libreSettingsHint:
+      "Según la configuración de la app LibreLink. Tus propios umbrales de visualización se configuran en Ajustes.",
     // --- Configuración inicial (independiente de la fuente) ---
     setupTitleGeneric: "Conecta tu fuente de glucosa",
     setupBodyGeneric:

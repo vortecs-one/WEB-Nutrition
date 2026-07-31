@@ -16,7 +16,13 @@
 
 import "server-only";
 
-import type { GlucoseReading, SensorInfo, TrendDirection } from "./types";
+import type {
+  GlucoseReading,
+  LibreAlarm,
+  LibreThresholds,
+  SensorInfo,
+  TrendDirection,
+} from "./types";
 
 // --- Constants ---------------------------------------------------------------
 
@@ -64,6 +70,8 @@ export type LibreGraphResult = {
   patientName: string;
   /** Worn sensor metadata, or null when the payload doesn't carry it. */
   sensor: SensorInfo | null;
+  /** Target range + alarms from the patient's LibreLink app, or null. */
+  thresholds: LibreThresholds | null;
 };
 
 export class LibreError extends Error {
@@ -181,6 +189,39 @@ const DEFAULT_WARMUP_MINUTES = 60;
 // This rejects a payload whose `a` isn't the epoch-seconds field we expect
 // (e.g. already-ms, or a different unit) rather than rendering a wrong date.
 const MIN_PLAUSIBLE_ACTIVATION = Date.UTC(2015, 0, 1);
+
+// One alarm rule from the connection's alarmRules block:
+//   on = alarm enabled, th = trigger threshold in mg/dL.
+type RawAlarmRule = {
+  on?: boolean;
+  th?: number;
+};
+
+type RawAlarmRules = {
+  /** High-glucose alarm. */
+  h?: RawAlarmRule | null;
+  /** Low-glucose alarm. */
+  l?: RawAlarmRule | null;
+};
+
+// Plausible mg/dL bounds for a target/alarm threshold. A value outside this
+// range isn't the mg/dL field we expect (most likely mmol/L), so it's dropped
+// rather than displayed — the UI hides what it can't trust.
+const MIN_THRESHOLD_MGDL = 40;
+const MAX_THRESHOLD_MGDL = 500;
+
+function plausibleMgdl(value: number | undefined): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  return rounded >= MIN_THRESHOLD_MGDL && rounded <= MAX_THRESHOLD_MGDL ? rounded : null;
+}
+
+function toAlarm(rule: RawAlarmRule | null | undefined): LibreAlarm | null {
+  const threshold = plausibleMgdl(rule?.th);
+  if (threshold === null) return null;
+  // Absent `on` means the alarm is active (Abbott only sends it when toggled).
+  return { enabled: rule?.on !== false, threshold };
+}
 
 function toSensor(s: RawSensor | null | undefined): SensorInfo | null {
   if (!s?.a) return null;
@@ -409,6 +450,10 @@ type GraphResponse = {
       lastName?: string;
       glucoseMeasurement?: RawMeasurement | null;
       sensor?: RawSensor | null;
+      /** Target range in mg/dL, as configured in the patient's LibreLink app. */
+      targetLow?: number;
+      targetHigh?: number;
+      alarmRules?: RawAlarmRules | null;
     };
     /** Alternate placement for the same sensor block in some payloads. */
     activeSensors?: Array<{ sensor?: RawSensor | null }>;
@@ -469,6 +514,18 @@ export async function libreGetGraph(
   const sensor =
     toSensor(connection?.sensor) ?? toSensor(body.data?.activeSensors?.[0]?.sensor);
 
+  // Target range + alarms as set in the patient's own LibreLink app. Reference
+  // data only — the app keeps using the user's configured thresholds to
+  // classify readings. Null when nothing plausible came back.
+  const targetLow = plausibleMgdl(connection?.targetLow);
+  const targetHigh = plausibleMgdl(connection?.targetHigh);
+  const highAlarm = toAlarm(connection?.alarmRules?.h);
+  const lowAlarm = toAlarm(connection?.alarmRules?.l);
+  const thresholds: LibreThresholds | null =
+    targetLow === null && targetHigh === null && !highAlarm && !lowAlarm
+      ? null
+      : { targetLow, targetHigh, highAlarm, lowAlarm };
+
   const patientName = [connection?.firstName, connection?.lastName].filter(Boolean).join(" ");
-  return { current, readings, patientName, sensor };
+  return { current, readings, patientName, sensor, thresholds };
 }

@@ -330,6 +330,14 @@ const en: Dictionary = {
     sensorExpired: "Sensor expired",
     sensorWarmingUp: "Warming up",
     sensorWarmUpEnds: "Readings start at {time}",
+    // --- Target range + alarms read from the LibreLink app (read-only) ---
+    libreAppSettingsTitle: "LibreLink settings",
+    libreTargetRange: "Target range",
+    libreHighAlarm: "High alarm",
+    libreLowAlarm: "Low alarm",
+    alarmOff: "Off",
+    libreSettingsHint:
+      "As configured in the LibreLink app. Your own display thresholds are set in Settings.",
     // --- Setup (source-agnostic) ---
     setupTitleGeneric: "Connect your glucose source",
     setupBodyGeneric:

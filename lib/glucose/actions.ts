@@ -509,8 +509,9 @@ async function fetchFromNightscout(
         settings: toClientSettings(row),
         patientName: null,
         patients: [],
-        // Nightscout entries carry no sensor block.
+        // Nightscout entries carry no sensor or LibreLink threshold data.
         sensor: null,
+        libreThresholds: null,
       },
     };
   } catch {
@@ -589,6 +590,7 @@ async function fetchFromLibre(
           currentMgdl: p.currentMgdl,
         })),
         sensor: result.graph.sensor,
+        libreThresholds: result.graph.thresholds,
       },
     };
   } catch (err) {
