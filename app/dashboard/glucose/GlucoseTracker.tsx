@@ -93,6 +93,17 @@ const statusCard: Record<GlucoseStatus, string> = {
   urgent: "bg-destructive text-destructive-foreground",
 };
 
+// SVG counterpart of statusCard, for the chart's endpoint badge — Tailwind
+// classes can't paint SVG fills, so keep the two in sync by hand.
+// `ink` is chosen against the fill's luminance rather than read from a theme
+// token: the app defines no --destructive-foreground or amber scale.
+const statusBadge: Record<GlucoseStatus, { fill: string; ink: string }> = {
+  "in-range": { fill: "var(--color-chart-2)", ink: "#ffffff" },
+  high: { fill: "var(--color-amber-500)", ink: "#451a03" },
+  low: { fill: "var(--color-amber-500)", ink: "#451a03" },
+  urgent: { fill: "var(--color-destructive)", ink: "#ffffff" },
+};
+
 export default function GlucoseTracker({
   initialSettings,
 }: {
@@ -442,7 +453,7 @@ export default function GlucoseTracker({
       </div>
     ) : (
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 320 }}>
-        <AreaChart data={chartData} margin={{ top: 10, right: 44, bottom: 0, left: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 32, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="glucose-detail-stroke" x1="0" y1="0" x2="0" y2="1">
               {zoneStopsFor(yScale.domain[0], yScale.domain[1], 1)}
@@ -525,7 +536,8 @@ export default function GlucoseTracker({
             isAnimationActive={false}
           >
             {/* Only the latest point is labelled — the axis and tooltip carry
-                the rest, and a value on every point would be unreadable. */}
+                the rest, and a value on every point would be unreadable. The
+                badge is tinted by the same status as the reading pill above. */}
             <LabelList
               dataKey="value"
               content={(props) => {
@@ -534,25 +546,31 @@ export default function GlucoseTracker({
                 };
                 if (index !== chartData.length - 1) return null;
                 if (typeof x !== "number" || typeof y !== "number") return null;
+                const label = String(value);
+                // Grow with the text so a 3-digit mg/dL value and a 4-character
+                // mmol value ("25.3") both clear the edge.
+                const r = Math.max(12, label.length * 3 + 6);
+                const badge = statusBadge[currentStatus];
                 return (
                   <g>
                     <circle
                       cx={x}
                       cy={y}
-                      r={4}
-                      fill="var(--color-sidebar-foreground)"
+                      r={r}
+                      fill={badge.fill}
                       stroke="var(--color-sidebar)"
                       strokeWidth={2}
                     />
                     <text
-                      x={x + 9}
+                      x={x}
                       y={y}
-                      fill="currentColor"
-                      fontSize={12}
-                      fontWeight={600}
-                      dominantBaseline="middle"
+                      fill={badge.ink}
+                      fontSize={11}
+                      fontWeight={700}
+                      textAnchor="middle"
+                      dominantBaseline="central"
                     >
-                      {value}
+                      {label}
                     </text>
                   </g>
                 );
