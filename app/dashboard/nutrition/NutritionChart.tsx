@@ -255,7 +255,9 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     </>
   );
 
-  // Macro row — dashboard card shows percentage only; detail popup adds grams.
+  // Macro row — dashboard card shows the gram quantity; detail popup shows
+  // grams alongside the percentage. The donut itself (slices, center label,
+  // tooltip) stays percentage-based regardless — only this text row changes.
   const renderMacroRow = (d: (typeof data)[number], detailed: boolean) => {
     const pct = Math.round((d.value / total) * 100);
     const grams =
@@ -274,15 +276,15 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
           </span>
         )}
         <span className="shrink-0 font-bold tabular-nums w-10 text-right" style={{ color: colorMap[d.key] ?? "inherit" }}>
-          {pct}%
+          {detailed ? `${pct}%` : grams != null ? `${grams}${t.unitG}` : `${pct}%`}
         </span>
       </li>
     );
   };
 
-  // Extra-nutrient row — percentage only on the card, except sugars (no daily
-  // value defined) which shows its gram value in that same trailing column
-  // instead, so it right-aligns flush with the percentages above it.
+  // Extra-nutrient row — dashboard card shows the quantity; detail popup shows
+  // grams alongside the percentage (blank when no daily value is defined, e.g.
+  // sugars, since its gram figure is already the light span above).
   const renderExtraRow = (n: (typeof extraNutrients)[number], detailed: boolean) => (
     <li key={n.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
       <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
@@ -294,7 +296,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
         </span>
       )}
       <span className="shrink-0 font-semibold tabular-nums w-10 text-right text-sidebar-foreground/70">
-        {n.pct != null ? `${n.pct}%` : !detailed ? `${n.value}${n.unit}` : ""}
+        {detailed ? (n.pct != null ? `${n.pct}%` : "") : `${n.value}${n.unit}`}
       </span>
     </li>
   );
