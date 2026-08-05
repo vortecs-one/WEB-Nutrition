@@ -295,7 +295,7 @@ export default function BarcodeLookup({
       <form onSubmit={onSearch} className="flex">
         <div className="relative flex-1">
           <input
-            className={`${inputClass} pl-[4.5rem] pr-[4.5rem] rounded-b-none`}
+            className={`${inputClass} pl-[4.5rem] pr-[4.5rem] rounded-b-none !border-primary`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
@@ -307,7 +307,7 @@ export default function BarcodeLookup({
             <button
               type="submit"
               disabled={status === "loading" || !barcode.replace(/\D+/g, "")}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition disabled:opacity-50 disabled:hover:bg-transparent"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:text-primary hover:bg-primary/10 transition disabled:opacity-50 disabled:hover:bg-transparent"
               aria-label={t.barcodeSearch}
             >
               {status === "loading" ? (
@@ -377,30 +377,6 @@ export default function BarcodeLookup({
               <div className="flex justify-end gap-1">
                 <button
                   type="button"
-                  onClick={() => setDetailFood(product)}
-                  aria-label={t.viewDetails}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
-                >
-                  <Info className="h-5 w-5" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleSave(product)}
-                  aria-label={productSaved ? dict.common.delete : dict.common.save}
-                  className={`flex h-9 w-9 items-center justify-center rounded-full transition active:scale-95 ${
-                    productSaved
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "text-muted-foreground hover:bg-accent"
-                  }`}
-                >
-                  {productSaved ? (
-                    <Bookmark className="h-5 w-5" aria-hidden="true" />
-                  ) : (
-                    <BookmarkPlus className="h-5 w-5" aria-hidden="true" />
-                  )}
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
                     setProduct(null);
                     setStatus("idle");
@@ -413,9 +389,11 @@ export default function BarcodeLookup({
               </div>
 
               <div className="mt-2 min-w-0">
-                <div className="font-semibold leading-tight text-pretty">{product.name}</div>
+                <div className="text-sm font-semibold leading-tight text-pretty">{product.name}</div>
                 {product.brand && (
-                  <div className="text-sm text-muted-foreground">{product.brand}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {t.brandLabel}: {product.brand}
+                  </div>
                 )}
                 <div className="mt-1 text-xs text-muted-foreground whitespace-nowrap">
                   {t.barcodeLabel}: {product.barcode}
@@ -424,30 +402,44 @@ export default function BarcodeLookup({
             </div>
           </div>
 
+          {/* Basis toggle + info — on one row, always rendered (unlike the
+              toggle pills themselves, which need both bases present) so the
+              info button stays visible even for a product with no nutrition
+              data at all, matching its old guarantee in the top icon row. */}
+          <div className="mt-4 flex items-center gap-2">
+            {hasBasis(product.nutrition, "serving") &&
+              hasBasis(product.nutrition, "100g") && (
+                <div className="inline-flex rounded-xl border border-border p-1">
+                  <button
+                    type="button"
+                    onClick={() => setProductBasis("serving")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${productBasis === "serving" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t.perServing}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductBasis("100g")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${productBasis === "100g" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t.per100g}
+                  </button>
+                </div>
+              )}
+            <button
+              type="button"
+              onClick={() => setDetailFood(product)}
+              aria-label={t.viewDetails}
+              className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+            >
+              <Info className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+
           {previewValues &&
           (hasBasis(product.nutrition, "serving") ||
             hasBasis(product.nutrition, "100g")) ? (
             <>
-              {hasBasis(product.nutrition, "serving") &&
-                hasBasis(product.nutrition, "100g") && (
-                  <div className="mt-4 inline-flex rounded-xl border border-border p-1">
-                    <button
-                      type="button"
-                      onClick={() => setProductBasis("serving")}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${productBasis === "serving" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      {t.perServing}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setProductBasis("100g")}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${productBasis === "100g" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      {t.per100g}
-                    </button>
-                  </div>
-                )}
-
               <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
                 <div className="rounded-xl bg-muted p-2">
                   <dt className="text-[11px] text-muted-foreground">{t.kcal}</dt>
@@ -467,14 +459,32 @@ export default function BarcodeLookup({
                 </div>
               </dl>
 
-              <button
-                type="button"
-                onClick={addProductToCart}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition"
-              >
-                <Plus className="h-5 w-5" aria-hidden="true" />
-                {t.addToMeal}
-              </button>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={addProductToCart}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 min-h-12 text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition"
+                >
+                  <Plus className="h-5 w-5" aria-hidden="true" />
+                  {t.addToMeal}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSave(product)}
+                  className={`flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition active:scale-95 ${
+                    productSaved
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-muted text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {productSaved ? (
+                    <Bookmark className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <BookmarkPlus className="h-5 w-5" aria-hidden="true" />
+                  )}
+                  {productSaved ? dict.common.saved : dict.common.save}
+                </button>
+              </div>
             </>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">{t.noNutritionData}</p>

@@ -7,6 +7,9 @@ const en: Dictionary = {
     panel: "Panel",
     loading: "Loading...",
     save: "Save",
+    // Short status word (button label) — distinct from the full-sentence
+    // confirmations elsewhere (e.g. "Settings saved.").
+    saved: "Saved",
     cancel: "Cancel",
     language: "Language",
     role: "View",
@@ -103,6 +106,7 @@ const en: Dictionary = {
     // Plain "Barcode" label for a found product's detail line — distinct from
     // barcodePlaceholder, which is instructional text for the empty input.
     barcodeLabel: "Barcode",
+    brandLabel: "Brand",
     barcodeSearch: "Search",
     barcodeSearching: "Searching...",
     barcodeNotFound: "No product found for that barcode.",

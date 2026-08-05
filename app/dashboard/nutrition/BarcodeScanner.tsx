@@ -330,7 +330,7 @@ export default function BarcodeScanner({
   }, [active]);
 
   return (
-    <div className="overflow-hidden rounded-t-none rounded-b-2xl border border-border bg-black">
+    <div className="overflow-hidden rounded-t-none rounded-b-2xl border border-primary bg-black">
       {/* Camera viewport */}
       {/* h-40 is sized around the scan rectangle below (h-32) rather than an
           aspect ratio: this box shrinks to w-full on narrow phones, and an

@@ -6,6 +6,9 @@ const es = {
     panel: "Panel",
     loading: "Cargando...",
     save: "Guardar",
+    // Palabra corta de estado (etiqueta de botón) — distinta de las
+    // confirmaciones en frase completa de otras secciones (p. ej. "Settings saved.").
+    saved: "Guardado",
     cancel: "Cancelar",
     language: "Idioma",
     role: "Vista",
@@ -102,6 +105,7 @@ const es = {
     // Etiqueta simple para la línea de detalle de un producto encontrado —
     // distinta de barcodePlaceholder (texto instructivo del input vacío).
     barcodeLabel: "Código de barras",
+    brandLabel: "Marca",
     barcodeSearch: "Buscar",
     barcodeSearching: "Buscando...",
     barcodeNotFound: "No se encontró ningún producto para ese código.",

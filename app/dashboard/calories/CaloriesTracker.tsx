@@ -20,8 +20,8 @@ import { Modal } from "@/components/ui/modal";
 import CalorieGauge from "../nutrition/CalorieGauge";
 import NutritionChart from "../nutrition/NutritionChart";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
-import ActivityLog from "../nutrition/ActivityLog";
 import DietLog from "../nutrition/DietLog";
+import ActivityLog from "../nutrition/ActivityLog";
 import WaterLog, { NitroBottle } from "./WaterLog";
 
 const GAUGE_RANGE = 3000;
@@ -257,7 +257,10 @@ export default function CaloriesTracker() {
         )}
       </div>
 
-      {/* Quick-add food popup — barcode lookup + meal/supplement quick-add */}
+      {/* Quick-add food popup — meal-type quick-launch row above the barcode
+          scanner. The full logged-items history used to render below both of
+          these too; it's now a tab of the composition detail popup instead,
+          so only the icon row (showHistory=false) comes along here. */}
       <Modal
         isOpen={showAddFood}
         onClose={() => setShowAddFood(false)}
@@ -265,9 +268,8 @@ export default function CaloriesTracker() {
       >
         {dateKey && (
           <div className="space-y-5">
+            <DietLog todayKey={dateKey} embedded showHistory={false} />
             <BarcodeLookup todayKey={dateKey} embedded autoStart />
-            {/* Diet log — meal and supplement quick-add, below the scanner */}
-            <DietLog todayKey={dateKey} />
           </div>
         )}
       </Modal>

@@ -583,9 +583,21 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
 
 type DietLogProps = {
   todayKey: string;
+  // When embedded inside another card (e.g. a modal that already provides its
+  // own chrome), drop the outer card box so it reads as a sub-section rather
+  // than a nested card — same convention as BarcodeLookup's `embedded`.
+  embedded?: boolean;
+  // false renders just the meal-type icon row, without the logged meals /
+  // supplements lists below it — for placements that only need the quick-add
+  // launcher (e.g. above the barcode scanner), not the day's full history.
+  showHistory?: boolean;
 };
 
-export default function DietLog({ todayKey }: DietLogProps) {
+export default function DietLog({
+  todayKey,
+  embedded = false,
+  showHistory = true,
+}: DietLogProps) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
 
@@ -632,7 +644,13 @@ export default function DietLog({ todayKey }: DietLogProps) {
 
   return (
     <>
-      <section className="bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5">
+      <section
+        className={
+          embedded
+            ? ""
+            : "bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5"
+        }
+      >
         <div className="grid grid-cols-5 gap-1.5">
           {mealTypes.map(({ type, label, icon: Icon }) => {
             const total = caloriesFor(type);
@@ -677,7 +695,7 @@ export default function DietLog({ todayKey }: DietLogProps) {
           </button>
         </div>
 
-        {meals.length > 0 && (
+        {showHistory && meals.length > 0 && (
           <ul className="mt-4 divide-y divide-border border-t border-border">
             {meals.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-3 py-3">
@@ -713,7 +731,7 @@ export default function DietLog({ todayKey }: DietLogProps) {
           </ul>
         )}
 
-        {supplements.length > 0 && (
+        {showHistory && supplements.length > 0 && (
           <ul className="mt-2 divide-y divide-border border-t border-border">
             {supplements.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 py-3">

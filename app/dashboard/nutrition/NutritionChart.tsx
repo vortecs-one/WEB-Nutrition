@@ -12,13 +12,14 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
+import DietLog from "./DietLog";
 
 // Light-gray palette for this card. All descendants are styled with the
 // `sidebar-*` tokens, so overriding the CSS variables in one place recolors
 // the background, every text opacity, borders, hover states and the donut
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
-  "--sidebar": "#00e808",
+  "--sidebar": "#00e808q",
   "--sidebar-foreground": "#1f2937",
   "--sidebar-accent": "#d1d5db",
   "--foreground": "#1f2937",
@@ -43,6 +44,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   const t = dict.nutritionUser;
   const { dayData } = useDayLog();
   const [showDetail, setShowDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState<"composition" | "log">("composition");
 
   const { meals, activities, supplements } = useMemo(
     () => dayData(dateKey),
@@ -386,27 +388,70 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       <div style={{ ...DARK_MODAL_RESET, display: "contents" }}>
       <Modal
         isOpen={showDetail}
-        onClose={() => setShowDetail(false)}
+        onClose={() => {
+          setShowDetail(false);
+          setActiveTab("composition");
+        }}
         title={t.composition}
         size="md"
       >
-        <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">
-          {t.compositionSubtitle}
-        </p>
-        <div className="flex flex-col items-center gap-4">
-          {total > 0 && renderDonut("aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0")}
-
-          <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
-            {calorieRows}
-            {data.map((d) => renderMacroRow(d, true))}
-
-            {extraNutrients.length > 0 && (
-              <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
-            )}
-
-            {extraNutrients.map((n) => renderExtraRow(n, true))}
-          </ul>
+        {/* Tab switcher — segmented pill matching this modal's own sidebar-toned
+            controls elsewhere (e.g. GlucoseTracker's unit/range selectors),
+            not BarcodeLookup's lighter card-style pill. */}
+        <div
+          role="group"
+          aria-label={t.composition}
+          className="mb-4 flex w-fit rounded-full bg-sidebar-accent p-1"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab("composition")}
+            aria-pressed={activeTab === "composition"}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+              activeTab === "composition"
+                ? "bg-sidebar text-sidebar-foreground shadow-sm"
+                : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            }`}
+          >
+            {t.composition}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("log")}
+            aria-pressed={activeTab === "log"}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+              activeTab === "log"
+                ? "bg-sidebar text-sidebar-foreground shadow-sm"
+                : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            }`}
+          >
+            {t.dietLog}
+          </button>
         </div>
+
+        {activeTab === "composition" ? (
+          <>
+            <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">
+              {t.compositionSubtitle}
+            </p>
+            <div className="flex flex-col items-center gap-4">
+              {total > 0 && renderDonut("aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0")}
+
+              <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
+                {calorieRows}
+                {data.map((d) => renderMacroRow(d, true))}
+
+                {extraNutrients.length > 0 && (
+                  <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
+                )}
+
+                {extraNutrients.map((n) => renderExtraRow(n, true))}
+              </ul>
+            </div>
+          </>
+        ) : (
+          <DietLog todayKey={dateKey} />
+        )}
       </Modal>
       </div>
     </section>
