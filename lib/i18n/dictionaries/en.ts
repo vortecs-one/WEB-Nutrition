@@ -100,6 +100,9 @@ const en: Dictionary = {
     activityLog: "Activity log",
     barcodeTitle: "Add food by barcode",
     barcodePlaceholder: "Enter barcode",
+    // Plain "Barcode" label for a found product's detail line — distinct from
+    // barcodePlaceholder, which is instructional text for the empty input.
+    barcodeLabel: "Barcode",
     barcodeSearch: "Search",
     barcodeSearching: "Searching...",
     barcodeNotFound: "No product found for that barcode.",

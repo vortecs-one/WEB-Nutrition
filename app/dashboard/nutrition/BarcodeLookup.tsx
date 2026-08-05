@@ -345,6 +345,10 @@ export default function BarcodeLookup({
       {/* Current product preview */}
       {product && (
         <div className="rounded-2xl border border-border p-4">
+          {/* Image beside a text column — icons at the column's top (right-
+              aligned), description underneath them. Image is sized a bit
+              taller than the old 72px so it reads as matching the column's
+              height (icon row + three text lines) instead of stopping short. */}
           <div className="flex items-start gap-4">
             {product.image ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -353,64 +357,63 @@ export default function BarcodeLookup({
                 alt={product.name}
                 loading="lazy"
                 className="shrink-0 rounded-xl border border-border object-cover bg-muted"
-                style={{ height: 72, width: 72 }}
+                style={{ height: 96, width: 96 }}
               />
             ) : (
               <div
                 className="flex shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground"
-                style={{ height: 72, width: 72 }}
+                style={{ height: 96, width: 96 }}
               >
                 <Barcode className="h-7 w-7" aria-hidden="true" />
               </div>
             )}
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold leading-tight text-pretty">{product.name}</div>
-                  {product.brand && (
-                    <div className="text-sm text-muted-foreground">{product.brand}</div>
+              <div className="flex justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDetailFood(product)}
+                  aria-label={t.viewDetails}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+                >
+                  <Info className="h-5 w-5" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSave(product)}
+                  aria-label={productSaved ? dict.common.delete : dict.common.save}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full transition active:scale-95 ${
+                    productSaved
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {productSaved ? (
+                    <Bookmark className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <BookmarkPlus className="h-5 w-5" aria-hidden="true" />
                   )}
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {t.barcodePlaceholder}: {product.barcode}
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setDetailFood(product)}
-                    aria-label={t.viewDetails}
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
-                  >
-                    <Info className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleSave(product)}
-                    aria-label={productSaved ? dict.common.delete : dict.common.save}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full transition active:scale-95 ${
-                      productSaved
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "text-muted-foreground hover:bg-accent"
-                    }`}
-                  >
-                    {productSaved ? (
-                      <Bookmark className="h-5 w-5" aria-hidden="true" />
-                    ) : (
-                      <BookmarkPlus className="h-5 w-5" aria-hidden="true" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProduct(null);
-                      setStatus("idle");
-                    }}
-                    aria-label={dict.common.close}
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
-                  >
-                    <X className="h-5 w-5" aria-hidden="true" />
-                  </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProduct(null);
+                    setStatus("idle");
+                  }}
+                  aria-label={dict.common.close}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent active:scale-95 transition"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div className="mt-2 min-w-0">
+                <div className="font-semibold leading-tight text-pretty">{product.name}</div>
+                {product.brand && (
+                  <div className="text-sm text-muted-foreground">{product.brand}</div>
+                )}
+                <div className="mt-1 text-xs text-muted-foreground whitespace-nowrap">
+                  {t.barcodeLabel}: {product.barcode}
                 </div>
               </div>
             </div>
@@ -792,8 +795,8 @@ export default function BarcodeLookup({
                   {detailFood.brand && (
                     <p className="mt-0.5 text-sm text-muted-foreground">{detailFood.brand}</p>
                   )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Barcode: {detailFood.barcode}
+                  <p className="mt-1 text-xs text-muted-foreground whitespace-nowrap">
+                    {t.barcodeLabel}: {detailFood.barcode}
                   </p>
                 </div>
               </div>

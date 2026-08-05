@@ -99,6 +99,9 @@ const es = {
     activityLog: "Registro de actividad",
     barcodeTitle: "Agregar alimento por código de barras",
     barcodePlaceholder: "Ingresa el código de barras",
+    // Etiqueta simple para la línea de detalle de un producto encontrado —
+    // distinta de barcodePlaceholder (texto instructivo del input vacío).
+    barcodeLabel: "Código de barras",
     barcodeSearch: "Buscar",
     barcodeSearching: "Buscando...",
     barcodeNotFound: "No se encontró ningún producto para ese código.",
