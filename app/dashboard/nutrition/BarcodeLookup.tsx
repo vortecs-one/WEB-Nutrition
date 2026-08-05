@@ -287,11 +287,15 @@ export default function BarcodeLookup({
     >
 
 
-      {/* Search */}
+      {/* Search + scanner grouped together (no gap between them) — this pair
+          counts as one child of the outer space-y-4, so the rhythm between
+          this group and whatever comes after (status text, product preview)
+          is unaffected; only the seam between the two is removed. */}
+      <div>
       <form onSubmit={onSearch} className="flex">
         <div className="relative flex-1">
           <input
-            className={`${inputClass} pl-[4.5rem] pr-[4.5rem]`}
+            className={`${inputClass} pl-[4.5rem] pr-[4.5rem] rounded-b-none`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
@@ -334,6 +338,7 @@ export default function BarcodeLookup({
         onDetected={onScanDetected}
         onActivate={() => setScannerOpen(true)}
       />
+      </div>
 
       {status === "not-found" && (
         <p className="text-sm text-muted-foreground">{t.barcodeNotFound}</p>
