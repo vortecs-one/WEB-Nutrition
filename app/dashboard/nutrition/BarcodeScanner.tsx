@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
-import { Loader2, CameraOff, VideoOff, Zap, ZapOff } from "lucide-react";
+import { Loader2, CameraOff, Camera, Zap, ZapOff } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 
 // Product barcodes — restrict to common retail 1D formats for speed.
@@ -49,10 +49,13 @@ type BarcodeDetectorCtor = {
 export default function BarcodeScanner({
   active,
   onDetected,
+  onActivate,
 }: {
   /** When false the camera stream is stopped but the frame stays visible. */
   active: boolean;
   onDetected: (code: string) => void;
+  /** Called when the idle frame is tapped — the parent owns `active`. */
+  onActivate: () => void;
 }) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
@@ -329,14 +332,22 @@ export default function BarcodeScanner({
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-black">
       {/* Camera viewport */}
-      <div className="relative aspect-[16/9] w-full max-w-sm mx-auto">
+      {/* h-40 is sized around the scan rectangle below (h-32) rather than an
+          aspect ratio: this box shrinks to w-full on narrow phones, and an
+          aspect ratio's height would shrink right along with it, risking
+          clipping the fixed-size rectangle. A fixed height doesn't move. */}
+      <div className="relative h-40 w-full max-w-sm mx-auto">
 
-        {/* Idle / camera-off state */}
+        {/* Idle state — the whole frame is the tap target to start scanning */}
         {!active && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
-            <VideoOff className="h-9 w-9 text-white/40" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={onActivate}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center"
+          >
+            <Camera className="h-9 w-9 text-white/40" aria-hidden="true" />
             <p className="text-sm text-white/50 text-pretty">{t.scanBarcode}</p>
-          </div>
+          </button>
         )}
 
         {/* Error state */}
@@ -347,10 +358,15 @@ export default function BarcodeScanner({
           </div>
         )}
 
-        {/* Video — always in the DOM so the ref is always valid */}
+        {/* Video — always in the DOM so the ref is always valid.
+            pointer-events-none matters: opacity < 1 puts this element in its
+            own stacking context at the same paint level as the idle button's
+            position:absolute, and being later in the DOM it would otherwise
+            paint (and hit-test) above that button while invisible, silently
+            swallowing the tap-to-scan click. */}
         <video
           ref={videoRef}
-          className={`h-full w-full object-cover transition-opacity duration-300 ${
+          className={`pointer-events-none h-full w-full object-cover transition-opacity duration-300 ${
             active && !error ? "opacity-100" : "opacity-0"
           }`}
           playsInline
@@ -437,11 +453,6 @@ export default function BarcodeScanner({
           </div>
         )}
       </div>
-
-      {/* Hint text */}
-      <p className="px-4 py-3 text-center text-sm text-white/80 text-pretty">
-        {active && !error ? t.scannerHint : t.scanBarcode}
-      </p>
     </div>
   );
 }

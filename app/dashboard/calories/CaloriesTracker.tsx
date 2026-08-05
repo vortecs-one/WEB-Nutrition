@@ -265,7 +265,7 @@ export default function CaloriesTracker() {
       >
         {dateKey && (
           <div className="space-y-5">
-            <BarcodeLookup todayKey={dateKey} embedded />
+            <BarcodeLookup todayKey={dateKey} embedded autoStart />
             {/* Diet log — meal and supplement quick-add, below the scanner */}
             <DietLog todayKey={dateKey} />
           </div>

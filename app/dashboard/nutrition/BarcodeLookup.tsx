@@ -15,7 +15,6 @@ import {
   Trash2,
   UtensilsCrossed,
   ChevronLeft,
-  Camera,
 } from "lucide-react";
 import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
@@ -68,11 +67,17 @@ function scaledValues(item: CartItem): NutrientValues {
 export default function BarcodeLookup({
   todayKey,
   embedded = false,
+  autoStart = false,
 }: {
   todayKey: string;
   // When embedded inside another card (e.g. the diet log), drop the outer
   // card chrome so it reads as a sub-section rather than a nested card.
   embedded?: boolean;
+  // Start the camera immediately instead of waiting for a tap. Only for
+  // placements gated behind an explicit "scan now" action (e.g. an Add-food
+  // modal) — never for an always-visible section, where it would fire a
+  // camera permission prompt on every page visit.
+  autoStart?: boolean;
 }) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
@@ -89,7 +94,7 @@ export default function BarcodeLookup({
   const [detailFood, setDetailFood] = useState<FoodProduct | null>(null);
   // Track whether the detail view was opened from the saved foods list.
   const [fromSaved, setFromSaved] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(autoStart);
 
   const anyModalOpen = savedOpen || detailFood !== null;
   useScrollLock(anyModalOpen);
@@ -285,7 +290,7 @@ export default function BarcodeLookup({
       <form onSubmit={onSearch} className="flex gap-2">
         <div className="relative flex-1">
           <input
-            className={`${inputClass} pl-[4.5rem] pr-[4.5rem]`}
+            className={`${inputClass} pl-[4.5rem] pr-4`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
@@ -307,21 +312,6 @@ export default function BarcodeLookup({
               )}
             </button>
           </div>
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => setScannerOpen((o) => !o)}
-              aria-pressed={scannerOpen}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition active:scale-95 ${
-                scannerOpen
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
-              aria-label={t.scanBarcode}
-            >
-              <Camera className="h-5 w-5" aria-hidden="true" />
-            </button>
-          </div>
         </div>
         {savedFoods.length > 0 && (
           <button
@@ -336,7 +326,11 @@ export default function BarcodeLookup({
         )}
       </form>
 
-      <BarcodeScanner active={scannerOpen} onDetected={onScanDetected} />
+      <BarcodeScanner
+        active={scannerOpen}
+        onDetected={onScanDetected}
+        onActivate={() => setScannerOpen(true)}
+      />
 
       {status === "not-found" && (
         <p className="text-sm text-muted-foreground">{t.barcodeNotFound}</p>
