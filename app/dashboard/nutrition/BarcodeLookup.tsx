@@ -11,6 +11,7 @@ import {
   X,
   BookmarkPlus,
   Bookmark,
+  Save,
   Info,
   Trash2,
   UtensilsCrossed,
@@ -287,10 +288,10 @@ export default function BarcodeLookup({
 
 
       {/* Search */}
-      <form onSubmit={onSearch} className="flex gap-2">
+      <form onSubmit={onSearch} className="flex">
         <div className="relative flex-1">
           <input
-            className={`${inputClass} pl-[4.5rem] pr-4`}
+            className={`${inputClass} pl-[4.5rem] pr-[4.5rem]`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
@@ -312,18 +313,20 @@ export default function BarcodeLookup({
               )}
             </button>
           </div>
+          {savedFoods.length > 0 && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setSavedOpen((o) => !o)}
+                aria-expanded={savedOpen}
+                aria-label={`${t.savedFoods} (${savedFoods.length})`}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-accent hover:text-accent hover:bg-accent/10 transition active:scale-95"
+              >
+                <Save className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
-        {savedFoods.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSavedOpen((o) => !o)}
-            aria-expanded={savedOpen}
-            aria-label={`${t.savedFoods} (${savedFoods.length})`}
-            className="flex shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground p-3 min-h-12 hover:bg-accent/90 active:scale-[0.98] transition"
-          >
-            <Bookmark className="h-5 w-5" aria-hidden="true" />
-          </button>
-        )}
       </form>
 
       <BarcodeScanner
