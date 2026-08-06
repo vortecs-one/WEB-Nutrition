@@ -20,10 +20,10 @@ import DietLog from "./DietLog";
 // center label at once — no per-element class changes needed.
 const LIGHT_GRAY_CARD: CSSProperties = {
   "--sidebar": "#00e808q",
-  "--sidebar-foreground": "#1f2937",
+  "--sidebar-foreground": "#ffffff",
   "--sidebar-accent": "#d1d5db",
-  "--foreground": "#1f2937",
-  "--muted-foreground": "#6b7280",
+  "--foreground": "#ffffff",
+  "--muted-foreground": "#ffffff",
 } as CSSProperties;
 
 // Restores the app's dark palette for the detail modal, which lives inside
@@ -357,7 +357,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
                 to 0 width. order-* swaps its position only on the mobile row;
                 md:order-1 restores its natural (first) place in the desktop
                 vertical stack. */}
-            {total > 0 && renderDonut("order-2 md:order-1 shrink-0 self-center md:self-auto aspect-square w-[clamp(6rem,27cqi,8.5rem)] md:h-36 md:w-36 md:flex-none")}
+            {total > 0 && renderDonut("order-2 md:order-1 shrink-0 self-center md:self-auto aspect-square w-[clamp(6.5rem,29cqi,9.5rem)] md:h-40 md:w-40 md:flex-none")}
 
             {/* Desktop title — between donut and list; hidden below md */}
             <h2 className={`hidden md:order-2 md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>

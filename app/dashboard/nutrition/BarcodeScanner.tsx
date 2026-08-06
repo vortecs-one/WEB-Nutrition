@@ -384,51 +384,64 @@ export default function BarcodeScanner({
           </div>
         )}
 
-        {/* Scan frame overlay */}
+        {/* Scan frame overlay. The blurred vignette is built from four strips
+            tiling everything OUTSIDE the scan rectangle, rather than one
+            full-bleed blurred layer behind everything — that previous
+            approach put the blur (and the rectangle's own backdrop-blur) right
+            over the barcode itself, exactly where it needs to be sharp to
+            decode. This way the rectangle's own area is never touched by any
+            backdrop-filter, however slight, while the border reads as
+            softly out of focus around it. */}
         {active && !starting && !error && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            {/* Vignette */}
-            <div className="absolute inset-0 bg-black/50" />
+          <div className="pointer-events-none absolute inset-0 flex flex-col">
+            <div className="flex-1 bg-black/50 backdrop-blur-sm" />
+            <div className="flex h-32 shrink-0 items-stretch">
+              <div className="flex-1 bg-black/50 backdrop-blur-sm" />
 
-            {/* Scan rectangle */}
-            <div className="relative z-10 h-32 w-72 max-w-[85%] rounded-2xl bg-black/20 backdrop-blur-[1px]">
-              {/* Corner brackets */}
-              <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
-              <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
-              <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
-              <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
+              {/* Scan rectangle — no blur here; this is exactly where the
+                  barcode needs to stay sharp to decode. */}
+              <div className="relative z-10 h-32 w-72 max-w-[85%] shrink-0 rounded-2xl bg-black/20">
+                {/* Corner brackets */}
+                <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
+                <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
+                <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
+                <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
 
-              {/* Barcode icon */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg
-                  viewBox="0 0 64 40"
-                  className="h-10 w-auto opacity-80"
-                  aria-hidden="true"
-                  fill="white"
-                >
-                  <rect x="0"  width="3" height="40" />
-                  <rect x="5"  width="1" height="40" />
-                  <rect x="8"  width="2" height="40" />
-                  <rect x="12" width="1" height="40" />
-                  <rect x="15" width="3" height="40" />
-                  <rect x="20" width="1" height="40" />
-                  <rect x="23" width="2" height="40" />
-                  <rect x="27" width="1" height="40" />
-                  <rect x="30" width="3" height="40" />
-                  <rect x="35" width="1" height="40" />
-                  <rect x="38" width="2" height="40" />
-                  <rect x="42" width="1" height="40" />
-                  <rect x="45" width="3" height="40" />
-                  <rect x="50" width="1" height="40" />
-                  <rect x="53" width="2" height="40" />
-                  <rect x="57" width="1" height="40" />
-                  <rect x="61" width="3" height="40" />
-                </svg>
+                {/* Barcode icon */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg
+                    viewBox="0 0 64 40"
+                    className="h-10 w-auto opacity-80"
+                    aria-hidden="true"
+                    fill="white"
+                  >
+                    <rect x="0"  width="3" height="40" />
+                    <rect x="5"  width="1" height="40" />
+                    <rect x="8"  width="2" height="40" />
+                    <rect x="12" width="1" height="40" />
+                    <rect x="15" width="3" height="40" />
+                    <rect x="20" width="1" height="40" />
+                    <rect x="23" width="2" height="40" />
+                    <rect x="27" width="1" height="40" />
+                    <rect x="30" width="3" height="40" />
+                    <rect x="35" width="1" height="40" />
+                    <rect x="38" width="2" height="40" />
+                    <rect x="42" width="1" height="40" />
+                    <rect x="45" width="3" height="40" />
+                    <rect x="50" width="1" height="40" />
+                    <rect x="53" width="2" height="40" />
+                    <rect x="57" width="1" height="40" />
+                    <rect x="61" width="3" height="40" />
+                  </svg>
+                </div>
+
+                {/* Animated scan line */}
+                <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-primary/80 shadow-[0_0_6px_2px] shadow-primary/40 animate-[scanline_2s_ease-in-out_infinite]" />
               </div>
 
-              {/* Animated scan line */}
-              <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-primary/80 shadow-[0_0_6px_2px] shadow-primary/40 animate-[scanline_2s_ease-in-out_infinite]" />
+              <div className="flex-1 bg-black/50 backdrop-blur-sm" />
             </div>
+            <div className="flex-1 bg-black/50 backdrop-blur-sm" />
 
             {/* Torch toggle — only shown when the device supports it */}
             {torchSupported && (
