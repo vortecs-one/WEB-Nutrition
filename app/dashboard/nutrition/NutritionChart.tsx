@@ -431,9 +431,6 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
 
         {activeTab === "composition" ? (
           <>
-            <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">
-              {t.compositionSubtitle}
-            </p>
             <div className="flex flex-col items-center gap-4">
               {total > 0 && renderDonut("aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0")}
 

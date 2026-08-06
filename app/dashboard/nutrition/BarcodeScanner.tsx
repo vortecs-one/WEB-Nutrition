@@ -32,9 +32,140 @@ const NATIVE_FORMATS = [
 // is wasteful and can starve the decoder; ~8 attempts/sec is plenty.
 const DECODE_INTERVAL_MS = 120;
 
+// Margin (as a fraction of the guide box's own size) added around it when
+// cropping the video frame for decoding — lets a code held slightly outside
+// the box still decode. Horizontal is wider since the box's width shrinks on
+// narrow phones (`max-w-[85%]`) while its height stays fixed.
+const ROI_MARGIN_X = 0.35;
+const ROI_MARGIN_Y = 0.3;
+const UPSCALE_FACTOR = 2;
+// Every Nth tick, decode the full frame instead of the cropped ROI, in case
+// the user hasn't aligned the barcode to the guide box yet.
+const FULL_FRAME_EVERY_N_TICKS = 5;
+const MIN_CROP_DIMENSION_PX = 20;
+
 const hints = new Map();
 hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
 hints.set(DecodeHintType.TRY_HARDER, true);
+
+// Camera constraint tiers, tried in order. Falling back only on
+// OverconstrainedError — other errors (permission denied, no camera) won't
+// be fixed by loosening resolution and should surface immediately.
+const CONSTRAINT_TIERS: MediaTrackConstraints[] = [
+  {
+    facingMode: { ideal: "environment" },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30, min: 15 },
+  },
+  {
+    facingMode: { ideal: "environment" },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  },
+  { facingMode: { ideal: "environment" } },
+];
+
+async function getCameraStream(): Promise<MediaStream> {
+  let lastErr: unknown;
+  for (const constraints of CONSTRAINT_TIERS) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: constraints,
+        audio: false,
+      });
+    } catch (err) {
+      lastErr = err;
+      if ((err as { name?: string })?.name !== "OverconstrainedError") {
+        throw err;
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// Best-effort autofocus: continuous AF is ideal for barcodes held close to
+// the lens; fall back to a single-shot trigger or a near manual focus
+// distance on devices that don't support continuous mode.
+async function applyBestEffortFocus(track: MediaStreamTrack) {
+  try {
+    const caps = track.getCapabilities?.() as
+      | { focusMode?: string[]; focusDistance?: { min?: number; max?: number } }
+      | undefined;
+    if (!caps?.focusMode) return;
+
+    if (caps.focusMode.includes("continuous")) {
+      await track.applyConstraints({
+        // @ts-expect-error focusMode isn't in the standard TS types yet
+        advanced: [{ focusMode: "continuous" }],
+      });
+    } else if (caps.focusMode.includes("single-shot")) {
+      await track.applyConstraints({
+        // @ts-expect-error focusMode isn't in the standard TS types yet
+        advanced: [{ focusMode: "single-shot" }],
+      });
+    } else if (
+      caps.focusMode.includes("manual") &&
+      typeof caps.focusDistance?.min === "number" &&
+      typeof caps.focusDistance?.max === "number"
+    ) {
+      // MediaTrackCapabilities convention: min = closest focus distance.
+      // Barcodes are scanned at close range, so bias near the near end.
+      const near =
+        caps.focusDistance.min +
+        (caps.focusDistance.max - caps.focusDistance.min) * 0.1;
+      await track.applyConstraints({
+        // @ts-expect-error focusDistance isn't in the standard TS types yet
+        advanced: [{ focusMode: "manual", focusDistance: near }],
+      });
+    }
+  } catch {
+    // Non-fatal — focus tuning is a best-effort enhancement.
+  }
+}
+
+type CropRect = { sx: number; sy: number; sw: number; sh: number };
+
+// Maps the on-screen guide box onto video-intrinsic-pixel coordinates,
+// replicating `object-cover`'s uniform-scale-then-center-crop behavior
+// (default 50%/50% object-position, matching the unstyled <video> here).
+function computeCropRect(
+  video: HTMLVideoElement,
+  guideBox: HTMLDivElement,
+): CropRect | null {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (vw === 0 || vh === 0) return null;
+
+  const videoBox = video.getBoundingClientRect();
+  const rectBox = guideBox.getBoundingClientRect();
+  if (videoBox.width === 0 || videoBox.height === 0) return null;
+
+  const scale = Math.max(videoBox.width / vw, videoBox.height / vh);
+  const offsetX = (vw * scale - videoBox.width) / 2;
+  const offsetY = (vh * scale - videoBox.height) / 2;
+
+  const x0 = (rectBox.left - videoBox.left + offsetX) / scale;
+  const y0 = (rectBox.top - videoBox.top + offsetY) / scale;
+  const x1 = (rectBox.right - videoBox.left + offsetX) / scale;
+  const y1 = (rectBox.bottom - videoBox.top + offsetY) / scale;
+
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w <= 0 || h <= 0) return null;
+
+  const padX = w * ROI_MARGIN_X;
+  const padY = h * ROI_MARGIN_Y;
+
+  const sx = Math.max(0, x0 - padX);
+  const sy = Math.max(0, y0 - padY);
+  const sw = Math.min(vw, x1 + padX) - sx;
+  const sh = Math.min(vh, y1 + padY) - sy;
+
+  if (sw < MIN_CROP_DIMENSION_PX || sh < MIN_CROP_DIMENSION_PX) return null;
+
+  return { sx, sy, sw, sh };
+}
 
 // Minimal typing for the native BarcodeDetector API (not in TS DOM libs yet).
 type NativeBarcode = { rawValue: string };
@@ -61,10 +192,14 @@ export default function BarcodeScanner({
   const t = dict.nutritionUser;
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const rectRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectedRef = useRef(false);
+  const cropRectRef = useRef<CropRect | null>(null);
+  const tickCountRef = useRef(0);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
 
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,21 +240,61 @@ export default function BarcodeScanner({
         }
       }
 
+      const recomputeCropRect = () => {
+        if (!videoRef.current || !rectRef.current) return;
+        cropRectRef.current = computeCropRect(videoRef.current, rectRef.current);
+      };
+
+      recomputeCropRect();
+
+      let resizeDebounce: ReturnType<typeof setTimeout> | null = null;
+      const onResize = () => {
+        if (resizeDebounce) clearTimeout(resizeDebounce);
+        resizeDebounce = setTimeout(recomputeCropRect, 150);
+      };
+      // Layout can lag the orientationchange event on mobile — give it a beat.
+      const onOrientationChange = () => setTimeout(recomputeCropRect, 250);
+
+      window.addEventListener("resize", onResize);
+      window.addEventListener("orientationchange", onOrientationChange);
+      resizeCleanupRef.current = () => {
+        if (resizeDebounce) clearTimeout(resizeDebounce);
+        window.removeEventListener("resize", onResize);
+        window.removeEventListener("orientationchange", onOrientationChange);
+      };
+
       const scheduleNext = () => {
         if (detectedRef.current || !streamRef.current) return;
         timerRef.current = setTimeout(tick, DECODE_INTERVAL_MS);
       };
 
-      const decodeWithZxing = (): string | null => {
+      // Draws either the cropped+upscaled guide-box region or the full frame
+      // into the shared offscreen canvas, for both decode paths to share.
+      const prepareFrame = (useFullFrame: boolean): HTMLCanvasElement | null => {
         const canvas = canvasRef.current;
         const vw = video.videoWidth;
         const vh = video.videoHeight;
         if (!canvas || vw === 0 || vh === 0) return null;
-        canvas.width = vw;
-        canvas.height = vh;
+
+        let sx = 0;
+        let sy = 0;
+        let sw = vw;
+        let sh = vh;
+        let scale = 1;
+        if (!useFullFrame && cropRectRef.current) {
+          ({ sx, sy, sw, sh } = cropRectRef.current);
+          scale = UPSCALE_FACTOR;
+        }
+
+        canvas.width = Math.round(sw * scale);
+        canvas.height = Math.round(sh * scale);
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) return null;
-        ctx.drawImage(video, 0, 0, vw, vh);
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      };
+
+      const decodeWithZxing = (canvas: HTMLCanvasElement): string | null => {
         try {
           const result = reader.decodeFromCanvas(canvas);
           return result.getText();
@@ -141,15 +316,26 @@ export default function BarcodeScanner({
           return;
         }
 
+        if (!cropRectRef.current) recomputeCropRect();
+
+        tickCountRef.current += 1;
+        const useFullFrame =
+          tickCountRef.current % FULL_FRAME_EVERY_N_TICKS === 0;
+        const canvas = prepareFrame(useFullFrame);
+        if (!canvas) {
+          scheduleNext();
+          return;
+        }
+
         try {
           if (nativeDetector) {
-            const codes = await nativeDetector.detect(video);
+            const codes = await nativeDetector.detect(canvas);
             if (codes && codes.length > 0 && codes[0].rawValue) {
               handleFound(codes[0].rawValue);
               return;
             }
           } else {
-            const text = decodeWithZxing();
+            const text = decodeWithZxing(canvas);
             if (text) {
               handleFound(text);
               return;
@@ -172,12 +358,18 @@ export default function BarcodeScanner({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    if (resizeCleanupRef.current) {
+      resizeCleanupRef.current();
+      resizeCleanupRef.current = null;
+    }
     streamRef.current?.getTracks().forEach((tr) => tr.stop());
     streamRef.current = null;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     detectedRef.current = false;
+    cropRectRef.current = null;
+    tickCountRef.current = 0;
     setTorchOn(false);
     setTorchSupported(false);
   }, []);
@@ -224,14 +416,7 @@ export default function BarcodeScanner({
           return;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-          audio: false,
-        });
+        const stream = await getCameraStream();
 
         if (cancelled) {
           stream.getTracks().forEach((tr) => tr.stop());
@@ -240,23 +425,10 @@ export default function BarcodeScanner({
 
         streamRef.current = stream;
 
-        // Ask the camera for continuous autofocus — barcodes are usually held
-        // close to the lens, and without this many Android cameras stay fixed
-        // at infinity focus and never resolve the bars.
-        try {
-          const track = stream.getVideoTracks()[0];
-          const caps = track.getCapabilities?.() as
-            | { focusMode?: string[] }
-            | undefined;
-          if (caps?.focusMode?.includes("continuous")) {
-            await track.applyConstraints({
-              // @ts-expect-error focusMode isn't in the standard TS types yet
-              advanced: [{ focusMode: "continuous" }],
-            });
-          }
-        } catch {
-          // Non-fatal — focus tuning is a best-effort enhancement.
-        }
+        // Ask the camera for its best available autofocus mode — barcodes
+        // are usually held close to the lens, and without this many Android
+        // cameras stay fixed at infinity focus and never resolve the bars.
+        await applyBestEffortFocus(stream.getVideoTracks()[0]);
 
         // Check if the track supports the torch/flashlight constraint.
         try {
@@ -304,6 +476,13 @@ export default function BarcodeScanner({
         // Small delay to let autofocus settle (especially on Android).
         await new Promise((r) => setTimeout(r, 400));
 
+        if (cancelled) return;
+
+        // Re-trigger focus right before scanning starts — a no-op for
+        // continuous mode, but gives single-shot-only devices a fresh AF
+        // sweep timed to when the user is actually about to hold up a code.
+        await applyBestEffortFocus(stream.getVideoTracks()[0]);
+
         if (!cancelled) {
           startDecodeLoop(reader, video);
         }
@@ -330,7 +509,7 @@ export default function BarcodeScanner({
   }, [active]);
 
   return (
-    <div className="overflow-hidden rounded-t-none rounded-b-2xl border border-primary bg-black">
+    <div className="overflow-hidden rounded-t-none rounded-b-xl border border-primary bg-black">
       {/* Camera viewport */}
       {/* h-40 is sized around the scan rectangle below (h-32) rather than an
           aspect ratio: this box shrinks to w-full on narrow phones, and an
@@ -400,7 +579,10 @@ export default function BarcodeScanner({
 
               {/* Scan rectangle — no blur here; this is exactly where the
                   barcode needs to stay sharp to decode. */}
-              <div className="relative z-10 h-32 w-72 max-w-[85%] shrink-0 rounded-2xl bg-black/20">
+              <div
+                ref={rectRef}
+                className="relative z-10 h-32 w-72 max-w-[85%] shrink-0 rounded-2xl bg-black/20"
+              >
                 {/* Corner brackets */}
                 <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
                 <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
