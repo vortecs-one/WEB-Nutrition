@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
-import { Loader2, CameraOff, Camera, Zap, ZapOff } from "lucide-react";
+import { Loader2, CameraOff, Camera, Zap, ZapOff, Plus, Minus } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
+import { normalizeBarcode } from "@/lib/foods/barcode";
 
 // Product barcodes — restrict to common retail 1D formats for speed.
+//
+// ITF is deliberately absent. It is a shipping-carton symbology (ITF-14) that
+// consumer food packaging doesn't use, and ZXing's ITF reader is the single
+// biggest source of phantom reads: with no fixed length and no mandatory check
+// digit it will happily lock onto a *portion* of an EAN-13's bars and return a
+// short number that looks like a real barcode.
 const PRODUCT_FORMATS = [
   BarcodeFormat.EAN_13,
   BarcodeFormat.EAN_8,
@@ -14,7 +21,6 @@ const PRODUCT_FORMATS = [
   BarcodeFormat.UPC_E,
   BarcodeFormat.CODE_128,
   BarcodeFormat.CODE_39,
-  BarcodeFormat.ITF,
 ];
 
 // Native BarcodeDetector format equivalents (Android Chrome / modern browsers).
@@ -25,33 +31,114 @@ const NATIVE_FORMATS = [
   "upc_e",
   "code_128",
   "code_39",
-  "itf",
 ];
 
 // How often to attempt a decode (ms). Running every animation frame (~16ms)
 // is wasteful and can starve the decoder; ~8 attempts/sec is plenty.
 const DECODE_INTERVAL_MS = 120;
 
-// Margin (as a fraction of the guide box's own size) added around it when
-// cropping the video frame for decoding — lets a code held slightly outside
-// the box still decode. Horizontal is wider since the box's width shrinks on
-// narrow phones (`max-w-[85%]`) while its height stays fixed.
-const ROI_MARGIN_X = 0.35;
-const ROI_MARGIN_Y = 0.3;
-const UPSCALE_FACTOR = 2;
+// Forgiveness added around the guide box when cropping, as a fraction of the
+// frame's LARGER dimension — so the pad is isotropic in sensor pixels, which
+// under object-cover's uniform scale is isotropic on screen too.
+//
+// Padding relative to the BOX was the wrong knob: the guide box already covers
+// most of the frame, so a margin proportional to the box scales with the very
+// thing it is meant to pad and saturates at the frame edge. At the previous
+// 0.35/0.30 the "crop" worked out to 95-100% of the frame at every real
+// viewport width — the crop was a no-op, and the upscale that followed it was
+// interpolating a full frame for nothing. Frame-relative padding is bounded by
+// construction and gives constant on-screen forgiveness regardless of box size.
+const ROI_PAD_FRAME = 0.04;
+
+// Normalize the decoded bitmap to a fixed width rather than blindly upscaling:
+// upscale small crops, DOWNSCALE oversized ones. 1280px keeps several pixels
+// on each of an EAN-13's 95 modules — clear of the floor where thin bars start
+// aliasing away — while costing ~9x fewer pixels per tick than drawing the
+// full frame at 2x. It also makes cost independent of stream resolution, so
+// asking the camera for 1440p buys a genuine supersample instead of just work.
+const TARGET_DECODE_WIDTH = 1280;
+const MAX_DECODE_SCALE = 3; // past ~3x it's interpolation, not information
+const MAX_DECODE_PIXELS = 1_600_000; // ceiling for pathological aspect ratios
+
 // Every Nth tick, decode the full frame instead of the cropped ROI, in case
 // the user hasn't aligned the barcode to the guide box yet.
 const FULL_FRAME_EVERY_N_TICKS = 5;
 const MIN_CROP_DIMENSION_PX = 20;
 
+// Some builds construct a BarcodeDetector successfully but reject every
+// detect() call. Give up on it after this many consecutive failures so the
+// ZXing fallback can take over instead of the scanner silently never working.
+const NATIVE_FAILURE_LIMIT = 3;
+
+// Codes that can't be checksum-verified must be seen this many times, within
+// this window, before we act on them.
+const CONFIRMATIONS_REQUIRED = 2;
+const CONFIRM_WINDOW_MS = 1500;
+
+const SUCCESS_VIBRATE_MS = 30;
+const SUCCESS_FLASH_MS = 450;
+const FOCUS_RING_MS = 700;
+// How long to let a forced single-shot sweep run before handing control back
+// to continuous autofocus.
+const FOCUS_HANDBACK_MS = 900;
+// Re-trigger focus after this long with no candidate decode at all.
+const AF_NUDGE_IDLE_MS = 3000;
+
+// Auto-zoom: aim for a modest 1.5x, but never more than 20% into the device's
+// reported range. Beyond ~2x, digital-zoom devices are just upscaling, and
+// optical-zoom devices hand off to a telephoto module whose 30-40cm minimum
+// focus distance makes close-up barcode scanning impossible.
+const AUTO_ZOOM_TARGET = 1.5;
+const AUTO_ZOOM_RANGE_FRACTION = 0.2;
+
 const hints = new Map();
 hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
 hints.set(DecodeHintType.TRY_HARDER, true);
 
+// The camera-control fields below live in the Media Capture extensions and
+// aren't in TypeScript's DOM lib yet. They're declared locally rather than
+// silenced with @ts-expect-error, which would turn into a build ERROR the day
+// TypeScript ships them (an unused expect-error is itself an error, and
+// `next build` type-checks).
+type ExtraConstraintSet = MediaTrackConstraintSet & {
+  torch?: boolean;
+  zoom?: number;
+  focusMode?: "none" | "manual" | "single-shot" | "continuous";
+  focusDistance?: number;
+  pointsOfInterest?: { x: number; y: number }[];
+};
+type ExtraConstraints = MediaTrackConstraints & {
+  resizeMode?: "none" | "crop-and-scale";
+  advanced?: ExtraConstraintSet[];
+};
+// Note MediaSettingsRange has every field optional, so runtime typeof guards
+// on min/max/step are load-bearing, not decorative.
+type ExtraCapabilities = MediaTrackCapabilities & {
+  torch?: boolean;
+  zoom?: MediaSettingsRange;
+  focusMode?: string[];
+  focusDistance?: MediaSettingsRange;
+  pointsOfInterest?: unknown;
+};
+
+type FocusMode = "continuous" | "single-shot" | "manual";
+
 // Camera constraint tiers, tried in order. Falling back only on
 // OverconstrainedError — other errors (permission denied, no camera) won't
 // be fixed by loosening resolution and should surface immediately.
-const CONSTRAINT_TIERS: MediaTrackConstraints[] = [
+//
+// Everything is `ideal`, so the UA silently picks the nearest supported mode
+// rather than throwing; the chain is mostly insurance for facingMode/frameRate
+// on unusual devices. resizeMode "none" asks for the sensor's native output
+// instead of a UA-rescaled one, and is only meaningful on the top tier.
+const CONSTRAINT_TIERS: ExtraConstraints[] = [
+  {
+    facingMode: { ideal: "environment" },
+    width: { ideal: 2560 },
+    height: { ideal: 1440 },
+    frameRate: { ideal: 30, min: 15 },
+    resizeMode: "none",
+  },
   {
     facingMode: { ideal: "environment" },
     width: { ideal: 1920 },
@@ -86,25 +173,28 @@ async function getCameraStream(): Promise<MediaStream> {
 
 // Best-effort autofocus: continuous AF is ideal for barcodes held close to
 // the lens; fall back to a single-shot trigger or a near manual focus
-// distance on devices that don't support continuous mode.
-async function applyBestEffortFocus(track: MediaStreamTrack) {
+// distance on devices that don't support continuous mode. Returns the mode it
+// managed to apply, so the caller knows whether re-triggering is worthwhile.
+async function applyBestEffortFocus(
+  track: MediaStreamTrack,
+): Promise<FocusMode | null> {
   try {
-    const caps = track.getCapabilities?.() as
-      | { focusMode?: string[]; focusDistance?: { min?: number; max?: number } }
-      | undefined;
-    if (!caps?.focusMode) return;
+    const caps = track.getCapabilities?.() as ExtraCapabilities | undefined;
+    if (!caps?.focusMode) return null;
 
     if (caps.focusMode.includes("continuous")) {
       await track.applyConstraints({
-        // @ts-expect-error focusMode isn't in the standard TS types yet
         advanced: [{ focusMode: "continuous" }],
-      });
-    } else if (caps.focusMode.includes("single-shot")) {
+      } as ExtraConstraints);
+      return "continuous";
+    }
+    if (caps.focusMode.includes("single-shot")) {
       await track.applyConstraints({
-        // @ts-expect-error focusMode isn't in the standard TS types yet
         advanced: [{ focusMode: "single-shot" }],
-      });
-    } else if (
+      } as ExtraConstraints);
+      return "single-shot";
+    }
+    if (
       caps.focusMode.includes("manual") &&
       typeof caps.focusDistance?.min === "number" &&
       typeof caps.focusDistance?.max === "number"
@@ -115,60 +205,175 @@ async function applyBestEffortFocus(track: MediaStreamTrack) {
         caps.focusDistance.min +
         (caps.focusDistance.max - caps.focusDistance.min) * 0.1;
       await track.applyConstraints({
-        // @ts-expect-error focusDistance isn't in the standard TS types yet
         advanced: [{ focusMode: "manual", focusDistance: near }],
-      });
+      } as ExtraConstraints);
+      return "manual";
     }
   } catch {
     // Non-fatal — focus tuning is a best-effort enhancement.
   }
+  return null;
+}
+
+// Force a fresh autofocus sweep, optionally at a point of interest.
+//
+// Re-applying focusMode "continuous" does nothing on a device already in
+// continuous mode — the constraint is already satisfied, so no sweep starts.
+// Only a single-shot request actually re-focuses, after which control is
+// handed back to continuous.
+async function retriggerFocus(
+  track: MediaStreamTrack,
+  poi?: { x: number; y: number },
+) {
+  try {
+    const caps = track.getCapabilities?.() as ExtraCapabilities | undefined;
+    if (!caps?.focusMode) return;
+
+    if (poi && caps.pointsOfInterest) {
+      await track.applyConstraints({
+        advanced: [{ pointsOfInterest: [poi] }],
+      } as ExtraConstraints);
+    }
+
+    if (caps.focusMode.includes("single-shot")) {
+      await track.applyConstraints({
+        advanced: [{ focusMode: "single-shot" }],
+      } as ExtraConstraints);
+      if (caps.focusMode.includes("continuous")) {
+        setTimeout(() => void applyBestEffortFocus(track), FOCUS_HANDBACK_MS);
+      }
+      return;
+    }
+
+    if (caps.focusMode.includes("manual")) {
+      await applyBestEffortFocus(track);
+    }
+    // Continuous-only device: nothing to re-trigger, it's already tracking.
+  } catch {
+    // Non-fatal.
+  }
+}
+
+// Pick a conservative zoom level. Taking the min of an absolute target and a
+// range-relative one keeps both a device reporting {min:1,max:100} and one
+// reporting a shallow {min:1,max:2} from overshooting. Anchoring on `min`
+// rather than a literal 1 generalizes to devices that report zoom in percent.
+function pickAutoZoom(min: number, max: number, step?: number): number {
+  const byAbsolute = min * AUTO_ZOOM_TARGET;
+  const byRange = min + (max - min) * AUTO_ZOOM_RANGE_FRACTION;
+  let target = Math.min(byAbsolute, byRange);
+  if (step && step > 0) target = min + Math.round((target - min) / step) * step;
+  return Math.min(max, Math.max(min, target));
+}
+
+type CoverMapping = { scale: number; offsetX: number; offsetY: number };
+
+// The scale/offset `object-fit: cover` applies: uniform scale that fills the
+// rendered box, overflow cropped, centered on both axes (the default
+// object-position of 50% 50% — the <video> sets no object-position utility).
+function computeCoverMapping(
+  video: HTMLVideoElement,
+  videoBox: DOMRect,
+): CoverMapping | null {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (vw === 0 || vh === 0) return null;
+  if (videoBox.width === 0 || videoBox.height === 0) return null;
+
+  const scale = Math.max(videoBox.width / vw, videoBox.height / vh);
+  return {
+    scale,
+    offsetX: (vw * scale - videoBox.width) / 2,
+    offsetY: (vh * scale - videoBox.height) / 2,
+  };
 }
 
 type CropRect = { sx: number; sy: number; sw: number; sh: number };
 
-// Maps the on-screen guide box onto video-intrinsic-pixel coordinates,
-// replicating `object-cover`'s uniform-scale-then-center-crop behavior
-// (default 50%/50% object-position, matching the unstyled <video> here).
+// Maps the on-screen guide box onto video-intrinsic-pixel coordinates.
 function computeCropRect(
   video: HTMLVideoElement,
   guideBox: HTMLDivElement,
 ): CropRect | null {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-  if (vw === 0 || vh === 0) return null;
-
   const videoBox = video.getBoundingClientRect();
-  const rectBox = guideBox.getBoundingClientRect();
-  if (videoBox.width === 0 || videoBox.height === 0) return null;
+  const map = computeCoverMapping(video, videoBox);
+  if (!map) return null;
 
-  const scale = Math.max(videoBox.width / vw, videoBox.height / vh);
-  const offsetX = (vw * scale - videoBox.width) / 2;
-  const offsetY = (vh * scale - videoBox.height) / 2;
+  const rectBox = guideBox.getBoundingClientRect();
+  const { scale, offsetX, offsetY } = map;
 
   const x0 = (rectBox.left - videoBox.left + offsetX) / scale;
   const y0 = (rectBox.top - videoBox.top + offsetY) / scale;
   const x1 = (rectBox.right - videoBox.left + offsetX) / scale;
   const y1 = (rectBox.bottom - videoBox.top + offsetY) / scale;
+  if (x1 <= x0 || y1 <= y0) return null;
 
-  const w = x1 - x0;
-  const h = y1 - y0;
-  if (w <= 0 || h <= 0) return null;
-
-  const padX = w * ROI_MARGIN_X;
-  const padY = h * ROI_MARGIN_Y;
-
-  const sx = Math.max(0, x0 - padX);
-  const sy = Math.max(0, y0 - padY);
-  const sw = Math.min(vw, x1 + padX) - sx;
-  const sh = Math.min(vh, y1 + padY) - sy;
+  const pad = Math.max(vw, vh) * ROI_PAD_FRAME;
+  const sx = Math.max(0, x0 - pad);
+  const sy = Math.max(0, y0 - pad);
+  const sw = Math.min(vw, x1 + pad) - sx;
+  const sh = Math.min(vh, y1 + pad) - sy;
 
   if (sw < MIN_CROP_DIMENSION_PX || sh < MIN_CROP_DIMENSION_PX) return null;
 
   return { sx, sy, sw, sh };
 }
 
+// Un-project a viewport point onto normalized (0..1) video-intrinsic
+// coordinates, which is what pointsOfInterest expects.
+function screenToVideoPoint(
+  video: HTMLVideoElement,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } | null {
+  const videoBox = video.getBoundingClientRect();
+  const map = computeCoverMapping(video, videoBox);
+  if (!map) return null;
+  const { scale, offsetX, offsetY } = map;
+  const x = (clientX - videoBox.left + offsetX) / scale / video.videoWidth;
+  const y = (clientY - videoBox.top + offsetY) / scale / video.videoHeight;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return {
+    x: Math.min(1, Math.max(0, x)),
+    y: Math.min(1, Math.max(0, y)),
+  };
+}
+
+// Scale factor that lands the decoded bitmap near TARGET_DECODE_WIDTH,
+// upscaling small crops and downscaling oversized ones.
+function fitScale(sw: number, sh: number): number {
+  let scale = Math.min(TARGET_DECODE_WIDTH / sw, MAX_DECODE_SCALE);
+  if (sw * sh * scale * scale > MAX_DECODE_PIXELS) {
+    scale = Math.sqrt(MAX_DECODE_PIXELS / (sw * sh));
+  }
+  return scale;
+}
+
+// Map ZXing's format enum onto the same lowercase vocabulary the native
+// BarcodeDetector uses, so barcode validation sees one format namespace.
+function zxingFormatTag(format: BarcodeFormat): string | undefined {
+  switch (format) {
+    case BarcodeFormat.EAN_13:
+      return "ean_13";
+    case BarcodeFormat.EAN_8:
+      return "ean_8";
+    case BarcodeFormat.UPC_A:
+      return "upc_a";
+    case BarcodeFormat.UPC_E:
+      return "upc_e";
+    case BarcodeFormat.CODE_128:
+      return "code_128";
+    case BarcodeFormat.CODE_39:
+      return "code_39";
+    default:
+      return undefined;
+  }
+}
+
 // Minimal typing for the native BarcodeDetector API (not in TS DOM libs yet).
-type NativeBarcode = { rawValue: string };
+type NativeBarcode = { rawValue: string; format?: string };
 type NativeDetector = {
   detect: (source: CanvasImageSource) => Promise<NativeBarcode[]>;
 };
@@ -176,6 +381,8 @@ type BarcodeDetectorCtor = {
   new (options?: { formats?: string[] }): NativeDetector;
   getSupportedFormats?: () => Promise<string[]>;
 };
+
+type ZoomCaps = { min: number; max: number; step: number; unit: number };
 
 export default function BarcodeScanner({
   active,
@@ -193,28 +400,83 @@ export default function BarcodeScanner({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const rectRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const roiCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fullCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectedRef = useRef(false);
   const cropRectRef = useRef<CropRect | null>(null);
   const tickCountRef = useRef(0);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const focusModeRef = useRef<FocusMode | null>(null);
+  const lastActivityRef = useRef(0);
+  // Pending confirmation for codes that couldn't be checksum-verified.
+  const pendingCodeRef = useRef<string | null>(null);
+  const pendingCountRef = useRef(0);
+  const pendingSeenAtRef = useRef(0);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusRingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusSeqRef = useRef(0);
 
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [zoomCaps, setZoomCaps] = useState<ZoomCaps | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [flash, setFlash] = useState(false);
+  const [focusPoint, setFocusPoint] = useState<{
+    x: number;
+    y: number;
+    id: number;
+  } | null>(null);
 
-  // Fire the detection callback exactly once, then tear down the stream.
+  // Validate a raw decode, then either accept it (tearing down the stream and
+  // firing the callback exactly once) or hold it pending confirmation.
+  // Returns whether the code was accepted.
   const handleFound = useCallback(
-    (raw: string) => {
-      const text = raw.replace(/\D+/g, "");
-      if (!text || detectedRef.current) return;
+    (raw: string, format?: string): boolean => {
+      if (detectedRef.current) return false;
+
+      const norm = normalizeBarcode(raw, format);
+      if (!norm) return false;
+
+      // Any plausible decode means the optics are working — hold off the
+      // autofocus nudge even if this code isn't accepted yet.
+      const now = Date.now();
+      lastActivityRef.current = now;
+
+      if (!norm.trusted) {
+        const stale = now - pendingSeenAtRef.current > CONFIRM_WINDOW_MS;
+        if (pendingCodeRef.current !== norm.code || stale) {
+          pendingCodeRef.current = norm.code;
+          pendingCountRef.current = 1;
+        } else {
+          pendingCountRef.current += 1;
+        }
+        pendingSeenAtRef.current = now;
+        if (pendingCountRef.current < CONFIRMATIONS_REQUIRED) return false;
+      }
+
       detectedRef.current = true;
+
+      // navigator.vibrate is undefined on iOS Safari and returns false rather
+      // than throwing when a browser suppresses it; the guard covers both.
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+        try {
+          navigator.vibrate(SUCCESS_VIBRATE_MS);
+        } catch {
+          // Non-fatal.
+        }
+      }
+      setFlash(true);
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = setTimeout(() => setFlash(false), SUCCESS_FLASH_MS);
+
       streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = null;
-      onDetected(text);
+      onDetected(norm.code);
+      return true;
     },
     [onDetected],
   );
@@ -223,12 +485,9 @@ export default function BarcodeScanner({
   // Android Chrome / WebView); falls back to ZXing canvas decoding elsewhere.
   const startDecodeLoop = useCallback(
     (reader: BrowserMultiFormatReader, video: HTMLVideoElement) => {
-      if (!canvasRef.current) {
-        canvasRef.current = document.createElement("canvas");
-      }
-
       // Try to build a native detector if the platform supports it.
       let nativeDetector: NativeDetector | null = null;
+      let nativeFailures = 0;
       const Ctor = (
         globalThis as unknown as { BarcodeDetector?: BarcodeDetectorCtor }
       ).BarcodeDetector;
@@ -239,6 +498,24 @@ export default function BarcodeScanner({
           nativeDetector = null;
         }
       }
+
+      // willReadFrequently is only honored on the first getContext call for a
+      // canvas, so it has to be decided once, up front. ZXing reads pixels
+      // back via getImageData and wants it; the native detector consumes the
+      // canvas as an image source, where forcing a software-backed canvas
+      // would only make the drawImage downscale slower.
+      const wantReadback = !nativeDetector;
+      const ensure = (ref: React.MutableRefObject<HTMLCanvasElement | null>) => {
+        if (!ref.current) ref.current = document.createElement("canvas");
+        const canvas = ref.current;
+        const ctx = canvas.getContext(
+          "2d",
+          wantReadback ? { willReadFrequently: true } : undefined,
+        );
+        return { canvas, ctx };
+      };
+      const roi = ensure(roiCanvasRef);
+      const full = ensure(fullCanvasRef);
 
       const recomputeCropRect = () => {
         if (!videoRef.current || !rectRef.current) return;
@@ -257,10 +534,23 @@ export default function BarcodeScanner({
 
       window.addEventListener("resize", onResize);
       window.addEventListener("orientationchange", onOrientationChange);
+
+      // The viewport is `w-full max-w-sm` inside a modal or card, so its width
+      // changes without any window resize — the product preview mounting, the
+      // saved-foods button appearing, a mobile URL bar collapsing. Observe the
+      // elements themselves, not just the window.
+      let ro: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== "undefined") {
+        ro = new ResizeObserver(onResize);
+        ro.observe(video);
+        if (rectRef.current) ro.observe(rectRef.current);
+      }
+
       resizeCleanupRef.current = () => {
         if (resizeDebounce) clearTimeout(resizeDebounce);
         window.removeEventListener("resize", onResize);
         window.removeEventListener("orientationchange", onOrientationChange);
+        ro?.disconnect();
       };
 
       const scheduleNext = () => {
@@ -268,36 +558,48 @@ export default function BarcodeScanner({
         timerRef.current = setTimeout(tick, DECODE_INTERVAL_MS);
       };
 
-      // Draws either the cropped+upscaled guide-box region or the full frame
-      // into the shared offscreen canvas, for both decode paths to share.
+      // Draw either the cropped guide-box region or the whole frame into an
+      // offscreen canvas, normalized to a consistent decode size.
       const prepareFrame = (useFullFrame: boolean): HTMLCanvasElement | null => {
-        const canvas = canvasRef.current;
         const vw = video.videoWidth;
         const vh = video.videoHeight;
-        if (!canvas || vw === 0 || vh === 0) return null;
+        if (vw === 0 || vh === 0) return null;
 
-        let sx = 0;
-        let sy = 0;
-        let sw = vw;
-        let sh = vh;
-        let scale = 1;
-        if (!useFullFrame && cropRectRef.current) {
-          ({ sx, sy, sw, sh } = cropRectRef.current);
-          scale = UPSCALE_FACTOR;
-        }
+        const crop = useFullFrame ? null : cropRectRef.current;
+        const sx = crop?.sx ?? 0;
+        const sy = crop?.sy ?? 0;
+        const sw = crop?.sw ?? vw;
+        const sh = crop?.sh ?? vh;
 
-        canvas.width = Math.round(sw * scale);
-        canvas.height = Math.round(sh * scale);
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const target = crop ? roi : full;
+        const { canvas, ctx } = target;
         if (!ctx) return null;
-        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+        const scale = fitScale(sw, sh);
+        const w = Math.round(sw * scale);
+        const h = Math.round(sh * scale);
+        // Assigning width/height reallocates the backing store and resets all
+        // 2D state, so only do it when the size actually changed.
+        if (canvas.width !== w) canvas.width = w;
+        if (canvas.height !== h) canvas.height = h;
+
+        // We are usually downsampling now, and a naive reduction can drop the
+        // narrowest bars entirely.
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
         return canvas;
       };
 
-      const decodeWithZxing = (canvas: HTMLCanvasElement): string | null => {
+      const decodeWithZxing = (
+        canvas: HTMLCanvasElement,
+      ): { text: string; format?: string } | null => {
         try {
           const result = reader.decodeFromCanvas(canvas);
-          return result.getText();
+          return {
+            text: result.getText(),
+            format: zxingFormatTag(result.getBarcodeFormat()),
+          };
         } catch (err) {
           // NotFoundException just means no barcode in this frame — expected.
           if (!(err instanceof NotFoundException)) {
@@ -316,6 +618,9 @@ export default function BarcodeScanner({
           return;
         }
 
+        // Self-heal: the guide box may not have been mounted when the loop
+        // started. Once measured it's cached until the next resize, so this
+        // doesn't put a layout read on the hot path.
         if (!cropRectRef.current) recomputeCropRect();
 
         tickCountRef.current += 1;
@@ -330,24 +635,42 @@ export default function BarcodeScanner({
         try {
           if (nativeDetector) {
             const codes = await nativeDetector.detect(canvas);
-            if (codes && codes.length > 0 && codes[0].rawValue) {
-              handleFound(codes[0].rawValue);
-              return;
-            }
+            nativeFailures = 0;
+            const hit = codes?.[0];
+            if (hit?.rawValue && handleFound(hit.rawValue, hit.format)) return;
           } else {
-            const text = decodeWithZxing(canvas);
-            if (text) {
-              handleFound(text);
-              return;
-            }
+            const hit = decodeWithZxing(canvas);
+            if (hit && handleFound(hit.text, hit.format)) return;
           }
         } catch (err) {
           console.error("BarcodeScanner detect error:", err);
+          if (nativeDetector && ++nativeFailures >= NATIVE_FAILURE_LIMIT) {
+            // This platform's BarcodeDetector constructs but doesn't work.
+            // Hand the rest of the session to ZXing.
+            console.warn(
+              "BarcodeScanner: native BarcodeDetector failing, falling back to ZXing",
+            );
+            nativeDetector = null;
+          }
+        }
+
+        // No usable read for a while — nudge focus. Skipped on continuous-AF
+        // devices, which are already re-focusing; forcing a single-shot there
+        // just makes the preview visibly hunt.
+        const now = Date.now();
+        if (
+          focusModeRef.current !== "continuous" &&
+          now - lastActivityRef.current > AF_NUDGE_IDLE_MS
+        ) {
+          lastActivityRef.current = now;
+          const track = streamRef.current?.getVideoTracks()[0];
+          if (track) void retriggerFocus(track);
         }
 
         scheduleNext();
       };
 
+      lastActivityRef.current = Date.now();
       void tick();
     },
     [handleFound],
@@ -357,6 +680,14 @@ export default function BarcodeScanner({
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+    if (flashTimerRef.current) {
+      clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = null;
+    }
+    if (focusRingTimerRef.current) {
+      clearTimeout(focusRingTimerRef.current);
+      focusRingTimerRef.current = null;
     }
     if (resizeCleanupRef.current) {
       resizeCleanupRef.current();
@@ -370,8 +701,16 @@ export default function BarcodeScanner({
     detectedRef.current = false;
     cropRectRef.current = null;
     tickCountRef.current = 0;
+    focusModeRef.current = null;
+    pendingCodeRef.current = null;
+    pendingCountRef.current = 0;
+    pendingSeenAtRef.current = 0;
     setTorchOn(false);
     setTorchSupported(false);
+    setZoomCaps(null);
+    setZoom(null);
+    setFlash(false);
+    setFocusPoint(null);
   }, []);
 
   const toggleTorch = useCallback(async () => {
@@ -380,15 +719,60 @@ export default function BarcodeScanner({
     const next = !torchOn;
     try {
       await track.applyConstraints({
-        // @ts-expect-error torch is not in standard TS types yet
         advanced: [{ torch: next }],
-      });
+      } as ExtraConstraints);
       setTorchOn(next);
     } catch {
       // Device reported torch support but failed — hide the button.
       setTorchSupported(false);
     }
   }, [torchOn]);
+
+  const stepZoom = useCallback(
+    async (direction: 1 | -1) => {
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (!track || !zoomCaps || zoom === null) return;
+      // Step linearly in device units; multiplicative stepping breaks on a
+      // device that reports min: 0.
+      const raw = zoom + direction * zoomCaps.unit * 0.25;
+      const snapped =
+        zoomCaps.step > 0
+          ? zoomCaps.min +
+            Math.round((raw - zoomCaps.min) / zoomCaps.step) * zoomCaps.step
+          : raw;
+      const next = Math.min(zoomCaps.max, Math.max(zoomCaps.min, snapped));
+      if (next === zoom) return;
+      try {
+        await track.applyConstraints({
+          advanced: [{ zoom: next }],
+        } as ExtraConstraints);
+        setZoom(next);
+      } catch {
+        setZoomCaps(null);
+      }
+    },
+    [zoom, zoomCaps],
+  );
+
+  const onTapFocus = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const host = e.currentTarget.getBoundingClientRect();
+    focusSeqRef.current += 1;
+    setFocusPoint({
+      x: e.clientX - host.left,
+      y: e.clientY - host.top,
+      id: focusSeqRef.current,
+    });
+    if (focusRingTimerRef.current) clearTimeout(focusRingTimerRef.current);
+    focusRingTimerRef.current = setTimeout(
+      () => setFocusPoint(null),
+      FOCUS_RING_MS,
+    );
+
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !videoRef.current) return;
+    const poi = screenToVideoPoint(videoRef.current, e.clientX, e.clientY);
+    void retriggerFocus(track, poi ?? undefined);
+  }, []);
 
   useEffect(() => {
     if (!active) {
@@ -424,23 +808,43 @@ export default function BarcodeScanner({
         }
 
         streamRef.current = stream;
+        const track = stream.getVideoTracks()[0];
 
         // Ask the camera for its best available autofocus mode — barcodes
         // are usually held close to the lens, and without this many Android
         // cameras stay fixed at infinity focus and never resolve the bars.
-        await applyBestEffortFocus(stream.getVideoTracks()[0]);
+        focusModeRef.current = await applyBestEffortFocus(track);
 
-        // Check if the track supports the torch/flashlight constraint.
-        try {
-          const track = stream.getVideoTracks()[0];
-          const caps = track.getCapabilities?.() as
-            | { torch?: boolean }
-            | undefined;
-          if (caps?.torch) {
-            setTorchSupported(true);
+        const caps = track.getCapabilities?.() as ExtraCapabilities | undefined;
+
+        if (caps?.torch) setTorchSupported(true);
+
+        // Zoom, in its own applyConstraints call: an `advanced` set is applied
+        // atomically, so bundling zoom with focus means one unsupported key
+        // silently kills both.
+        const zc = caps?.zoom;
+        if (
+          zc &&
+          typeof zc.min === "number" &&
+          typeof zc.max === "number" &&
+          zc.max > zc.min
+        ) {
+          const step = typeof zc.step === "number" && zc.step > 0 ? zc.step : 0;
+          const unit = zc.min > 0 ? zc.min : 1;
+          const auto = pickAutoZoom(zc.min, zc.max, step || undefined);
+          try {
+            await track.applyConstraints({
+              advanced: [{ zoom: auto }],
+            } as ExtraConstraints);
+          } catch {
+            // Zoom advertised but not applicable — the control still works.
           }
-        } catch {
-          // Non-fatal.
+          if (!cancelled) {
+            setZoomCaps({ min: zc.min, max: zc.max, step, unit });
+            // Trust what the track actually settled on over what we asked for.
+            const applied = (track.getSettings() as MediaTrackSettings).zoom;
+            setZoom(typeof applied === "number" ? applied : auto);
+          }
         }
 
         const video = videoRef.current!;
@@ -478,10 +882,9 @@ export default function BarcodeScanner({
 
         if (cancelled) return;
 
-        // Re-trigger focus right before scanning starts — a no-op for
-        // continuous mode, but gives single-shot-only devices a fresh AF
-        // sweep timed to when the user is actually about to hold up a code.
-        await applyBestEffortFocus(stream.getVideoTracks()[0]);
+        // Re-assert focus after the zoom change — switching zoom can move the
+        // lens (or hand off to another module entirely) and reset focus mode.
+        focusModeRef.current = await applyBestEffortFocus(track);
 
         if (!cancelled) {
           startDecodeLoop(reader, video);
@@ -508,14 +911,24 @@ export default function BarcodeScanner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
+  const zoomLabel =
+    zoomCaps && zoom !== null ? `${(zoom / zoomCaps.unit).toFixed(1)}×` : null;
+
   return (
     <div className="overflow-hidden rounded-t-none rounded-b-xl border border-primary bg-black">
       {/* Camera viewport */}
-      {/* h-40 is sized around the scan rectangle below (h-32) rather than an
-          aspect ratio: this box shrinks to w-full on narrow phones, and an
-          aspect ratio's height would shrink right along with it, risking
-          clipping the fixed-size rectangle. A fixed height doesn't move. */}
-      <div className="relative h-40 w-full max-w-sm mx-auto">
+      {/* h-60 (240px) is sized around the scan rectangle below (h-36 = 144px)
+          plus a 48px vignette strip above and below, rather than an aspect
+          ratio: this box shrinks to w-full on narrow phones, and an aspect
+          ratio's height would shrink right along with it, risking clipping the
+          fixed-size rectangle. A fixed height doesn't move.
+          240 rather than the previous 160: a bigger target is much easier to
+          aim one-handed, the 48px strips seat the torch/zoom controls clear of
+          the rectangle, and being taller than the camera's 16:9 means
+          object-cover crops horizontally instead of vertically — which buys
+          standoff distance, letting the user hold the phone far enough away
+          for the lens to actually focus. */}
+      <div className="relative h-60 w-full max-w-sm mx-auto">
 
         {/* Idle state — the whole frame is the tap target to start scanning */}
         {!active && !error && (
@@ -573,15 +986,28 @@ export default function BarcodeScanner({
             softly out of focus around it. */}
         {active && !starting && !error && (
           <div className="pointer-events-none absolute inset-0 flex flex-col">
+            {/* Tap-to-focus target. Safe to lay over the whole frame here:
+                this overlay is gated on `active`, which is mutually exclusive
+                with the idle button's `!active` gate, so it can never shadow
+                the tap-to-scan button the way the video element would. The
+                z-20 controls below still win, and z-10's rectangle still
+                paints on top since this has no background. */}
+            <button
+              type="button"
+              onClick={onTapFocus}
+              aria-label={t.scannerTapFocus}
+              className="pointer-events-auto absolute inset-0 z-0 cursor-default"
+            />
+
             <div className="flex-1 bg-black/50 backdrop-blur-sm" />
-            <div className="flex h-32 shrink-0 items-stretch">
+            <div className="flex h-36 shrink-0 items-stretch">
               <div className="flex-1 bg-black/50 backdrop-blur-sm" />
 
               {/* Scan rectangle — no blur here; this is exactly where the
                   barcode needs to stay sharp to decode. */}
               <div
                 ref={rectRef}
-                className="relative z-10 h-32 w-72 max-w-[85%] shrink-0 rounded-2xl bg-black/20"
+                className="relative z-10 h-36 w-80 max-w-[88%] shrink-0 rounded-2xl bg-black/20"
               >
                 {/* Corner brackets */}
                 <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
@@ -625,6 +1051,42 @@ export default function BarcodeScanner({
             </div>
             <div className="flex-1 bg-black/50 backdrop-blur-sm" />
 
+            {/* Aiming hint, centred in the 48px top strip — (240 − 144) / 2. */}
+            <p className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-center px-3 text-center text-[11px] leading-tight text-white/70 text-balance">
+              {t.scannerHint}
+            </p>
+
+            {/* Zoom control — only shown when the camera reports zoom range */}
+            {zoomCaps && zoom !== null && (
+              <div
+                role="group"
+                aria-label={t.scannerZoomLabel}
+                className="pointer-events-auto absolute bottom-1 left-1 z-20 flex items-center gap-1 rounded-full border border-white/40 bg-black/50 px-1"
+              >
+                <button
+                  type="button"
+                  onClick={() => void stepZoom(-1)}
+                  aria-label={t.scannerZoomOut}
+                  disabled={zoom <= zoomCaps.min}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition-colors duration-200 hover:text-white disabled:opacity-40"
+                >
+                  <Minus className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className="min-w-9 text-center text-xs font-medium tabular-nums text-white/90">
+                  {zoomLabel}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void stepZoom(1)}
+                  aria-label={t.scannerZoomIn}
+                  disabled={zoom >= zoomCaps.max}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition-colors duration-200 hover:text-white disabled:opacity-40"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
             {/* Torch toggle — only shown when the device supports it */}
             {torchSupported && (
               <button
@@ -632,7 +1094,7 @@ export default function BarcodeScanner({
                 onClick={toggleTorch}
                 aria-label={torchOn ? t.scannerTorchOff : t.scannerTorchOn}
                 aria-pressed={torchOn}
-                className={`pointer-events-auto absolute bottom-4 right-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border transition-colors duration-200 ${
+                className={`pointer-events-auto absolute bottom-1 right-1 z-20 flex h-10 w-10 items-center justify-center rounded-full border transition-colors duration-200 ${
                   torchOn
                     ? "border-primary bg-primary text-black"
                     : "border-white/40 bg-black/50 text-white/80 hover:border-white/70 hover:text-white"
@@ -644,6 +1106,29 @@ export default function BarcodeScanner({
                   <Zap className="h-5 w-5" aria-hidden="true" />
                 )}
               </button>
+            )}
+
+            {/* Tap-to-focus ring. The key forces a remount so the animation
+                replays on every tap — CSS animations don't restart on an
+                element that's already mounted. */}
+            {focusPoint && (
+              <span
+                key={focusPoint.id}
+                aria-hidden="true"
+                style={{ left: focusPoint.x, top: focusPoint.y }}
+                className="pointer-events-none absolute z-30 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary motion-safe:animate-[focus-ring_600ms_ease-out_forwards]"
+              />
+            )}
+
+            {/* Success flash. Cleared by state rather than by the animation:
+                under prefers-reduced-motion the motion-safe animation never
+                runs, and a fill-mode:forwards element would otherwise sit
+                there tinted forever. */}
+            {flash && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-40 bg-primary/25 motion-safe:animate-[scan-success_450ms_ease-out_forwards]"
+              />
             )}
           </div>
         )}

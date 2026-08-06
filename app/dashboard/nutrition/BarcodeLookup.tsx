@@ -96,6 +96,13 @@ export default function BarcodeLookup({
   // Track whether the detail view was opened from the saved foods list.
   const [fromSaved, setFromSaved] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(autoStart);
+  // The code the last lookup actually queried — shown on a miss so the user
+  // can tell a misread from a product the database genuinely doesn't have.
+  const [lastQuery, setLastQuery] = useState("");
+  // Bumped to remount the scanner. Re-arming by toggling `scannerOpen` false
+  // then true in one handler batches into a single render where the value
+  // never changes, so the scanner's [active] effect would never re-run.
+  const [scanNonce, setScanNonce] = useState(0);
 
   const anyModalOpen = savedOpen || detailFood !== null;
   useScrollLock(anyModalOpen);
@@ -135,6 +142,7 @@ export default function BarcodeLookup({
   const runLookup = async (raw: string) => {
     const clean = raw.replace(/\D+/g, "");
     if (!clean) return;
+    setLastQuery(clean);
     setStatus("loading");
     setProduct(null);
     try {
@@ -143,6 +151,8 @@ export default function BarcodeLookup({
         setProduct(result.product);
         setProductBasis(pickDefaultBasis(result.product));
         setStatus("idle");
+        // Collapse the camera only once there's a product to show.
+        setScannerOpen(false);
       } else if (result.reason === "not-found") {
         setStatus("not-found");
       } else {
@@ -159,12 +169,25 @@ export default function BarcodeLookup({
     void runLookup(barcode);
   };
 
-  // Called when the camera scanner reads a barcode: deactivate it, fill the
-  // input, and immediately look the product up.
+  // Called when the camera scanner reads a barcode: fill the input and look
+  // the product up.
+  //
+  // The scanner is deliberately left mounted until the lookup resolves. It
+  // has already stopped the camera tracks itself the moment it accepted a
+  // code, so this costs no battery — but it keeps the frozen frame and the
+  // success flash on screen as confirmation, and on a miss it saves the user
+  // a full camera restart (permission → start → autofocus settle).
   const onScanDetected = (code: string) => {
-    setScannerOpen(false);
     setBarcode(code);
     void runLookup(code);
+  };
+
+  // Re-arm the camera for another attempt.
+  const rescan = () => {
+    setStatus("idle");
+    setLastQuery("");
+    setScanNonce((n) => n + 1);
+    setScannerOpen(true);
   };
 
   const toggleSave = async (p: FoodProduct) => {
@@ -334,18 +357,62 @@ export default function BarcodeLookup({
       </form>
 
       <BarcodeScanner
+        key={scanNonce}
         active={scannerOpen}
         onDetected={onScanDetected}
         onActivate={() => setScannerOpen(true)}
       />
       </div>
 
-      {status === "not-found" && (
-        <p className="text-sm text-muted-foreground">{t.barcodeNotFound}</p>
-      )}
-      {status === "error" && (
-        <p className="text-sm text-destructive">{t.barcodeError}</p>
-      )}
+      {/* Status region. The live region itself stays mounted and only its
+          contents swap — several screen readers won't announce content that
+          arrives at the same time as the region that holds it. */}
+      <div role="status" aria-live="polite">
+        {status === "loading" && (
+          <p className="text-sm text-muted-foreground">{t.barcodeSearching}</p>
+        )}
+
+        {status === "not-found" && (
+          <div className="space-y-2 rounded-2xl border border-border p-4">
+            <p className="text-sm text-muted-foreground text-pretty">
+              {t.barcodeNotFound}
+            </p>
+            {lastQuery && (
+              <p className="text-xs text-muted-foreground">
+                {t.barcodeLabel}:{" "}
+                <span className="font-mono tabular-nums">{lastQuery}</span>
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground text-pretty">
+              {t.barcodeNotFoundHint}
+            </p>
+            <button
+              type="button"
+              onClick={rescan}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent active:scale-95"
+            >
+              <Barcode className="h-4 w-4" aria-hidden="true" />
+              {t.scanAgain}
+            </button>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="space-y-2 rounded-2xl border border-border p-4">
+            <p className="text-sm text-destructive text-pretty">
+              {t.barcodeError}
+            </p>
+            <button
+              type="button"
+              onClick={rescan}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent active:scale-95"
+            >
+              <Barcode className="h-4 w-4" aria-hidden="true" />
+              {t.scanAgain}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Current product preview */}
       {product && (
