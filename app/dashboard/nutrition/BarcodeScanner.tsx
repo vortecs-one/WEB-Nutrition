@@ -84,13 +84,6 @@ const FOCUS_HANDBACK_MS = 900;
 // Re-trigger focus after this long with no candidate decode at all.
 const AF_NUDGE_IDLE_MS = 3000;
 
-// Auto-zoom: aim for a modest 1.5x, but never more than 20% into the device's
-// reported range. Beyond ~2x, digital-zoom devices are just upscaling, and
-// optical-zoom devices hand off to a telephoto module whose 30-40cm minimum
-// focus distance makes close-up barcode scanning impossible.
-const AUTO_ZOOM_TARGET = 1.5;
-const AUTO_ZOOM_RANGE_FRACTION = 0.2;
-
 const hints = new Map();
 hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
 hints.set(DecodeHintType.TRY_HARDER, true);
@@ -252,18 +245,6 @@ async function retriggerFocus(
   } catch {
     // Non-fatal.
   }
-}
-
-// Pick a conservative zoom level. Taking the min of an absolute target and a
-// range-relative one keeps both a device reporting {min:1,max:100} and one
-// reporting a shallow {min:1,max:2} from overshooting. Anchoring on `min`
-// rather than a literal 1 generalizes to devices that report zoom in percent.
-function pickAutoZoom(min: number, max: number, step?: number): number {
-  const byAbsolute = min * AUTO_ZOOM_TARGET;
-  const byRange = min + (max - min) * AUTO_ZOOM_RANGE_FRACTION;
-  let target = Math.min(byAbsolute, byRange);
-  if (step && step > 0) target = min + Math.round((target - min) / step) * step;
-  return Math.min(max, Math.max(min, target));
 }
 
 type CoverMapping = { scale: number; offsetX: number; offsetY: number };
@@ -819,9 +800,12 @@ export default function BarcodeScanner({
 
         if (caps?.torch) setTorchSupported(true);
 
-        // Zoom, in its own applyConstraints call: an `advanced` set is applied
-        // atomically, so bundling zoom with focus means one unsupported key
-        // silently kills both.
+        // Leave zoom at whatever the device naturally starts on (the main
+        // lens, effectively 1x) rather than forcing one: on some devices,
+        // zooming past 1x hands off from the main lens to a telephoto module
+        // with a much longer minimum focus distance, which makes close-up
+        // barcode scanning — the whole point of this screen — impossible.
+        // Zoom is exposed to the user via the manual +/- control instead.
         const zc = caps?.zoom;
         if (
           zc &&
@@ -831,19 +815,10 @@ export default function BarcodeScanner({
         ) {
           const step = typeof zc.step === "number" && zc.step > 0 ? zc.step : 0;
           const unit = zc.min > 0 ? zc.min : 1;
-          const auto = pickAutoZoom(zc.min, zc.max, step || undefined);
-          try {
-            await track.applyConstraints({
-              advanced: [{ zoom: auto }],
-            } as ExtraConstraints);
-          } catch {
-            // Zoom advertised but not applicable — the control still works.
-          }
           if (!cancelled) {
             setZoomCaps({ min: zc.min, max: zc.max, step, unit });
-            // Trust what the track actually settled on over what we asked for.
             const applied = (track.getSettings() as MediaTrackSettings).zoom;
-            setZoom(typeof applied === "number" ? applied : auto);
+            setZoom(typeof applied === "number" ? applied : zc.min);
           }
         }
 
