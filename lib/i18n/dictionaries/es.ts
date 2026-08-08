@@ -384,6 +384,15 @@ const es = {
       "El enlace de acceso no es válido o ya expiró. Vuelve a intentarlo desde la aplicación.",
     goToLogin: "Ir a iniciar sesión",
   },
+  huaweiAuth: {
+    title: "Autenticando...",
+    body: "Te estamos devolviendo a la aplicación Thruxion.",
+    returnToApp: "Volver a la app Thruxion",
+    blockedHint: "¿No ocurrió nada? Toca el botón para volver a la aplicación.",
+    missingParamsTitle: "No hay nada que autenticar",
+    missingParamsBody:
+      "Esta página se abre sola al iniciar sesión con Huawei. Vuelve a intentarlo desde la aplicación Thruxion.",
+  },
 } as const;
 
 export default es;

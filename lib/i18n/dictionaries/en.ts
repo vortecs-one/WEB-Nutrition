@@ -378,6 +378,15 @@ const en: Dictionary = {
       "This access link is invalid or has expired. Please try again from the app.",
     goToLogin: "Go to login",
   },
+  huaweiAuth: {
+    title: "Authenticating...",
+    body: "Returning you to the Thruxion app.",
+    returnToApp: "Return to Thruxion App",
+    blockedHint: "Nothing happened? Tap the button to return to the app.",
+    missingParamsTitle: "Nothing to authenticate",
+    missingParamsBody:
+      "This page opens on its own when you sign in with Huawei. Please try again from the Thruxion app.",
+  },
 };
 
 export default en;
