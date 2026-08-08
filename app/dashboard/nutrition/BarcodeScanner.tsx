@@ -889,8 +889,13 @@ export default function BarcodeScanner({
   const zoomLabel =
     zoomCaps && zoom !== null ? `${(zoom / zoomCaps.unit).toFixed(1)}×` : null;
 
+  // Borders are 2px, not the usual hairline: a 1px border gets anti-aliased
+  // across a curve, so on a high-DPI phone the rounded bottom corners wash out
+  // to nothing while the straight runs still read. border-t-0 because the
+  // search input directly above already draws the seam between them — two
+  // adjacent 1px borders would otherwise double up into a 4px line.
   return (
-    <div className="overflow-hidden rounded-t-none rounded-b-xl border border-primary bg-black">
+    <div className="overflow-hidden rounded-t-none rounded-b-3xl border-2 border-t-0 border-primary bg-black">
       {/* Camera viewport */}
       {/* h-60 (240px) is sized around the scan rectangle below (h-36 = 144px)
           plus a 48px vignette strip above and below, rather than an aspect
@@ -982,13 +987,17 @@ export default function BarcodeScanner({
                   barcode needs to stay sharp to decode. */}
               <div
                 ref={rectRef}
-                className="relative z-10 h-36 w-80 max-w-[88%] shrink-0 rounded-2xl bg-black/20"
+                className="relative z-10 h-36 w-80 max-w-[88%] shrink-0 rounded-3xl bg-black/20"
               >
-                {/* Corner brackets */}
-                <span className="absolute -left-px -top-px h-8 w-8 rounded-tl-2xl border-l-[3px] border-t-[3px] border-primary" />
-                <span className="absolute -right-px -top-px h-8 w-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary" />
-                <span className="absolute -bottom-px -left-px h-8 w-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary" />
-                <span className="absolute -bottom-px -right-px h-8 w-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary" />
+                {/* Corner brackets. Their radius must match the rect's above,
+                    or the arc sits proud of the corner it traces. Note this
+                    theme overrides --radius-xl to 18px but leaves --radius-2xl
+                    at Tailwind's default 16px, so 2xl is SMALLER than xl here —
+                    3xl (24px) is the first step that actually rounds more. */}
+                <span className="absolute -left-px -top-px h-10 w-10 rounded-tl-3xl border-l-[3px] border-t-[3px] border-primary" />
+                <span className="absolute -right-px -top-px h-10 w-10 rounded-tr-3xl border-r-[3px] border-t-[3px] border-primary" />
+                <span className="absolute -bottom-px -left-px h-10 w-10 rounded-bl-3xl border-b-[3px] border-l-[3px] border-primary" />
+                <span className="absolute -bottom-px -right-px h-10 w-10 rounded-br-3xl border-b-[3px] border-r-[3px] border-primary" />
 
                 {/* Barcode icon */}
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -1024,7 +1033,13 @@ export default function BarcodeScanner({
 
               <div className="flex-1 bg-black/50 backdrop-blur-sm" />
             </div>
-            <div className="flex-1 bg-black/50 backdrop-blur-sm" />
+            {/* Bottom strip carries its own bottom radius. An element with
+                backdrop-filter escapes an ancestor's rounded-corner clip in
+                Chromium — it gets clipped to the square padding box instead —
+                so without this its corners paint over the frame's curved
+                border. 22px = the container's 24px outer radius minus its 2px
+                border, i.e. the padding-box radius this strip sits against. */}
+            <div className="flex-1 rounded-b-[22px] bg-black/50 backdrop-blur-sm" />
 
             {/* Aiming hint, centred in the 48px top strip — (240 − 144) / 2. */}
             <p className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-center px-3 text-center text-[11px] leading-tight text-white/70 text-balance">

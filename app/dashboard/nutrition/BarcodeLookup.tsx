@@ -318,7 +318,7 @@ export default function BarcodeLookup({
       <form onSubmit={onSearch} className="flex">
         <div className="relative flex-1">
           <input
-            className={`${inputClass} pl-[4.5rem] pr-[4.5rem] rounded-b-none !border-primary`}
+            className={`${inputClass} pl-[4.5rem] pr-[4.5rem] rounded-t-3xl rounded-b-none border-2 !border-primary`}
             inputMode="numeric"
             autoComplete="off"
             placeholder={t.barcodePlaceholder}
