@@ -52,10 +52,7 @@ import {
   unitLabel,
   STALE_MINUTES,
   sensorExpiresAt,
-  sensorIsWarmingUp,
-  sensorNeedsAttention,
-  sensorRemainingFraction,
-  sensorRemainingMs,
+  sensorStatus,
   sensorWarmUpEndsAt,
   splitDuration,
 } from "@/lib/glucose/types";
@@ -233,11 +230,16 @@ export default function GlucoseTracker({
   // Target range + alarms as configured in the patient's LibreLink app; shown
   // for reference only, never applied to glucoseStatus().
   const libreThresholds = data?.libreThresholds ?? null;
-  const sensorRemaining = sensor ? sensorRemainingMs(sensor) : 0;
-  const sensorExpired = sensor !== null && sensorRemaining <= 0;
-  const sensorWarmUp = sensor !== null && sensorIsWarmingUp(sensor);
+  // The live reading doubles as proof of life: it decides both which wear
+  // duration applies and whether an out-of-life sensor is really dead.
+  const lastReadingAt = current?.date ?? null;
+  const sensorState = sensor ? sensorStatus(sensor, lastReadingAt) : null;
+  const sensorRemaining = sensorState?.remainingMs ?? 0;
+  const sensorExpired = sensorState?.expired ?? false;
+  const sensorPastEstimate = sensorState?.pastEstimate ?? false;
+  const sensorWarmUp = sensorState?.warmingUp ?? false;
   const sensorLeft = splitDuration(sensorRemaining);
-  const sensorPct = sensor ? Math.round(sensorRemainingFraction(sensor) * 100) : 0;
+  const sensorPct = sensorState ? Math.round(sensorState.fraction * 100) : 0;
 
   const formatDateTime = (ms: number) =>
     new Date(ms).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
@@ -247,27 +249,33 @@ export default function GlucoseTracker({
   // Remaining-life copy: days+hours normally, hours+minutes on the last day.
   const sensorRemainingLabel = sensorExpired
     ? t.sensorExpired
-    : sensorLeft.days > 0
-      ? t.sensorRemainingDays
-          .replace("{d}", String(sensorLeft.days))
-          .replace("{h}", String(sensorLeft.hours))
-      : t.sensorRemainingHours
-          .replace("{h}", String(sensorLeft.hours))
-          .replace("{m}", String(sensorLeft.minutes));
+    : sensorPastEstimate
+      ? t.sensorPastEstimate
+      : sensorLeft.days > 0
+        ? t.sensorRemainingDays
+            .replace("{d}", String(sensorLeft.days))
+            .replace("{h}", String(sensorLeft.hours))
+        : t.sensorRemainingHours
+            .replace("{h}", String(sensorLeft.hours))
+            .replace("{m}", String(sensorLeft.minutes));
 
-  // Bar color tracks urgency: healthy → running out → expired/critical.
-  const sensorBarClass = sensorExpired
-    ? "bg-destructive"
-    : sensorPct <= 10
+  // Bar color tracks urgency: healthy → running out → expired/critical. A
+  // sensor still reporting past its expected life is amber, not red — it's
+  // overdue for a change, but it hasn't failed.
+  const sensorBarClass = sensorPastEstimate
+    ? "bg-amber-500"
+    : sensorExpired
       ? "bg-destructive"
-      : sensorPct <= 25
-        ? "bg-amber-500"
-        : "bg-chart-2";
+      : sensorPct <= 10
+        ? "bg-destructive"
+        : sensorPct <= 25
+          ? "bg-amber-500"
+          : "bg-chart-2";
 
   // Compact-card warning: only once a sensor change is actually due, so the
   // card stays quiet for most of the sensor's 14-day life. Distinct from
   // `isStale` above, which is about reading freshness rather than sensor age.
-  const sensorWarn = sensor !== null && sensorNeedsAttention(sensor);
+  const sensorWarn = sensorState?.needsAttention ?? false;
   const sensorWarnLabel = sensorExpired
     ? t.sensorExpired
     : `${t.sensorTitle}: ${sensorRemainingLabel}`;
@@ -901,7 +909,7 @@ export default function GlucoseTracker({
                   {t.sensorExpires}
                 </span>
                 <span className={infoValue}>
-                  {formatDateTime(sensorExpiresAt(sensor))}
+                  {formatDateTime(sensorState?.expiresAt ?? sensorExpiresAt(sensor))}
                 </span>
               </li>
               {sensor.serialNumber && (

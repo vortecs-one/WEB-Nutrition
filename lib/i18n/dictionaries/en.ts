@@ -341,6 +341,7 @@ const en: Dictionary = {
     sensorRemainingDays: "{d}d {h}h left",
     sensorRemainingHours: "{h}h {m}m left",
     sensorExpired: "Sensor expired",
+    sensorPastEstimate: "Past expected life",
     sensorWarmingUp: "Warming up",
     sensorWarmUpEnds: "Readings start at {time}",
     // --- Target range + alarms read from the LibreLink app (read-only) ---

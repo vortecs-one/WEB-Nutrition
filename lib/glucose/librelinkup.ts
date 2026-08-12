@@ -234,6 +234,7 @@ function toSensor(s: RawSensor | null | undefined): SensorInfo | null {
     activatedAt,
     warmUpMinutes:
       typeof s.w === "number" && s.w >= 0 && s.w < 24 * 60 ? s.w : DEFAULT_WARMUP_MINUTES,
+    productType: typeof s.pt === "number" ? s.pt : null,
   };
 }
 

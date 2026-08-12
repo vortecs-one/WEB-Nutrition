@@ -51,6 +51,8 @@ export type SensorInfo = {
   activatedAt: number;
   /** Warm-up period in minutes; no readings are produced until it elapses. */
   warmUpMinutes: number;
+  /** Abbott's undocumented per-model code (`pt` in the API), if reported. */
+  productType: number | null;
 };
 
 // A single glucose alarm as configured in the patient's LibreLink app.
@@ -186,12 +188,59 @@ export const STALE_MINUTES = 15;
 
 // --- Sensor lifecycle helpers -----------------------------------------------
 
-/** Every current FreeStyle Libre sensor (2 / 3 / 14-day) runs for 14 days. */
-export const SENSOR_LIFETIME_MS = 14 * 24 * 3600_000;
+/** Most FreeStyle Libre sensors (2 / 3, standard) run for 14 days. */
+export const DEFAULT_SENSOR_LIFETIME_MS = 14 * 24 * 3600_000;
+
+/**
+ * Abbott doesn't document what its `pt` (product type) codes mean, so this
+ * map only carries entries we've confirmed against a real sensor's actual
+ * expiry (cross-checked against the official LibreLinkUp app). Anything not
+ * listed here is resolved from live readings instead — see sensorLifetimeMs.
+ */
+export const SENSOR_LIFETIME_BY_PRODUCT_TYPE: Record<number, number> = {
+  // pt: <confirmed Libre 2 Plus code> -> 15 * 24 * 3600_000,
+};
+
+/**
+ * The only wear durations Abbott ships: 14 days (Libre 2 / 3) and 15 days for
+ * the extended-wear "Plus" models. Ascending — sensorLifetimeMs walks this.
+ */
+export const SENSOR_LIFETIME_CANDIDATES_MS = [14 * 24 * 3600_000, 15 * 24 * 3600_000];
+
+/**
+ * How far past a candidate duration readings must continue before we accept
+ * them as proof of a longer-wearing model. A 14-day sensor legitimately
+ * reports right up to its final minute, so without this margin an ordinary
+ * last reading would promote it to 15 days and invent a day of life it
+ * doesn't have.
+ */
+export const SENSOR_LIFETIME_PROMOTION_GRACE_MS = 60 * 60_000;
+
+/**
+ * How long this sensor actually runs for.
+ *
+ * Without a calibrated `pt` we can't know the model up front, so we let the
+ * sensor tell us: a reading produced at day 14+ disproves the 14-day guess and
+ * promotes it to the next candidate. That self-corrects within one poll of
+ * crossing the boundary and never claims a sensor is dead while it's still
+ * reporting.
+ */
+export function sensorLifetimeMs(sensor: SensorInfo, lastReadingAt: number | null = null): number {
+  if (sensor.productType !== null && sensor.productType in SENSOR_LIFETIME_BY_PRODUCT_TYPE) {
+    return SENSOR_LIFETIME_BY_PRODUCT_TYPE[sensor.productType];
+  }
+  if (lastReadingAt === null) return DEFAULT_SENSOR_LIFETIME_MS;
+  // Smallest candidate the sensor hasn't clearly outlived.
+  const provenAge = lastReadingAt - sensor.activatedAt - SENSOR_LIFETIME_PROMOTION_GRACE_MS;
+  return (
+    SENSOR_LIFETIME_CANDIDATES_MS.find((candidate) => candidate > provenAge) ??
+    SENSOR_LIFETIME_CANDIDATES_MS[SENSOR_LIFETIME_CANDIDATES_MS.length - 1]
+  );
+}
 
 /** Epoch ms at which the sensor stops producing readings. */
-export function sensorExpiresAt(sensor: SensorInfo): number {
-  return sensor.activatedAt + SENSOR_LIFETIME_MS;
+export function sensorExpiresAt(sensor: SensorInfo, lastReadingAt: number | null = null): number {
+  return sensor.activatedAt + sensorLifetimeMs(sensor, lastReadingAt);
 }
 
 /** Epoch ms at which warm-up ends and the first reading becomes available. */
@@ -200,13 +249,21 @@ export function sensorWarmUpEndsAt(sensor: SensorInfo): number {
 }
 
 /** Sensor life left in ms; 0 once expired. */
-export function sensorRemainingMs(sensor: SensorInfo, now: number = Date.now()): number {
-  return Math.max(0, sensorExpiresAt(sensor) - now);
+export function sensorRemainingMs(
+  sensor: SensorInfo,
+  lastReadingAt: number | null = null,
+  now: number = Date.now(),
+): number {
+  return Math.max(0, sensorExpiresAt(sensor, lastReadingAt) - now);
 }
 
 /** Fraction of the sensor's life still remaining, 0..1. */
-export function sensorRemainingFraction(sensor: SensorInfo, now: number = Date.now()): number {
-  return sensorRemainingMs(sensor, now) / SENSOR_LIFETIME_MS;
+export function sensorRemainingFraction(
+  sensor: SensorInfo,
+  lastReadingAt: number | null = null,
+  now: number = Date.now(),
+): number {
+  return sensorRemainingMs(sensor, lastReadingAt, now) / sensorLifetimeMs(sensor, lastReadingAt);
 }
 
 /** True while the sensor is still warming up (worn, but not yet reading). */
@@ -218,8 +275,56 @@ export function sensorIsWarmingUp(sensor: SensorInfo, now: number = Date.now()):
 export const SENSOR_WARN_MS = 2 * 24 * 3600_000;
 
 /** True once the sensor is expired or close enough that a change is due. */
-export function sensorNeedsAttention(sensor: SensorInfo, now: number = Date.now()): boolean {
-  return sensorRemainingMs(sensor, now) <= SENSOR_WARN_MS;
+export function sensorNeedsAttention(
+  sensor: SensorInfo,
+  lastReadingAt: number | null = null,
+  now: number = Date.now(),
+): boolean {
+  return sensorRemainingMs(sensor, lastReadingAt, now) <= SENSOR_WARN_MS;
+}
+
+/** Everything the sensor panel needs, resolved against the same lifetime. */
+export type SensorStatus = {
+  /** Best-known expiry: exact when `pt` is calibrated, inferred otherwise. */
+  expiresAt: number;
+  remainingMs: number;
+  /** Life left as 0..1, for the progress bar. */
+  fraction: number;
+  /** Only true when the sensor is both past expiry AND no longer reporting. */
+  expired: boolean;
+  /** Still reporting despite outliving every known wear duration. */
+  pastEstimate: boolean;
+  needsAttention: boolean;
+  warmingUp: boolean;
+};
+
+/**
+ * Resolves the sensor panel's state in one pass.
+ *
+ * `lastReadingAt` is the authority here: a sensor that is still producing
+ * fresh readings is by definition not expired, no matter what the computed
+ * expiry says. That keeps the widget from contradicting the live value shown
+ * right next to it.
+ */
+export function sensorStatus(
+  sensor: SensorInfo,
+  lastReadingAt: number | null,
+  now: number = Date.now(),
+): SensorStatus {
+  const expiresAt = sensorExpiresAt(sensor, lastReadingAt);
+  const remainingMs = Math.max(0, expiresAt - now);
+  const readingIsFresh =
+    lastReadingAt !== null && now - lastReadingAt <= STALE_MINUTES * 60_000;
+  const pastExpiry = remainingMs <= 0;
+  return {
+    expiresAt,
+    remainingMs,
+    fraction: remainingMs / sensorLifetimeMs(sensor, lastReadingAt),
+    expired: pastExpiry && !readingIsFresh,
+    pastEstimate: pastExpiry && readingIsFresh,
+    needsAttention: remainingMs <= SENSOR_WARN_MS,
+    warmingUp: sensorIsWarmingUp(sensor, now),
+  };
 }
 
 /** Break a duration into whole days / hours / minutes for display. */

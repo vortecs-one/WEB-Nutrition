@@ -347,6 +347,7 @@ const es = {
     sensorRemainingDays: "Quedan {d} d {h} h",
     sensorRemainingHours: "Quedan {h} h {m} min",
     sensorExpired: "Sensor caducado",
+    sensorPastEstimate: "Supera la vida estimada",
     sensorWarmingUp: "Calentando",
     sensorWarmUpEnds: "Las lecturas empiezan a las {time}",
     // --- Rango objetivo y alarmas leídos de la app LibreLink (solo lectura) ---

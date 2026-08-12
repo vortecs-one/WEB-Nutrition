@@ -688,6 +688,19 @@ async function fetchFromLibre(
     const since = Date.now() - windowHours * 3600_000;
     const readings = result.graph.readings.filter((r) => r.date >= since);
 
+    // TEMP: calibrating SENSOR_LIFETIME_BY_PRODUCT_TYPE (see lib/glucose/types.ts) —
+    // remove once the productType -> wear-duration mapping is confirmed and filled in.
+    if (result.graph.sensor) {
+      console.log(
+        "[v0] sensor productType calibration:",
+        JSON.stringify({
+          serialNumber: result.graph.sensor.serialNumber,
+          productType: result.graph.sensor.productType,
+          activatedAt: new Date(result.graph.sensor.activatedAt).toISOString(),
+        }),
+      );
+    }
+
     // Abbott's own target range + alarm thresholds drive the in-range colors
     // and chart bands. The alarm threshold is used whether or not the alarm is
     // enabled — it's still the configured bound, and the detail view shows the
