@@ -545,7 +545,9 @@ export default function GlucoseTracker({
           >
             {/* Only the latest point is labelled — the axis and tooltip carry
                 the rest, and a value on every point would be unreadable. The
-                badge is tinted by the same status as the reading pill above. */}
+                badge is tinted by the same status as the reading pill above,
+                and shows the same trend arrow rather than repeating the
+                numeric value already shown big in that pill. */}
             <LabelList
               dataKey="value"
               content={(props) => {
@@ -554,10 +556,7 @@ export default function GlucoseTracker({
                 };
                 if (index !== chartData.length - 1) return null;
                 if (typeof x !== "number" || typeof y !== "number") return null;
-                const label = String(value);
-                // Grow with the text so a 3-digit mg/dL value and a 4-character
-                // mmol value ("25.3") both clear the edge.
-                const r = Math.max(12, label.length * 3 + 6);
+                const r = 10;
                 const badge = statusBadge[currentStatus];
                 return (
                   <g>
@@ -569,17 +568,28 @@ export default function GlucoseTracker({
                       stroke="var(--color-sidebar)"
                       strokeWidth={2}
                     />
-                    <text
-                      x={x}
-                      y={y}
-                      fill={badge.ink}
-                      fontSize={11}
-                      fontWeight={700}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                    >
-                      {label}
-                    </text>
+                    {TrendIcon ? (
+                      <TrendIcon
+                        x={x - 8}
+                        y={y - 8}
+                        width={16}
+                        height={16}
+                        color={badge.ink}
+                        strokeWidth={2.75}
+                      />
+                    ) : (
+                      <text
+                        x={x}
+                        y={y}
+                        fill={badge.ink}
+                        fontSize={11}
+                        fontWeight={700}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                      >
+                        {String(value)}
+                      </text>
+                    )}
                   </g>
                 );
               }}
