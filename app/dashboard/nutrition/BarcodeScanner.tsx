@@ -1,27 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType, NotFoundException } from "@zxing/library";
 import { Loader2, CameraOff, Camera, Zap, ZapOff, Plus, Minus } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { normalizeBarcode } from "@/lib/foods/barcode";
-
-// Product barcodes — restrict to common retail 1D formats for speed.
-//
-// ITF is deliberately absent. It is a shipping-carton symbology (ITF-14) that
-// consumer food packaging doesn't use, and ZXing's ITF reader is the single
-// biggest source of phantom reads: with no fixed length and no mandatory check
-// digit it will happily lock onto a *portion* of an EAN-13's bars and return a
-// short number that looks like a real barcode.
-const PRODUCT_FORMATS = [
-  BarcodeFormat.EAN_13,
-  BarcodeFormat.EAN_8,
-  BarcodeFormat.UPC_A,
-  BarcodeFormat.UPC_E,
-  BarcodeFormat.CODE_128,
-  BarcodeFormat.CODE_39,
-];
+import type { CanvasDecoder } from "@/lib/foods/zxing-decoder";
 
 // Native BarcodeDetector format equivalents (Android Chrome / modern browsers).
 const NATIVE_FORMATS = [
@@ -83,10 +66,6 @@ const FOCUS_RING_MS = 700;
 const FOCUS_HANDBACK_MS = 900;
 // Re-trigger focus after this long with no candidate decode at all.
 const AF_NUDGE_IDLE_MS = 3000;
-
-const hints = new Map();
-hints.set(DecodeHintType.POSSIBLE_FORMATS, PRODUCT_FORMATS);
-hints.set(DecodeHintType.TRY_HARDER, true);
 
 // The camera-control fields below live in the Media Capture extensions and
 // aren't in TypeScript's DOM lib yet. They're declared locally rather than
@@ -332,27 +311,6 @@ function fitScale(sw: number, sh: number): number {
   return scale;
 }
 
-// Map ZXing's format enum onto the same lowercase vocabulary the native
-// BarcodeDetector uses, so barcode validation sees one format namespace.
-function zxingFormatTag(format: BarcodeFormat): string | undefined {
-  switch (format) {
-    case BarcodeFormat.EAN_13:
-      return "ean_13";
-    case BarcodeFormat.EAN_8:
-      return "ean_8";
-    case BarcodeFormat.UPC_A:
-      return "upc_a";
-    case BarcodeFormat.UPC_E:
-      return "upc_e";
-    case BarcodeFormat.CODE_128:
-      return "code_128";
-    case BarcodeFormat.CODE_39:
-      return "code_39";
-    default:
-      return undefined;
-  }
-}
-
 // Minimal typing for the native BarcodeDetector API (not in TS DOM libs yet).
 type NativeBarcode = { rawValue: string; format?: string };
 type NativeDetector = {
@@ -422,7 +380,7 @@ export default function BarcodeScanner({
       const norm = normalizeBarcode(raw, format);
       if (!norm) return false;
 
-      // Any plausible decode means the optics are working — hold off the
+      // Any plausible decode means the optics are working ��� hold off the
       // autofocus nudge even if this code isn't accepted yet.
       const now = Date.now();
       lastActivityRef.current = now;
@@ -465,7 +423,7 @@ export default function BarcodeScanner({
   // Decode loop. Prefers the native BarcodeDetector API (fast + reliable on
   // Android Chrome / WebView); falls back to ZXing canvas decoding elsewhere.
   const startDecodeLoop = useCallback(
-    (reader: BrowserMultiFormatReader, video: HTMLVideoElement) => {
+    (decodeWithZxing: CanvasDecoder, video: HTMLVideoElement) => {
       // Try to build a native detector if the platform supports it.
       let nativeDetector: NativeDetector | null = null;
       let nativeFailures = 0;
@@ -570,24 +528,6 @@ export default function BarcodeScanner({
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
         return canvas;
-      };
-
-      const decodeWithZxing = (
-        canvas: HTMLCanvasElement,
-      ): { text: string; format?: string } | null => {
-        try {
-          const result = reader.decodeFromCanvas(canvas);
-          return {
-            text: result.getText(),
-            format: zxingFormatTag(result.getBarcodeFormat()),
-          };
-        } catch (err) {
-          // NotFoundException just means no barcode in this frame — expected.
-          if (!(err instanceof NotFoundException)) {
-            console.error("BarcodeScanner ZXing error:", err);
-          }
-          return null;
-        }
       };
 
       const tick = async () => {
@@ -769,7 +709,11 @@ export default function BarcodeScanner({
     setError(null);
     detectedRef.current = false;
 
-    const reader = new BrowserMultiFormatReader(hints);
+    // Start fetching ZXing in parallel with the camera permission prompt.
+    const decoderPromise = import("@/lib/foods/zxing-decoder").then((m) =>
+      m.createCanvasDecoder(),
+    );
+    decoderPromise.catch(() => {});
 
     async function start() {
       try {
@@ -861,8 +805,10 @@ export default function BarcodeScanner({
         // lens (or hand off to another module entirely) and reset focus mode.
         focusModeRef.current = await applyBestEffortFocus(track);
 
+        const decoder = await decoderPromise;
+
         if (!cancelled) {
-          startDecodeLoop(reader, video);
+          startDecodeLoop(decoder, video);
         }
       } catch (err) {
         if (!cancelled) {
