@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { glucoseSettings } from "@/drizzle/schema";
 import { auth } from "@/auth";
+import { isGlucoseEmailAllowed } from "./access";
 import type {
   GlucoseFetchResult,
   GlucoseReading,
@@ -39,6 +40,7 @@ async function getUserKey(): Promise<string | null> {
   const user = session?.user as
     | { humanId?: string | null; email?: string | null }
     | undefined;
+  if (!isGlucoseEmailAllowed(user?.email)) return null;
   return user?.humanId ?? user?.email ?? null;
 }
 

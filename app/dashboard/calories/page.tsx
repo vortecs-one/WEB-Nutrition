@@ -2,6 +2,7 @@
 import { getCurrentRole } from "@/lib/role/server";
 import { redirect } from "next/navigation";
 import { fetchGlucoseSettings } from "@/lib/glucose/actions";
+import { canAccessGlucose } from "@/lib/glucose/access";
 import GlucoseTracker from "../glucose/GlucoseTracker";
 import CaloriesTracker from "./CaloriesTracker";
 
@@ -13,12 +14,13 @@ export default async function CaloriesPage() {
     redirect("/dashboard");
   }
 
-  const glucoseSettings = await fetchGlucoseSettings();
+  const showGlucose = await canAccessGlucose();
+  const glucoseSettings = showGlucose ? await fetchGlucoseSettings() : null;
 
   return (
     <div className="space-y-6">
       <CaloriesTracker />
-      <GlucoseTracker initialSettings={glucoseSettings} />
+      {showGlucose && <GlucoseTracker initialSettings={glucoseSettings} />}
     </div>
   );
 }
