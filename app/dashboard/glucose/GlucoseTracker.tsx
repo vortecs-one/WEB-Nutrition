@@ -101,6 +101,10 @@ const statusBadge: Record<GlucoseStatus, { fill: string; ink: string }> = {
   urgent: { fill: "var(--color-destructive)", ink: "#ffffff" },
 };
 
+const ZONE_RED = "#ef4444";
+const ZONE_AMBER = "#f59e0b";
+const ZONE_GREEN = "var(--color-lime-500)";
+
 export default function GlucoseTracker({
   initialSettings,
 }: {
@@ -332,22 +336,75 @@ export default function GlucoseTracker({
   // red outside it. Shared by both charts, which have different y-domains — so
   // the stops are computed per-domain and each chart gets its own gradient ids
   // (identical ids would cross-contaminate, since both mount at once).
+  // Zones, top to bottom: red above the high alarm, amber between the alarm and
+  // the target range, green inside it, then the mirror image below. The
+  // boundaries are blended over a short distance so the line fades from one
+  // zone to the next instead of snapping.
   const zoneStopsFor = (min: number, max: number, opacity: number) => {
     const offset = (mgdl: number) => {
       const v = (max - cv(mgdl)) / (max - min);
       return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
     };
-    const offHigh = offset(settings?.targetHigh ?? 180);
-    const offLow = offset(settings?.targetLow ?? 70);
+    const bottoms = [
+      { color: ZONE_RED, bottom: offset(settings?.highThreshold ?? 240) },
+      { color: ZONE_AMBER, bottom: offset(settings?.targetHigh ?? 180) },
+      { color: ZONE_GREEN, bottom: offset(settings?.targetLow ?? 70) },
+      { color: ZONE_AMBER, bottom: offset(settings?.lowThreshold ?? 54) },
+      { color: ZONE_RED, bottom: 1 },
+    ];
+    let top = 0;
+    const zones: { color: string; top: number; bottom: number }[] = [];
+    for (const z of bottoms) {
+      const bottom = Math.max(top, z.bottom);
+      if (bottom - top > 0.001) zones.push({ color: z.color, top, bottom });
+      top = bottom;
+    }
     return (
       <>
-        <stop offset={0} stopColor="#ef4444" stopOpacity={opacity} />
-        <stop offset={offHigh} stopColor="#ef4444" stopOpacity={opacity} />
-        <stop offset={offHigh} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
-        <stop offset={offLow} stopColor="var(--color-lime-500)" stopOpacity={opacity} />
-        <stop offset={offLow} stopColor="#ef4444" stopOpacity={opacity} />
-        <stop offset={1} stopColor="#ef4444" stopOpacity={opacity} />
+        {zones.flatMap((z, i) => {
+          const inset = Math.min(0.03, (z.bottom - z.top) / 4);
+          const from = i === 0 ? 0 : z.top + inset;
+          const to = i === zones.length - 1 ? 1 : z.bottom - inset;
+          return [
+            <stop key={`${i}-a`} offset={from} stopColor={z.color} stopOpacity={opacity} />,
+            <stop key={`${i}-b`} offset={to} stopColor={z.color} stopOpacity={opacity} />,
+          ];
+        })}
       </>
+    );
+  };
+
+  // Zone color for a single reading (already in display units), used to tint
+  // the tooltip dot so it agrees with the line beneath the cursor.
+  const zoneColorFor = (value: number) => {
+    if (!settings) return ZONE_GREEN;
+    if (value >= cv(settings.highThreshold) || value < cv(settings.lowThreshold)) return ZONE_RED;
+    if (value > cv(settings.targetHigh) || value < cv(settings.targetLow)) return ZONE_AMBER;
+    return ZONE_GREEN;
+  };
+
+  const renderTooltip = (props: unknown) => {
+    const { active, payload } = props as {
+      active?: boolean;
+      payload?: { payload: { date: number; value: number } }[];
+    };
+    if (!active || !payload?.length) return null;
+    const point = payload[0].payload;
+    return (
+      <div className="rounded-xl border border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground shadow-lg">
+        <div className="flex items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: zoneColorFor(point.value) }}
+            aria-hidden="true"
+          />
+          <span className="text-base font-semibold tabular-nums">{point.value}</span>
+          <span className="text-xs text-sidebar-foreground/60">{unitLabel(unit)}</span>
+        </div>
+        <div className="mt-0.5 text-xs tabular-nums text-sidebar-foreground/60">
+          {timeFormatter(point.date)}
+        </div>
+      </div>
     );
   };
 
@@ -467,7 +524,7 @@ export default function GlucoseTracker({
               {zoneStopsFor(yScale.domain[0], yScale.domain[1], 1)}
             </linearGradient>
             <linearGradient id="glucose-detail-fill" x1="0" y1="0" x2="0" y2="1">
-              {zoneStopsFor(yScale.domain[0], yScale.domain[1], 0.12)}
+              {zoneStopsFor(yScale.domain[0], yScale.domain[1], 0.14)}
             </linearGradient>
           </defs>
           {/* Recessive hairline grid — horizontal only, solid (dashes here are
@@ -476,71 +533,99 @@ export default function GlucoseTracker({
             horizontal
             vertical={false}
             stroke="currentColor"
-            strokeOpacity={0.08}
+            strokeOpacity={0.06}
           />
           <XAxis
             dataKey="date"
             type="number"
             domain={["dataMin", "dataMax"]}
             tickFormatter={timeFormatter}
-            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.55 }}
+            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.6 }}
             tickLine={false}
             axisLine={false}
-            minTickGap={48}
+            tickMargin={8}
+            minTickGap={64}
           />
           <YAxis
             domain={yScale.domain}
             ticks={yScale.ticks}
-            width={38}
-            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.55 }}
+            width={40}
+            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.6 }}
             tickLine={false}
             axisLine={false}
           />
-          {/* Target range band */}
+          {/* Target range band, with hairline edges so the range reads as a
+              corridor rather than a flat block */}
           <ReferenceArea
             y1={cv(settings.targetLow)}
             y2={cv(settings.targetHigh)}
-            fill="var(--color-lime-500)"
-            fillOpacity={0.08}
+            fill={ZONE_GREEN}
+            fillOpacity={0.06}
             stroke="none"
           />
-          {/* High threshold (amber dashed) */}
+          <ReferenceLine
+            y={cv(settings.targetHigh)}
+            stroke={ZONE_GREEN}
+            strokeOpacity={0.3}
+            strokeWidth={1}
+          />
+          <ReferenceLine
+            y={cv(settings.targetLow)}
+            stroke={ZONE_GREEN}
+            strokeOpacity={0.3}
+            strokeWidth={1}
+          />
+          {/* Alarm thresholds (red dashed), labelled with their value */}
           <ReferenceLine
             y={cv(settings.highThreshold)}
-            stroke="#f59e0b"
-            strokeDasharray="5 5"
-            strokeOpacity={0.7}
+            stroke={ZONE_RED}
+            strokeDasharray="4 6"
+            strokeOpacity={0.6}
             strokeWidth={1}
+            label={{
+              value: formatGlucose(settings.highThreshold, unit),
+              position: "insideTopLeft",
+              fill: ZONE_RED,
+              fontSize: 11,
+              fontWeight: 600,
+              opacity: 0.85,
+            }}
           />
-          {/* Low threshold (red dashed) */}
           <ReferenceLine
             y={cv(settings.lowThreshold)}
-            stroke="#ef4444"
-            strokeDasharray="5 5"
-            strokeOpacity={0.7}
+            stroke={ZONE_RED}
+            strokeDasharray="4 6"
+            strokeOpacity={0.6}
             strokeWidth={1}
+            label={{
+              value: formatGlucose(settings.lowThreshold, unit),
+              position: "insideBottomLeft",
+              fill: ZONE_RED,
+              fontSize: 11,
+              fontWeight: 600,
+              opacity: 0.85,
+            }}
           />
           <Tooltip
-            cursor={{ stroke: "currentColor", strokeOpacity: 0.25, strokeWidth: 1 }}
-            formatter={(value) => [`${value} ${unitLabel(unit)}`, ""]}
-            labelFormatter={(ms) => timeFormatter(ms as number)}
-            contentStyle={{
-              background: "var(--color-sidebar)",
-              border: "1px solid var(--color-sidebar-border)",
-              borderRadius: "0.75rem",
-              fontSize: "12px",
+            cursor={{
+              stroke: "currentColor",
+              strokeOpacity: 0.3,
+              strokeWidth: 1,
+              strokeDasharray: "3 3",
             }}
+            content={renderTooltip}
+            wrapperStyle={{ outline: "none" }}
           />
           <Area
             type="monotone"
             dataKey="value"
             stroke="url(#glucose-detail-stroke)"
-            strokeWidth={2}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="url(#glucose-detail-fill)"
             dot={false}
-            activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--color-sidebar)" }}
+            activeDot={{ r: 5, strokeWidth: 2.5, stroke: "var(--color-sidebar)" }}
             isAnimationActive={false}
           >
             {/* Only the latest point is labelled — the axis and tooltip carry
@@ -560,6 +645,7 @@ export default function GlucoseTracker({
                 const badge = statusBadge[currentStatus];
                 return (
                   <g>
+                    <circle cx={x} cy={y} r={r + 6} fill={badge.fill} fillOpacity={0.22} />
                     <circle
                       cx={x}
                       cy={y}
@@ -639,16 +725,7 @@ export default function GlucoseTracker({
             minTickGap={60}
           />
           <YAxis domain={[vMin, vMax]} hide />
-          <Tooltip
-            formatter={(value) => [`${value} ${unitLabel(unit)}`, ""]}
-            labelFormatter={(ms) => timeFormatter(ms as number)}
-            contentStyle={{
-              background: "var(--color-sidebar)",
-              border: "1px solid var(--color-sidebar-border)",
-              borderRadius: "0.75rem",
-              fontSize: "12px",
-            }}
-          />
+          <Tooltip content={renderTooltip} wrapperStyle={{ outline: "none" }} />
           <Area
             type="monotone"
             dataKey="value"
