@@ -23,6 +23,7 @@ import {
   ArrowDownRight,
   ChevronsUp,
   ChevronsDown,
+  Syringe,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -59,6 +60,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
+import InsulinCalculator from "./InsulinCalculator";
 
 const RANGES = [3, 6, 12, 24] as const;
 type RangeHours = (typeof RANGES)[number];
@@ -115,6 +117,7 @@ export default function GlucoseTracker({
 
   const [settings, setSettings] = useState<GlucoseSettings | null>(initialSettings);
   const [showChart, setShowChart] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   // Connection form inside the settings panel — collapsed until the gear is used.
   const [showConnection, setShowConnection] = useState(false);
   // Toast explaining where the target range / alarms come from.
@@ -802,7 +805,24 @@ export default function GlucoseTracker({
 
         {/* Panoramic simplified chart — full detail + range selector in the expand popup */}
         <div className="mt-3 h-32 sm:h-40 w-full">{compactChart}</div>
+
+        <button
+          type="button"
+          onClick={() => setShowCalculator(true)}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-sidebar-accent px-4 py-3 text-sm font-medium transition hover:bg-sidebar-accent/70 active:scale-[0.99]"
+        >
+          <Syringe className="h-4 w-4" aria-hidden="true" />
+          {t.calculator.open}
+        </button>
       </section>
+
+      <InsulinCalculator
+        isOpen={showCalculator}
+        onClose={() => setShowCalculator(false)}
+        currentMgdl={current?.sgv ?? null}
+        isStale={isStale}
+        settings={settings}
+      />
 
       {/* Patient switcher (LibreLinkUp: main sensor + followed patients) */}
       {settings.source === "librelinkup" && (data?.patients?.length ?? 0) > 1 && (
