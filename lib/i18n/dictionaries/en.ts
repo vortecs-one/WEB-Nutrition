@@ -276,6 +276,12 @@ const en: Dictionary = {
       sensitivity: "Sensitivity factor",
       sensitivityHint: "How much 1 unit lowers glucose.",
       target: "Target glucose",
+      rangeLow: "Lower range",
+      rangeHigh: "Upper range",
+      tableTitle: "Dose table",
+      tableHint:
+        "Rows: glucose. Columns: grams of carbs. Each cell shows insulin units. The cell matching your current values is highlighted.",
+      carbsRounded: "Calculated on {grams} g, the nearest lower column in the table.",
       iob: "Insulin on board",
       iobHint: "Units from earlier boluses still active.",
       parameters: "Your parameters",
@@ -294,7 +300,8 @@ const en: Dictionary = {
       hypoRule:
         "Take 15 g of fast-acting carbs, wait 15 minutes and check again. Do not take insulin.",
       staleWarning: "The reading is over 15 minutes old. Confirm with a fresh check before dosing.",
-      invalid: "Fill in ratio, sensitivity and target with values above 0.",
+      invalid:
+        "Fill in ratio, sensitivity and ranges with values above 0 (upper range can't be below lower range).",
       disclaimer:
         "Estimate only. It does not replace your care team's advice. Use the ratios prescribed by your doctor.",
       sessionNote: "Parameters are kept while this page stays open.",

@@ -275,6 +275,12 @@ const es = {
       sensitivity: "Factor de sensibilidad",
       sensitivityHint: "Cuánto baja la glucosa 1 unidad.",
       target: "Glucosa objetivo",
+      rangeLow: "Rango menor",
+      rangeHigh: "Rango mayor",
+      tableTitle: "Tabla de dosis",
+      tableHint:
+        "Filas: glucemia. Columnas: gramos de hidratos de carbono. Cada celda indica las unidades de insulina. Se resalta la celda que corresponde a tus valores actuales.",
+      carbsRounded: "Calculado sobre {grams} g, la columna inferior más cercana de la tabla.",
       iob: "Insulina activa",
       iobHint: "Unidades de bolos anteriores aún activas.",
       parameters: "Tus parámetros",
@@ -293,7 +299,8 @@ const es = {
       hypoRule:
         "Toma 15 g de carbohidratos de acción rápida, espera 15 minutos y vuelve a medir. No te administres insulina.",
       staleWarning: "La lectura tiene más de 15 minutos. Confirma con una medición antes de dosificar.",
-      invalid: "Completa ratio, sensibilidad y objetivo con valores mayores a 0.",
+      invalid:
+        "Completa ratio, sensibilidad y rangos con valores mayores a 0 (el rango mayor no puede ser menor que el rango menor).",
       disclaimer:
         "Estimación orientativa. No reemplaza las indicaciones de tu equipo médico. Usa los ratios que te haya indicado tu endocrinólogo.",
       sessionNote: "Los parámetros se mantienen mientras la página esté abierta.",
