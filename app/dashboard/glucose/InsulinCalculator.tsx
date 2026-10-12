@@ -133,10 +133,12 @@ export default function InsulinCalculator({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t.title}>
       <div className="flex flex-col gap-5">
-        <section
-          aria-labelledby={`${ids}-current`}
-          className="flex flex-col gap-2 rounded-2xl bg-sidebar-accent p-4"
-        >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+          <section
+            aria-labelledby={`${ids}-current`}
+            className="flex flex-col gap-2 rounded-2xl bg-sidebar-accent p-4"
+          >
+          
           <h3
             id={`${ids}-current`}
             className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70"
@@ -167,20 +169,24 @@ export default function InsulinCalculator({
               {t.staleWarning}
             </p>
           )}
-        </section>
+          </section>
 
-        <NumberField
-          id={`${ids}-carbs`}
+          <div className="flex flex-col">
+            <NumberField
+              id={`${ids}-carbs`}
           label={t.carbsToEat}
           hint={t.carbsHint}
           suffix={t.grams}
           value={carbs}
           onChange={setCarbs}
-          step="1"
-          large
-        />
+                        step="1"
+              large
+            />
+          </div>
+        </div>
 
-        <section aria-labelledby={`${ids}-result`} aria-live="polite" className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:items-start">
+          <section aria-labelledby={`${ids}-result`} aria-live="polite" className="flex flex-col gap-3">
           <h3
             id={`${ids}-result`}
             className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70"
@@ -233,18 +239,20 @@ export default function InsulinCalculator({
           )}
         </section>
 
-        {paramsValid && (
-          <DoseTable
-            ratio={ratioG}
-            params={params}
-            lowThreshold={settings.lowThreshold}
-            unit={unit}
-            activeSteps={ready && !isHypo ? Math.min(steps, MAX_CORRECTION_STEPS) : null}
-            activeCarbSteps={ready && !isHypo ? Math.min(carbSteps, MAX_CARB_STEPS) : null}
-          />
-        )}
+          {paramsValid && (
+            <div className="sm:col-span-2">
+              <DoseTable
+                ratio={ratioG}
+                params={params}
+                lowThreshold={settings.lowThreshold}
+                unit={unit}
+                activeSteps={ready && !isHypo ? Math.min(steps, MAX_CORRECTION_STEPS) : null}
+                activeCarbSteps={ready && !isHypo ? Math.min(carbSteps, MAX_CARB_STEPS) : null}
+              />
+            </div>
+          )}
 
-        <fieldset className="flex flex-col gap-3">
+          <fieldset className="flex flex-col gap-3 sm:col-start-2">
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
             {t.parameters}
           </legend>
@@ -294,7 +302,8 @@ export default function InsulinCalculator({
             />
           </div>
           <p className="text-xs text-sidebar-foreground/60">{t.sessionNote}</p>
-        </fieldset>
+          </fieldset>
+        </div>
 
         <p className="flex items-start gap-2 text-xs leading-relaxed text-sidebar-foreground/60">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
