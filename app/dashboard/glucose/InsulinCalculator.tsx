@@ -130,7 +130,8 @@ export default function InsulinCalculator({
   const glucoseUnit = unitLabel(unit);
   const glucoseStep = unit === "mmol" ? "0.1" : "1";
 
-  const sectionTitle = "text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70";
+  const sectionTitle =
+    "flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70 before:h-3 before:w-1 before:shrink-0 before:rounded-full before:bg-highlight before:content-['']";
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t.title}>
@@ -174,7 +175,7 @@ export default function InsulinCalculator({
               )}
             </section>
 
-            <div className="flex min-w-0 flex-col justify-between gap-3 rounded-2xl bg-sidebar-accent p-3 focus-within:ring-2 focus-within:ring-primary sm:p-4">
+            <div className="flex min-w-0 flex-col justify-between gap-3 rounded-2xl border border-highlight/25 bg-highlight/10 p-3 transition-colors focus-within:border-highlight focus-within:ring-2 focus-within:ring-highlight/40 sm:p-4">
               <label htmlFor={`${ids}-carbs`} className={sectionTitle}>
                 {t.carbsToEat}
               </label>
@@ -243,7 +244,7 @@ export default function InsulinCalculator({
                   </span>
                 </div>
 
-                <dl className="flex min-w-0 flex-col justify-center divide-y divide-sidebar-border rounded-2xl bg-sidebar-accent px-3 sm:px-4">
+                <dl className="flex min-w-0 flex-col justify-center divide-y divide-highlight/20 rounded-2xl border border-highlight/20 bg-sidebar-accent px-3 sm:px-4">
                   <ResultRow label={t.carbDose} value={fmtU(carbSteps)} />
                   <ResultRow label={t.correctionDose} value={fmtU(correction)} />
                   {iobApplied > 0 && <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied)} />}
@@ -263,59 +264,6 @@ export default function InsulinCalculator({
           )}
         </section>
 
-        <fieldset className="flex min-w-0 flex-col gap-4 rounded-2xl border border-sidebar-border p-3 sm:p-4">
-          <legend className={`${sectionTitle} px-1`}>{t.parameters}</legend>
-          <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 sm:gap-4">
-            <NumberField
-              id={`${ids}-ratio`}
-              label={t.ratio}
-              hint={t.ratioHint}
-              suffix={`${t.grams} ${t.perUnit}`}
-              value={ratio}
-              onChange={setRatio}
-              step="0.5"
-              compactHint
-            />
-            <NumberField
-              id={`${ids}-isf`}
-              label={t.sensitivity}
-              hint={t.sensitivityHint}
-              suffix={`${glucoseUnit} ${t.perUnit}`}
-              value={sensitivity}
-              onChange={setSensitivity}
-              step={glucoseStep}
-              compactHint
-            />
-            <NumberField
-              id={`${ids}-iob`}
-              label={t.iob}
-              hint={t.iobHint}
-              suffix={t.units}
-              value={iob}
-              onChange={setIob}
-              step="0.5"
-              compactHint
-            />
-            <NumberField
-              id={`${ids}-low`}
-              label={t.rangeLow}
-              suffix={glucoseUnit}
-              value={rangeLow}
-              onChange={setRangeLow}
-              step={glucoseStep}
-            />
-            <NumberField
-              id={`${ids}-high`}
-              label={t.rangeHigh}
-              suffix={glucoseUnit}
-              value={rangeHigh}
-              onChange={setRangeHigh}
-              step={glucoseStep}
-            />
-          </div>
-          <p className="text-xs text-sidebar-foreground/60">{t.sessionNote}</p>
-        </fieldset>
-
         {paramsValid && (
           <DoseTable
             ratio={ratioG}
@@ -326,6 +274,64 @@ export default function InsulinCalculator({
             activeCarbSteps={ready && !isHypo ? Math.min(carbSteps, MAX_CARB_STEPS) : null}
           />
         )}
+
+        <fieldset className="flex min-w-0 flex-col gap-4 rounded-2xl border border-highlight/25 bg-sidebar-accent/40 p-3 sm:p-4">
+          <legend className={`${sectionTitle} px-1`}>{t.parameters}</legend>
+          <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-6 sm:gap-4">
+            <NumberField
+              id={`${ids}-ratio`}
+              label={t.ratio}
+              hint={t.ratioHint}
+              suffix={`${t.grams} ${t.perUnit}`}
+              value={ratio}
+              onChange={setRatio}
+              step="0.5"
+              compactHint
+              className="sm:col-span-2"
+            />
+            <NumberField
+              id={`${ids}-isf`}
+              label={t.sensitivity}
+              hint={t.sensitivityHint}
+              suffix={`${glucoseUnit} ${t.perUnit}`}
+              value={sensitivity}
+              onChange={setSensitivity}
+              step={glucoseStep}
+              compactHint
+              className="sm:col-span-2"
+            />
+            <NumberField
+              id={`${ids}-iob`}
+              label={t.iob}
+              hint={t.iobHint}
+              suffix={t.units}
+              value={iob}
+              onChange={setIob}
+              step="0.5"
+              compactHint
+              className="col-span-2"
+            />
+            <NumberField
+              id={`${ids}-low`}
+              label={t.rangeLow}
+              suffix={glucoseUnit}
+              value={rangeLow}
+              onChange={setRangeLow}
+              step={glucoseStep}
+              className="sm:col-span-3"
+            />
+            <NumberField
+              id={`${ids}-high`}
+              label={t.rangeHigh}
+              suffix={glucoseUnit}
+              value={rangeHigh}
+              onChange={setRangeHigh}
+              step={glucoseStep}
+              className="sm:col-span-3"
+            />
+          </div>
+          <p className="text-xs text-sidebar-foreground/60">{t.sessionNote}</p>
+        </fieldset>
 
         <p className="flex items-start gap-2 text-xs leading-relaxed text-sidebar-foreground/60">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -374,22 +380,24 @@ function DoseTable({
   const columns = Array.from({ length: MAX_CARB_STEPS + 1 }, (_, c) => c);
 
   return (
-    <details className="group rounded-2xl bg-sidebar-accent">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
-        {t.tableTitle}
+    <details open className="group rounded-2xl border border-highlight/20 bg-sidebar-accent">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl p-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-highlight sm:p-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 before:h-3 before:w-1 before:rounded-full before:bg-highlight before:content-['']">
+          {t.tableTitle}
+        </span>
         <ChevronDown
-          className="h-4 w-4 shrink-0 text-sidebar-foreground/60 transition-transform group-open:rotate-180"
+          className="h-4 w-4 shrink-0 text-highlight transition-transform group-open:rotate-180"
           aria-hidden="true"
         />
       </summary>
-      <div className="flex flex-col gap-3 px-4 pb-4">
+      <div className="flex flex-col gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
         <p className="text-xs leading-relaxed text-sidebar-foreground/60">{t.tableHint}</p>
-        <div className="overflow-x-auto rounded-xl border border-sidebar-border">
+        <div className="max-h-72 overflow-auto rounded-xl border border-sidebar-border">
           <table className="w-full border-collapse text-center text-xs tabular-nums">
             <caption className="sr-only">{t.tableTitle}</caption>
             <thead>
-              <tr className="bg-sidebar">
-                <th scope="col" className="sticky left-0 bg-sidebar px-2 py-1.5 text-left font-semibold">
+              <tr className="sticky top-0 z-10 bg-sidebar">
+                <th scope="col" className="sticky left-0 z-20 bg-sidebar px-2 py-1.5 text-left font-semibold text-highlight">
                   {unitLabel(unit)} / {t.grams}
                 </th>
                 {columns.map((c) => (
@@ -397,7 +405,7 @@ function DoseTable({
                     key={c}
                     scope="col"
                     className={`px-1.5 py-1.5 font-semibold ${
-                      c === activeCarbSteps ? "text-primary" : "text-sidebar-foreground/70"
+                      c === activeCarbSteps ? "bg-highlight/20 text-highlight" : "text-sidebar-foreground/70"
                     }`}
                   >
                     {Math.round(c * ratio * 10) / 10}
@@ -413,7 +421,9 @@ function DoseTable({
                     <th
                       scope="row"
                       className={`sticky left-0 whitespace-nowrap px-2 py-1.5 text-left font-medium ${
-                        rowActive ? "bg-sidebar text-primary" : "bg-sidebar text-sidebar-foreground/70"
+                        rowActive
+                          ? "bg-sidebar text-highlight shadow-[inset_3px_0_0_var(--highlight)]"
+                          : "bg-sidebar text-sidebar-foreground/70"
                       }`}
                     >
                       {row.label}
@@ -427,9 +437,9 @@ function DoseTable({
                           aria-current={active ? "true" : undefined}
                           className={`px-1.5 py-1.5 ${
                             active
-                              ? "bg-primary font-semibold text-primary-foreground"
+                              ? "bg-primary font-semibold text-primary-foreground ring-2 ring-inset ring-highlight"
                               : crossed
-                                ? "bg-primary/10"
+                                ? "bg-highlight/10"
                                 : ""
                           }`}
                         >
@@ -467,6 +477,7 @@ function NumberField({
   step,
   large,
   compactHint,
+  className = "",
 }: {
   id: string;
   label: string;
@@ -477,13 +488,14 @@ function NumberField({
   step: string;
   large?: boolean;
   compactHint?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
       <label htmlFor={id} className="truncate text-sm font-medium" title={label}>
         {label}
       </label>
-      <div className="flex items-center gap-2 rounded-xl bg-sidebar-accent px-3 focus-within:ring-2 focus-within:ring-primary">
+      <div className="flex items-center gap-2 rounded-xl border border-transparent bg-sidebar-accent px-3 transition-colors focus-within:border-highlight focus-within:ring-2 focus-within:ring-highlight/40">
         <input
           id={id}
           type="number"
