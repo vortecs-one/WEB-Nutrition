@@ -200,68 +200,72 @@ export default function InsulinCalculator({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 items-stretch gap-3 sm:gap-4">
-          <section
-            aria-labelledby={`${ids}-result`}
-            aria-live="polite"
-            className="flex min-w-0 flex-col gap-3"
-          >
-            <h3 id={`${ids}-result`} className={sectionTitle}>
-              {t.resultTitle}
-            </h3>
+        <section
+          aria-labelledby={`${ids}-result`}
+          aria-live="polite"
+          className="flex flex-col gap-2"
+        >
+          <h3 id={`${ids}-result`} className={`${sectionTitle} px-1`}>
+            {t.resultTitle}
+          </h3>
 
-            {!ready ? (
-              <p className="rounded-2xl bg-sidebar-accent p-4 text-sm text-sidebar-foreground/70">
-                {hasGlucose ? t.invalid : t.noReading}
+          {!ready ? (
+            <p className="rounded-2xl bg-sidebar-accent p-4 text-sm text-sidebar-foreground/70">
+              {hasGlucose ? t.invalid : t.noReading}
+            </p>
+          ) : isHypo ? (
+            <div
+              role="alert"
+              className="flex flex-col gap-2 rounded-2xl bg-destructive/15 p-4 text-destructive"
+            >
+              <p className="flex items-center gap-2 font-semibold">
+                <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                {t.hypoTitle}
               </p>
-            ) : isHypo ? (
-              <div
-                role="alert"
-                className="flex flex-col gap-2 rounded-2xl bg-destructive/15 p-4 text-destructive"
-              >
-                <p className="flex items-center gap-2 font-semibold">
-                  <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  {t.hypoTitle}
-                </p>
-                <p className="text-sm leading-relaxed">{t.hypoRule}</p>
-                <p className="text-sm">
-                  {t.carbsNeeded}:{" "}
-                  <span className="font-semibold tabular-nums">
-                    {carbsNeeded} {t.grams}
+              <p className="text-sm leading-relaxed">{t.hypoRule}</p>
+              <p className="text-sm">
+                {t.carbsNeeded}:{" "}
+                <span className="font-semibold tabular-nums">
+                  {carbsNeeded} {t.grams}
+                </span>
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="flex min-w-0 flex-col justify-between gap-3 rounded-2xl bg-primary p-3 text-primary-foreground sm:p-4">
+                  <span className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                    {t.totalDose}
                   </span>
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-1 flex-col gap-3">
-                <div className="flex flex-1 flex-col justify-between gap-4 rounded-2xl bg-primary p-4 text-primary-foreground">
-                  <span className="text-sm font-medium">{t.totalDose}</span>
-                  <span className="text-5xl font-semibold tabular-nums leading-none sm:text-6xl">
+                  <span className="flex items-baseline gap-1 text-4xl font-semibold tabular-nums leading-none sm:text-5xl">
                     {total.toFixed(1)}
-                    <span className="ml-1.5 text-lg font-medium">{t.units}</span>
+                    <span className="text-base font-medium sm:text-lg">{t.units}</span>
                   </span>
                 </div>
 
-                <dl className="flex flex-col gap-2 rounded-2xl bg-sidebar-accent p-3 text-sm sm:p-4">
+                <dl className="flex min-w-0 flex-col justify-center divide-y divide-sidebar-border rounded-2xl bg-sidebar-accent px-3 sm:px-4">
                   <ResultRow label={t.carbDose} value={fmtU(carbSteps)} />
                   <ResultRow label={t.correctionDose} value={fmtU(correction)} />
                   {iobApplied > 0 && <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied)} />}
                 </dl>
-
-                {carbsG > 0 && carbsG % ratioG > 1e-9 && (
-                  <p className="text-xs text-sidebar-foreground/60">
-                    {t.carbsRounded.replace("{grams}", String(carbSteps * ratioG))}
-                  </p>
-                )}
-
-                {total === 0 && (
-                  <p className="text-sm text-sidebar-foreground/70">{t.noInsulinNeeded}</p>
-                )}
               </div>
-            )}
-          </section>
 
-          <fieldset className="flex min-w-0 flex-col gap-3">
-            <legend className={`${sectionTitle} mb-3 p-0`}>{t.parameters}</legend>
+              {carbsG > 0 && carbsG % ratioG > 1e-9 && (
+                <p className="px-1 text-xs text-sidebar-foreground/60">
+                  {t.carbsRounded.replace("{grams}", String(carbSteps * ratioG))}
+                </p>
+              )}
+
+              {total === 0 && (
+                <p className="px-1 text-sm text-sidebar-foreground/70">{t.noInsulinNeeded}</p>
+              )}
+            </>
+          )}
+        </section>
+
+        <fieldset className="flex min-w-0 flex-col gap-4 rounded-2xl border border-sidebar-border p-3 sm:p-4">
+          <legend className={`${sectionTitle} px-1`}>{t.parameters}</legend>
+          <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 sm:gap-4">
             <NumberField
               id={`${ids}-ratio`}
               label={t.ratio}
@@ -282,24 +286,6 @@ export default function InsulinCalculator({
               step={glucoseStep}
               compactHint
             />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <NumberField
-                id={`${ids}-low`}
-                label={t.rangeLow}
-                suffix={glucoseUnit}
-                value={rangeLow}
-                onChange={setRangeLow}
-                step={glucoseStep}
-              />
-              <NumberField
-                id={`${ids}-high`}
-                label={t.rangeHigh}
-                suffix={glucoseUnit}
-                value={rangeHigh}
-                onChange={setRangeHigh}
-                step={glucoseStep}
-              />
-            </div>
             <NumberField
               id={`${ids}-iob`}
               label={t.iob}
@@ -310,9 +296,25 @@ export default function InsulinCalculator({
               step="0.5"
               compactHint
             />
-            <p className="text-xs text-sidebar-foreground/60">{t.sessionNote}</p>
-          </fieldset>
-        </div>
+            <NumberField
+              id={`${ids}-low`}
+              label={t.rangeLow}
+              suffix={glucoseUnit}
+              value={rangeLow}
+              onChange={setRangeLow}
+              step={glucoseStep}
+            />
+            <NumberField
+              id={`${ids}-high`}
+              label={t.rangeHigh}
+              suffix={glucoseUnit}
+              value={rangeHigh}
+              onChange={setRangeHigh}
+              step={glucoseStep}
+            />
+          </div>
+          <p className="text-xs text-sidebar-foreground/60">{t.sessionNote}</p>
+        </fieldset>
 
         {paramsValid && (
           <DoseTable
@@ -448,9 +450,9 @@ function DoseTable({
 
 function ResultRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-sidebar-foreground/70">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
+    <div className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <dt className="text-xs text-sidebar-foreground/70 sm:text-sm">{label}</dt>
+      <dd className="text-base font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -477,8 +479,8 @@ function NumberField({
   compactHint?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className="truncate text-sm font-medium" title={label}>
         {label}
       </label>
       <div className="flex items-center gap-2 rounded-xl bg-sidebar-accent px-3 focus-within:ring-2 focus-within:ring-primary">
