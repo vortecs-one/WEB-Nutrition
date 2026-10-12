@@ -444,6 +444,7 @@ function NumberField({
   onChange,
   step,
   large,
+  compactHint,
 }: {
   id: string;
   label: string;
@@ -453,6 +454,7 @@ function NumberField({
   onChange: (v: string) => void;
   step: string;
   large?: boolean;
+  compactHint?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -477,7 +479,10 @@ function NumberField({
         <span className="shrink-0 text-sm text-sidebar-foreground/60">{suffix}</span>
       </div>
       {hint && (
-        <p id={`${id}-hint`} className="text-xs text-sidebar-foreground/60">
+        <p
+          id={`${id}-hint`}
+          className={`text-xs text-sidebar-foreground/60 ${compactHint ? "hidden sm:block" : ""}`}
+        >
           {hint}
         </p>
       )}
