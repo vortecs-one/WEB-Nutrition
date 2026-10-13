@@ -135,6 +135,8 @@ export const dayLogEntries = pgTable(
     sugars: integer("sugars"),
     fiber: integer("fiber"),
     sodium: integer("sodium"),
+    // Minutes slept for kind="sleep", level 1-5 for kind="stress".
+    value: integer("value"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

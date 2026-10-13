@@ -11,7 +11,10 @@ import type {
   WaterEntry,
   DayData,
   DayLog,
+  SleepEntry,
+  StressEntry,
 } from "./types";
+import { DATE_KEY_RE, isSleepMinutes, isStressLevel } from "./types";
 
 // Resolve a stable per-user key from the session: prefer the Thruxion
 // human_id, fall back to the email. Returns null when unauthenticated so
@@ -81,6 +84,15 @@ export async function fetchUserDayLog(): Promise<DayLog> {
         id: row.id,
         amountMl: row.amountMl ?? 0,
       });
+    } else if (row.kind === "sleep") {
+      // Rows are newest-first, so the first one seen is the current value.
+      if (!day.sleep && isSleepMinutes(row.value)) {
+        day.sleep = { id: row.id, minutes: row.value };
+      }
+    } else if (row.kind === "stress") {
+      if (!day.stress && isStressLevel(row.value)) {
+        day.stress = { id: row.id, level: row.value };
+      }
     }
   }
 
@@ -202,6 +214,60 @@ export async function addWaterEntry(
     .returning({ id: dayLogEntries.id });
 
   return { id: row.id, amountMl };
+}
+
+// Replaces the user's single entry of `kind` for the day. Inputs are
+// re-validated here because server actions are callable from any client.
+async function setDailyValue(
+  kind: "sleep" | "stress",
+  dateKey: string,
+  value: number,
+): Promise<number | null> {
+  const userKey = await getUserKey();
+  if (!userKey) return null;
+  if (typeof dateKey !== "string" || !DATE_KEY_RE.test(dateKey)) return null;
+
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(dayLogEntries)
+      .where(
+        and(
+          eq(dayLogEntries.userKey, userKey),
+          eq(dayLogEntries.logDate, dateKey),
+          eq(dayLogEntries.kind, kind),
+        ),
+      );
+    const [row] = await tx
+      .insert(dayLogEntries)
+      .values({
+        userKey,
+        logDate: dateKey,
+        kind,
+        subtype: kind === "sleep" ? "night" : "self",
+        name: kind,
+        value,
+      })
+      .returning({ id: dayLogEntries.id });
+    return row.id;
+  });
+}
+
+export async function setSleepEntry(
+  dateKey: string,
+  minutes: number,
+): Promise<SleepEntry | null> {
+  if (!isSleepMinutes(minutes)) return null;
+  const id = await setDailyValue("sleep", dateKey, minutes);
+  return id === null ? null : { id, minutes };
+}
+
+export async function setStressEntry(
+  dateKey: string,
+  level: number,
+): Promise<StressEntry | null> {
+  if (!isStressLevel(level)) return null;
+  const id = await setDailyValue("stress", dateKey, level);
+  return id === null ? null : { id, level };
 }
 
 // Deletes one entry, always scoped to the signed-in user so a user can never

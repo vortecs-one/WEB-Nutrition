@@ -16,6 +16,8 @@ import {
   addSupplementEntry,
   addWaterEntry,
   removeEntry,
+  setSleepEntry,
+  setStressEntry,
 } from "./actions";
 import type {
   Meal,
@@ -24,6 +26,7 @@ import type {
   WaterEntry,
   DayData,
   DayLog,
+  StressLevel,
 } from "./types";
 
 // Re-export shared types & constants so existing imports from
@@ -58,6 +61,10 @@ type DayLogValue = {
   waterFor: (dateKey: string) => number;
   addWater: (dateKey: string, amountMl: number) => void;
   removeWater: (dateKey: string, id: number) => void;
+  sleepFor: (dateKey: string) => number | null;
+  setSleep: (dateKey: string, minutes: number) => void;
+  stressFor: (dateKey: string) => StressLevel | null;
+  setStress: (dateKey: string, level: StressLevel) => void;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
@@ -262,6 +269,44 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [runMutation],
   );
 
+  const sleepFor = useCallback(
+    (dateKey: string) => log[dateKey]?.sleep?.minutes ?? null,
+    [log],
+  );
+
+  const stressFor = useCallback(
+    (dateKey: string) => log[dateKey]?.stress?.level ?? null,
+    [log],
+  );
+
+  const setSleep = useCallback(
+    (dateKey: string, minutes: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            sleep: { id: d.sleep?.id ?? -Date.now(), minutes },
+          })),
+        () => setSleepEntry(dateKey, minutes),
+      );
+    },
+    [runMutation],
+  );
+
+  const setStress = useCallback(
+    (dateKey: string, level: StressLevel) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            stress: { id: d.stress?.id ?? -Date.now(), level },
+          })),
+        () => setStressEntry(dateKey, level),
+      );
+    },
+    [runMutation],
+  );
+
   const value = useMemo<DayLogValue>(
     () => ({
       dayData,
@@ -277,8 +322,16 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       waterFor,
       addWater,
       removeWater,
+      sleepFor,
+      setSleep,
+      stressFor,
+      setStress,
     }),
     [
+      sleepFor,
+      setSleep,
+      stressFor,
+      setStress,
       dayData,
       consumedFor,
       burnedFor,

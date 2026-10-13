@@ -6,8 +6,9 @@ import { useI18n } from "@/lib/i18n/provider";
 import { displayName, getCharacter } from "@/lib/pets/manager";
 import type { CharacterMood, Locale } from "@/lib/pets/types";
 import type { Dictionary } from "@/lib/i18n/dictionaries/es";
+import { AnimatedPortrait } from "./AnimatedPortrait";
 import { CharacterGallery } from "./CharacterGallery";
-import { CharacterPortrait } from "./CharacterPortrait";
+import { CompanionHealthStats } from "./CompanionHealthStats";
 import { useCompanion } from "./use-companion";
 
 export function moodLabel(dict: Dictionary, mood: CharacterMood): string {
@@ -69,12 +70,13 @@ export function CompanionDetailModal({ isOpen, onClose }: CompanionDetailModalPr
       <div className="flex flex-col gap-6">
         {companion && character && (
           <section className="flex flex-col gap-5 sm:flex-row">
-            <CharacterPortrait
+            <AnimatedPortrait
               character={character}
+              mood={companion.mood}
               locale={lang}
+              petLabel={dict.pets.petAction.replace("{name}", displayName(companion, lang))}
               sizes="(min-width: 640px) 240px, 90vw"
-              priority
-              className="aspect-square w-full shrink-0 rounded-2xl sm:w-60"
+              className="aspect-square w-full shrink-0 rounded-2xl sm:w-60 sm:self-start"
             />
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <div className="flex flex-col gap-1">
@@ -142,6 +144,8 @@ export function CompanionDetailModal({ isOpen, onClose }: CompanionDetailModalPr
             </div>
           </section>
         )}
+
+        {companion && <CompanionHealthStats />}
 
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold">{dict.pets.galleryTitle}</h3>
