@@ -214,6 +214,8 @@ const es = {
     photoDetected: "Detectado",
     photoNotFood: "No encontramos comida en la foto. Intenta con otra toma más cercana.",
     photoRateLimited: "Espera unos segundos antes de analizar otra foto.",
+    photoQuota:
+      "Alcanzaste el límite diario de análisis con IA. Vuelve mañana o registra el alimento manualmente.",
     photoError: "No se pudo analizar la foto. Inténtalo de nuevo.",
     photoCameraDenied: "No hay acceso a la cámara. Puedes subir una foto desde tu galería.",
     photoSourceAi: "Estimación IA",

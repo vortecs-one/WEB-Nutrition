@@ -38,7 +38,7 @@ export type FoodPhotoResult =
   | { ok: true; items: FoodPhotoItem[] }
   | {
       ok: false;
-      reason: "unauthenticated" | "invalid-image" | "rate-limited" | "not-food" | "error";
+      reason: "unauthenticated" | "invalid-image" | "rate-limited" | "quota" | "not-food" | "error";
     };
 
 export const LOW_CONFIDENCE = 0.5;

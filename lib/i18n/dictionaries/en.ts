@@ -215,6 +215,8 @@ const en: Dictionary = {
     photoDetected: "Detected",
     photoNotFood: "We couldn't find food in this photo. Try a closer shot.",
     photoRateLimited: "Wait a few seconds before analyzing another photo.",
+    photoQuota:
+      "You reached today's AI analysis limit. Come back tomorrow or log the food manually.",
     photoError: "Couldn't analyze the photo. Try again.",
     photoCameraDenied: "No camera access. You can upload a photo from your gallery.",
     photoSourceAi: "AI estimate",

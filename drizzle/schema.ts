@@ -10,6 +10,7 @@ import {
   integer,
   boolean,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // === Usuarios ===
@@ -199,6 +200,20 @@ export const glucoseSettings = pgTable("glucose_settings", {
     .notNull()
     .defaultNow(),
 });
+
+// === AI photo scans: daily counter that caps AI Gateway spend ===
+// One row per user per day, plus a "__global__" row for the app-wide cap.
+export const aiPhotoScans = pgTable(
+  "ai_photo_scans",
+  {
+    userKey: text("user_key").notNull(),
+    day: date("day").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userKey, table.day] }),
+  }),
+);
 
 // === Saved foods (barcode-scanned products bookmarked by user) ===
 // Stores food products saved by users for quick re-use. Each row is scoped

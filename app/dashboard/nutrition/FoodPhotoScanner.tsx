@@ -18,15 +18,16 @@ import {
   LOW_CONFIDENCE,
   REFERENCE_MIN_CONFIDENCE,
   type FoodPhotoItem,
+  type FoodPhotoResult,
 } from "@/lib/foods/photo-types";
 
 const isPreselected = (item: FoodPhotoItem) =>
   item.confidence >= (item.reference ? REFERENCE_MIN_CONFIDENCE : LOW_CONFIDENCE);
 
 type Phase = "camera" | "analyzing" | "review" | "failed";
-type FailReason = "not-food" | "rate-limited" | "error";
+type FailReason = "not-food" | "rate-limited" | "quota" | "error";
 
-const MAX_DIMENSION = 1024;
+const MAX_DIMENSION = 768;
 const JPEG_QUALITY = 0.8;
 
 function drawToDataUrl(source: CanvasImageSource, width: number, height: number) {
@@ -85,6 +86,7 @@ export default function FoodPhotoScanner({
   const [photo, setPhoto] = useState<string | null>(null);
   const [items, setItems] = useState<FoodPhotoItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const lastResultRef = useRef<{ dataUrl: string; result: FoodPhotoResult } | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -130,7 +132,12 @@ export default function FoodPhotoScanner({
     setPhase("analyzing");
     stopCamera();
     try {
-      const result = await analyzeFoodPhoto(dataUrl, locale === "en" ? "en" : "es");
+      const cached = lastResultRef.current;
+      const result =
+        cached && cached.dataUrl === dataUrl
+          ? cached.result
+          : await analyzeFoodPhoto(dataUrl, locale === "en" ? "en" : "es");
+      if (result.ok) lastResultRef.current = { dataUrl, result };
       if (result.ok) {
         setItems(result.items);
         setSelected(new Set(result.items.filter(isPreselected).map((i) => i.id)));
@@ -138,7 +145,9 @@ export default function FoodPhotoScanner({
         return;
       }
       setFailReason(
-        result.reason === "not-food" || result.reason === "rate-limited"
+        result.reason === "not-food" ||
+          result.reason === "rate-limited" ||
+          result.reason === "quota"
           ? result.reason
           : "error",
       );
@@ -312,7 +321,9 @@ export default function FoodPhotoScanner({
                   ? t.photoNotFood
                   : failReason === "rate-limited"
                     ? t.photoRateLimited
-                    : t.photoError}
+                    : failReason === "quota"
+                      ? t.photoQuota
+                      : t.photoError}
               </p>
               <button
                 type="button"
