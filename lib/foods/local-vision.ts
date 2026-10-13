@@ -103,7 +103,8 @@ export async function analyzeFoodPhotoLocally(
       return [toItem(entry, Math.min(1, confidence), locale)];
     });
     return items.length ? { ok: true, items } : { ok: false, reason: "not-food" };
-  } catch {
+  } catch (err) {
+    console.log("[v0] local vision failed:", err instanceof Error ? `${err.name}: ${err.message}\n${err.stack}` : String(err));
     return { ok: false, reason: "error" };
   }
 }
