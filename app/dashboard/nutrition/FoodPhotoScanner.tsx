@@ -49,10 +49,16 @@ function fileToDataUrl(file: File): Promise<string | null> {
       resolve(drawToDataUrl(img, img.naturalWidth, img.naturalHeight));
       URL.revokeObjectURL(url);
     };
-    img.onerror = () => {
-      resolve(null);
-      URL.revokeObjectURL(url);
-    };
+  img.onerror = () => {
+  URL.revokeObjectURL(url);
+  if (typeof createImageBitmap !== "function") return resolve(null);
+  createImageBitmap(file)
+    .then((bitmap) => {
+      resolve(drawToDataUrl(bitmap, bitmap.width, bitmap.height));
+      bitmap.close();
+    })
+    .catch(() => resolve(null));
+  };
     img.src = url;
   });
 }
@@ -169,8 +175,15 @@ export default function FoodPhotoScanner({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    if (dataUrl) void analyze(dataUrl);
+    const dataUrl = file.type.startsWith("image/") || file.type === "" ? await fileToDataUrl(file) : null;
+    if (dataUrl) {
+      void analyze(dataUrl);
+      return;
+    }
+    stopCamera();
+    setPhoto(null);
+    setFailReason("error");
+    setPhase("failed");
   };
 
   const retake = () => {
@@ -272,14 +285,16 @@ export default function FoodPhotoScanner({
             <Camera className="h-5 w-5" aria-hidden="true" />
             {t.photoTake}
           </button>
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent active:scale-95"
-          >
-            <ImageUp className="h-5 w-5" aria-hidden="true" />
+          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent focus-within:ring-2 focus-within:ring-highlight active:scale-95">
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={onFile}
+            />
+            <ImageUp className="h-5 w-5 text-highlight" aria-hidden="true" />
             <span className={cameraDenied ? "" : "sr-only sm:not-sr-only"}>{t.photoUpload}</span>
-          </button>
+          </label>
         </div>
       </div>
     );
