@@ -17,6 +17,7 @@
     "@vercel/blob": "^2.0.0",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
+    "ai": "^7.0.138",
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -31,7 +32,8 @@
     "recharts": "^3.8.0",
     "server-only": "^0.0.1",
     "swr": "^2.4.1",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",

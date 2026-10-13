@@ -16,6 +16,8 @@ import {
   Trash2,
   UtensilsCrossed,
   ChevronLeft,
+  Camera,
+  Sparkles,
 } from "lucide-react";
 import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
@@ -36,6 +38,8 @@ import {
 } from "@/lib/foods/nutrition";
 import NutritionFacts from "./NutritionFacts";
 import BarcodeScanner from "./BarcodeScanner";
+import FoodPhotoScanner from "./FoodPhotoScanner";
+import { photoItemToProduct, type FoodPhotoItem } from "@/lib/foods/photo-types";
 
 type Status = "idle" | "loading" | "not-found" | "error";
 
@@ -103,6 +107,7 @@ export default function BarcodeLookup({
   // then true in one handler batches into a single render where the value
   // never changes, so the scanner's [active] effect would never re-run.
   const [scanNonce, setScanNonce] = useState(0);
+  const [tab, setTab] = useState<"barcode" | "photo">("barcode");
 
   const anyModalOpen = savedOpen || detailFood !== null;
   useScrollLock(anyModalOpen);
@@ -211,6 +216,17 @@ export default function BarcodeLookup({
     ]);
   };
 
+  const addPhotoItemsToCart = (items: FoodPhotoItem[]) =>
+    setCart((prev) => [
+      ...prev,
+      ...items.map((item) => ({
+        key: `c${cartSeq++}`,
+        product: photoItemToProduct(item),
+        basis: "100g" as Basis,
+        amount: item.grams,
+      })),
+    ]);
+
   const addProductToCart = () => {
     if (!product) return;
     addToCart(product);
@@ -314,6 +330,60 @@ export default function BarcodeLookup({
           counts as one child of the outer space-y-4, so the rhythm between
           this group and whatever comes after (status text, product preview)
           is unaffected; only the seam between the two is removed. */}
+      <div
+        role="tablist"
+        aria-label={t.addMeal}
+        className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-muted p-1"
+      >
+        {(
+          [
+            { id: "barcode", label: t.tabBarcode, Icon: Barcode },
+            { id: "photo", label: t.tabPhoto, Icon: Camera },
+          ] as const
+        ).map(({ id, label, Icon }) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`addfood-tab-${id}`}
+              aria-selected={active}
+              aria-controls={`addfood-panel-${id}`}
+              onClick={() => setTab(id)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  const next = id === "barcode" ? "photo" : "barcode";
+                  setTab(next);
+                  document.getElementById(`addfood-tab-${next}`)?.focus();
+                }
+              }}
+              tabIndex={active ? 0 : -1}
+              className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition ${
+                active
+                  ? id === "photo"
+                    ? "bg-highlight text-highlight-foreground shadow-sm"
+                    : "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {label}
+              {id === "photo" && !active && (
+                <Sparkles className="h-3.5 w-3.5 text-highlight" aria-hidden="true" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "photo" ? (
+        <div role="tabpanel" id="addfood-panel-photo" aria-labelledby="addfood-tab-photo">
+          <FoodPhotoScanner onAdd={addPhotoItemsToCart} />
+        </div>
+      ) : (
+      <div role="tabpanel" id="addfood-panel-barcode" aria-labelledby="addfood-tab-barcode" className="space-y-4">
       <div>
       <form onSubmit={onSearch} className="flex">
         <div className="relative flex-1">
@@ -557,6 +627,8 @@ export default function BarcodeLookup({
             <p className="mt-4 text-sm text-muted-foreground">{t.noNutritionData}</p>
           )}
         </div>
+      )}
+      </div>
       )}
 
       {/* Saved foods modal */}

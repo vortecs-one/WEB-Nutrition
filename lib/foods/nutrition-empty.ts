@@ -1,0 +1,26 @@
+import type { FoodNutrition } from "./types";
+
+export const emptyNutrition = (): FoodNutrition => ({
+  caloriesServing: null,
+  calories100g: null,
+  energyKjServing: null,
+  energyKj100g: null,
+  proteinServing: null,
+  protein100g: null,
+  carbsServing: null,
+  carbs100g: null,
+  fatServing: null,
+  fat100g: null,
+  saturatedFatServing: null,
+  saturatedFat100g: null,
+  sugarsServing: null,
+  sugars100g: null,
+  addedSugarsServing: null,
+  addedSugars100g: null,
+  fiberServing: null,
+  fiber100g: null,
+  saltServing: null,
+  salt100g: null,
+  sodiumServing: null,
+  sodium100g: null,
+});
