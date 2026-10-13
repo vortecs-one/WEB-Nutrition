@@ -101,6 +101,7 @@ const en: Dictionary = {
     extraMeal: "Extra meal",
     dietLog: "Diet log",
     activityLog: "Activity log",
+    logFoodTitle: "Log food",
     barcodeTitle: "Add food by barcode",
     barcodePlaceholder: "Enter barcode",
     // Plain "Barcode" label for a found product's detail line — distinct from

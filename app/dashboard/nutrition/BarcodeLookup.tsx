@@ -653,7 +653,7 @@ export default function BarcodeLookup({
           role="presentation"
         >
           <div
-            className="w-full sm:max-w-lg bg-card text-card-foreground rounded-t-3xl sm:rounded-3xl shadow-lg max-h-[90vh] flex flex-col"
+            className="w-full sm:max-w-lg bg-card text-card-foreground rounded-t-3xl sm:rounded-3xl shadow-lg max-h-[92dvh] sm:max-h-[90dvh] flex flex-col overflow-hidden"
             role="dialog"
             aria-modal="true"
             aria-label={t.savedFoods}
@@ -678,7 +678,7 @@ export default function BarcodeLookup({
             </div>
 
             {/* Body */}
-            <div className="overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
               {loadingSaved ? (
                 <p className="text-sm text-muted-foreground">{dict.common.loading}</p>
               ) : savedFoods.length === 0 ? (
@@ -942,7 +942,7 @@ export default function BarcodeLookup({
           role="presentation"
         >
           <div
-            className="w-full sm:max-w-lg bg-card text-card-foreground rounded-t-3xl sm:rounded-3xl shadow-lg max-h-[90vh] overflow-y-auto"
+            className="w-full sm:max-w-lg bg-card text-card-foreground rounded-t-3xl sm:rounded-3xl shadow-lg max-h-[92dvh] sm:max-h-[90dvh] overflow-y-auto overscroll-contain"
             role="dialog"
             aria-modal="true"
             aria-label={detailFood.name}

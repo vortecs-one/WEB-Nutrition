@@ -100,6 +100,7 @@ const es = {
     extraMeal: "Comida extra",
     dietLog: "Registro de comidas",
     activityLog: "Registro de actividad",
+    logFoodTitle: "Registrar alimento",
     barcodeTitle: "Agregar alimento por código de barras",
     barcodePlaceholder: "Ingresa el código de barras",
     // Etiqueta simple para la línea de detalle de un producto encontrado —

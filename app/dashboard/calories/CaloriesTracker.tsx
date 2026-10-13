@@ -220,7 +220,7 @@ export default function CaloriesTracker() {
             <button
               type="button"
               onClick={() => setShowAddFood(true)}
-              aria-label={dict.nutritionUser.barcodeTitle}
+              aria-label={dict.nutritionUser.logFoodTitle}
               className="flex flex-col items-center gap-2 rounded-2xl p-1.5 sm:p-3 hover:bg-sidebar-accent active:scale-[0.98] transition"
             >
               <span className="relative flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-lime-500 text-white">
@@ -264,7 +264,7 @@ export default function CaloriesTracker() {
       <Modal
         isOpen={showAddFood}
         onClose={() => setShowAddFood(false)}
-        title={dict.nutritionUser.barcodeTitle}
+        title={dict.nutritionUser.logFoodTitle}
       >
         {dateKey && (
           <div className="space-y-5">
