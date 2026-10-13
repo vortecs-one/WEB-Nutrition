@@ -8,7 +8,9 @@ import type { VirtualCharacter } from "./types";
 export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
   {
     id: "pluto",
-    name: { es: "Pluto", en: "Pluto" },
+    // Shown as Rover (his 1930 name): "Pluto" dates from 1931 and enters the US
+    // public domain on 2027-01-01.
+    name: { es: "Rover", en: "Rover" },
     species: "dog",
     temperament: "loyal",
     description: {
@@ -26,6 +28,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "1930 design only (unnamed or as 'Rover'). The name 'Pluto' dates from 1931 and enters the US public domain in 2027. Disney holds active trademarks.",
       },
     },
+    rightsRisk: "high",
+    artwork: null,
     enabled: true,
   },
   {
@@ -48,6 +52,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "1920s silent-era design only. The 'Felix the Cat' trademark is still active (DreamWorks).",
       },
     },
+    rightsRisk: "high",
+    artwork: null,
     enabled: true,
   },
   {
@@ -70,6 +76,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "Based on the novel, where he is a European roe deer. Disney's 1942 film design is protected.",
       },
     },
+    rightsRisk: "low",
+    artwork: "/pets/bambi.png",
     enabled: true,
   },
   {
@@ -92,6 +100,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "Follow Shepard's illustrations. Disney's red shirt and design are protected.",
       },
     },
+    rightsRisk: "low",
+    artwork: "/pets/winnie-the-pooh.png",
     enabled: true,
   },
   {
@@ -114,6 +124,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "1929 comic strip version only. Later traits, such as spinach as his power source, may still be protected. King Features holds the trademark.",
       },
     },
+    rightsRisk: "high",
+    artwork: null,
     enabled: true,
   },
   {
@@ -136,6 +148,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "Public domain worldwide. Base designs on Tenniel's illustrations, not Disney's 1951 film.",
       },
     },
+    rightsRisk: "low",
+    artwork: "/pets/alice.png",
     enabled: true,
   },
   {
@@ -158,6 +172,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "Public domain worldwide. Avoid Disney's 1940 design: Tyrolean hat, red shorts, and gloves.",
       },
     },
+    rightsRisk: "low",
+    artwork: "/pets/pinocchio.png",
     enabled: true,
   },
   {
@@ -180,6 +196,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "Public domain in the US. The UK grants Great Ormond Street Hospital a perpetual royalty right. Avoid Disney's 1953 design.",
       },
     },
+    rightsRisk: "low",
+    artwork: "/pets/peter-pan.png",
     enabled: true,
   },
   {
@@ -202,6 +220,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "1928 black-and-white version only, without gloves. Disney actively enforces its trademarks: no logos or implied endorsement.",
       },
     },
+    rightsRisk: "high",
+    artwork: null,
     enabled: true,
   },
   {
@@ -224,8 +244,10 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
         en: "1928 black-and-white version only. Disney holds trademarks: no implied endorsement.",
       },
     },
+    rightsRisk: "high",
+    artwork: null,
     enabled: true,
   },
 ];
 
-export const DEFAULT_CHARACTER_ID = "pluto";
+export const DEFAULT_CHARACTER_ID = "bambi";

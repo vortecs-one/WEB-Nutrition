@@ -38,6 +38,13 @@ export interface PublicDomainInfo {
   usageNotes: Localized;
 }
 
+/**
+ * `low`: literary source, long in the public domain, no active studio claim on
+ * the original design. `high`: animation-studio character whose owner still
+ * holds active trademarks — artwork stays withheld until legal review.
+ */
+export type RightsRisk = "low" | "high";
+
 export interface VirtualCharacter {
   id: string;
   name: Localized;
@@ -45,6 +52,9 @@ export interface VirtualCharacter {
   temperament: CharacterTemperament;
   description: Localized;
   rights: PublicDomainInfo;
+  rightsRisk: RightsRisk;
+  /** Original artwork drawn from the public-domain source; null while withheld. */
+  artwork: string | null;
   enabled: boolean;
 }
 

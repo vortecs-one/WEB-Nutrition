@@ -4,6 +4,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Leaf, LogOut } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeSelector from "@/components/ThemeSelector";
 import RoleSwitcher from "@/components/RoleSwitcher";
 
 function formatLocaleDate(locale: string) {
@@ -47,6 +48,7 @@ export default function Topbar() {
         {/* TEST control to preview each experience */}
         <RoleSwitcher variant="light" />
         <LanguageSwitcher variant="light" className="hidden sm:inline-flex" />
+        <ThemeSelector />
 
         <div className="hidden items-center gap-2 sm:flex">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">

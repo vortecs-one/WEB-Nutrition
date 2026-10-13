@@ -1,6 +1,7 @@
 import { VIRTUAL_CHARACTERS } from "./characters";
 import type {
   CharacterAction,
+  CharacterMood,
   CharacterSpecies,
   CharacterState,
   Locale,
@@ -26,8 +27,35 @@ export function getCharacter(id: string): VirtualCharacter | undefined {
   return charactersById.get(id);
 }
 
+/**
+ * Only low-risk literary characters with original artwork can be adopted.
+ * Studio characters stay listed but locked while their owners hold active
+ * trademarks.
+ */
 export function isAvailableCharacter(id: string): boolean {
-  return charactersById.get(id)?.enabled === true;
+  const character = charactersById.get(id);
+  return (
+    character?.enabled === true &&
+    character.rightsRisk === "low" &&
+    character.artwork !== null
+  );
+}
+
+export const CHARACTER_MOODS = [
+  "happy",
+  "calm",
+  "neutral",
+  "worried",
+  "sad",
+  "proud",
+  "sleepy",
+] as const satisfies readonly CharacterMood[];
+
+export function isCharacterMood(value: unknown): value is CharacterMood {
+  return (
+    typeof value === "string" &&
+    (CHARACTER_MOODS as readonly string[]).includes(value)
+  );
 }
 
 export function sanitizeNickname(input: string | null): string | null {

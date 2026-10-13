@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import MobileTabBar from "./MobileTabBar";
+import ThemeSelector from "@/components/ThemeSelector";
 
 // Responsive shell:
 // - lg and up: fixed sidebar alongside the content (classic dashboard).
@@ -24,6 +25,13 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         <MobileTabBar />
         <main className="flex-1 overflow-auto p-4 lg:p-8">{children}</main>
       </div>
+
+      {/* The Topbar is desktop-only, so small screens get a floating theme control. */}
+      <ThemeSelector
+        placement="up"
+        className="fixed bottom-4 right-4 z-40 shadow-lg lg:hidden"
+      />
+
     </div>
   );
 }

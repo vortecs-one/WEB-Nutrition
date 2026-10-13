@@ -448,6 +448,47 @@ const es = {
     setupBodyGeneric:
       "Elige cómo obtener tus lecturas: inicia sesión con LibreLinkUp para leer directamente los datos de tu app LibreLink, o conecta tu propio sitio Nightscout.",
   },
+  theme: {
+    label: "Tema de color",
+    midnight: "Medianoche",
+    ocean: "Océano",
+    forest: "Bosque",
+    cocoa: "Cacao",
+  },
+  pets: {
+    title: "Tu compañero",
+    emptyTitle: "Elige un compañero",
+    emptyBody:
+      "Un personaje clásico de dominio público que te acompañará en tu día.",
+    choose: "Elegir",
+    viewDetails: "Ver detalle",
+    detailTitle: "Compañero virtual",
+    galleryTitle: "Personajes disponibles",
+    mood: "Ánimo",
+    moodPending:
+      "Pronto su ánimo reaccionará a tus comidas, agua y glucosa.",
+    moodHappy: "Feliz",
+    moodCalm: "Tranquilo",
+    moodNeutral: "Normal",
+    moodWorried: "Preocupado",
+    moodSad: "Triste",
+    moodProud: "Orgulloso",
+    moodSleepy: "Con sueño",
+    nickname: "Apodo",
+    nicknamePlaceholder: "Opcional, hasta 24 caracteres",
+    save: "Guardar",
+    adopt: "Elegir",
+    current: "Actual",
+    release: "Quitar compañero",
+    locked: "Bloqueado",
+    lockedNote:
+      "Pendiente de revisión de derechos: su estudio aún mantiene marcas registradas activas.",
+    source: "Obra original",
+    publicDomainSince: "Dominio público (EE. UU.) desde",
+    rightsNote:
+      "Ilustraciones originales basadas en los textos de dominio público, sin relación con ningún estudio.",
+    errorGeneric: "No se pudo guardar. Inténtalo de nuevo.",
+  },
   auth: {
     loginTitle: "Iniciar sesión",
     login: "Iniciar sesión",

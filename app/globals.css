@@ -134,6 +134,38 @@
   --sidebar-ring: #ffbe00;
 }
 
+/* User-selectable background palettes layered on the dark brand theme.
+   Only surface tokens change so brand accents keep their contrast. */
+.dark.theme-ocean {
+  --background: #0b1520;
+  --card: #111d2b;
+  --popover: #111d2b;
+  --secondary: #1b2a3c;
+  --muted: #1b2a3c;
+  --sidebar: #0e1926;
+  --sidebar-accent: #1b2a3c;
+}
+
+.dark.theme-forest {
+  --background: #0c1511;
+  --card: #121e18;
+  --popover: #121e18;
+  --secondary: #1d2c24;
+  --muted: #1d2c24;
+  --sidebar: #0f1a14;
+  --sidebar-accent: #1d2c24;
+}
+
+.dark.theme-cocoa {
+  --background: #16110e;
+  --card: #1f1814;
+  --popover: #1f1814;
+  --secondary: #2c231d;
+  --muted: #2c231d;
+  --sidebar: #1a1411;
+  --sidebar-accent: #2c231d;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
