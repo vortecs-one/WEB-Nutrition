@@ -1,5 +1,6 @@
 import type { FoodPhotoItem, FoodPhotoPer100g } from "./photo-types";
 import { REFERENCE_BY_ID, REFERENCE_TABLE, type ReferenceEntry } from "./reference-table";
+import { macrosFor } from "./reference-macros";
 
 export type RawPhotoItem = {
   name: string;
@@ -90,6 +91,52 @@ export function sanitizePer100g(raw: FoodPhotoPer100g, carbsOverride?: number): 
     fat: round1(fat),
     fiber: round1(fiber),
     sugars: round1(sugars),
+  };
+}
+
+export function searchReference(query: string, limit = 8): ReferenceEntry[] {
+  const q = normalize(query);
+  if (!q) return [];
+  const scored: { entry: ReferenceEntry; rank: number }[] = [];
+  for (const entry of REFERENCE_TABLE) {
+    let rank = Infinity;
+    for (const name of [entry.nameEs, entry.nameEn, ...entry.aliases]) {
+      const key = normalize(name);
+      const at = key.indexOf(q);
+      if (at === -1) continue;
+      rank = Math.min(rank, at === 0 ? 0 : key.includes(` ${q}`) ? 1 : 2);
+    }
+    if (rank !== Infinity) scored.push({ entry, rank });
+  }
+  return scored.sort((a, b) => a.rank - b.rank).slice(0, limit).map((s) => s.entry);
+}
+
+// Builds an item straight from the Tabla H. de C.: one table portion by default,
+// carbs locked to the table, other macros from the open-data snapshot.
+export function referenceToItem(
+  entry: ReferenceEntry,
+  locale: "es" | "en",
+  options: { id: string; confidence?: number; grams?: number; alternatives?: string[] },
+): FoodPhotoItem {
+  const macros = macrosFor(entry.id);
+  return {
+    id: options.id,
+    name: locale === "en" ? entry.nameEn : entry.nameEs,
+    grams: options.grams ?? entry.portionGrams,
+    confidence: Math.round((options.confidence ?? 1) * 100) / 100,
+    source: "reference",
+    per100g: sanitizePer100g(
+      { calories: 0, carbs: entry.carbsPer100g, ...macros },
+      entry.carbsPer100g,
+    ),
+    reference: {
+      id: entry.id,
+      portion: locale === "en" ? entry.portionEn : entry.portionEs,
+      portionGrams: entry.portionGrams,
+      portionCarbs: entry.portionCarbs,
+      ...(entry.warning ? { warning: entry.warning } : {}),
+    },
+    ...(options.alternatives?.length ? { alternatives: options.alternatives } : {}),
   };
 }
 

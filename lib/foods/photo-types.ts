@@ -29,6 +29,8 @@ export type FoodPhotoItem = {
   source: FoodPhotoSource;
   per100g: FoodPhotoPer100g;
   reference?: FoodPhotoReference;
+  // Other reference-table ids the model ranked next, offered as one-tap swaps.
+  alternatives?: string[];
 };
 
 // Matched items are trusted for carbs, so they're pre-selected at a lower bar.

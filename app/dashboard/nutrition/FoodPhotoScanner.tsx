@@ -20,6 +20,11 @@ import {
   type FoodPhotoItem,
   type FoodPhotoResult,
 } from "@/lib/foods/photo-types";
+import { referenceToItem } from "@/lib/foods/photo-postprocess";
+import { REFERENCE_BY_ID, type ReferenceEntry } from "@/lib/foods/reference-table";
+import ReferencePicker from "./ReferencePicker";
+
+const PORTION_STEPS = [0.5, 1, 1.5, 2, 3];
 
 const isPreselected = (item: FoodPhotoItem) =>
   item.confidence >= (item.reference ? REFERENCE_MIN_CONFIDENCE : LOW_CONFIDENCE);
@@ -190,6 +195,7 @@ export default function FoodPhotoScanner({
     setItems([]);
     setSelected(new Set());
     setPhoto(null);
+    setPickerFor(null);
     setPhase("camera");
   };
 
@@ -205,6 +211,44 @@ export default function FoodPhotoScanner({
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, grams: Math.max(0, Math.round(grams)) } : i)),
     );
+
+  const lang = locale === "en" ? "en" : "es";
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+
+  const swapItem = (id: string, entry: ReferenceEntry) => {
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        const previous = i.reference?.id;
+        const alternatives = [previous, ...(i.alternatives ?? [])].filter(
+          (alt): alt is string => !!alt && alt !== entry.id,
+        );
+        return referenceToItem(entry, lang, { id, confidence: 1, alternatives });
+      }),
+    );
+    setSelected((prev) => new Set(prev).add(id));
+    setPickerFor(null);
+  };
+
+  const addItem = (entry: ReferenceEntry) => {
+    const id = `manual-${entry.id}-${items.length}`;
+    setItems((prev) => [...prev, referenceToItem(entry, lang, { id, confidence: 1 })]);
+    setSelected((prev) => new Set(prev).add(id));
+    setPickerFor(null);
+  };
+
+  const picker = (onPick: (entry: ReferenceEntry) => void) => (
+    <ReferencePicker
+      locale={lang}
+      placeholder={t.photoSearchPlaceholder}
+      emptyLabel={t.photoSearchEmpty}
+      closeLabel={t.photoSearchClose}
+      carbsLabel={t.photoCarbsShort}
+      unitG={t.unitG}
+      onPick={onPick}
+      onClose={() => setPickerFor(null)}
+    />
+  );
 
   const chosen = items.filter((i) => selected.has(i.id) && i.grams > 0);
   const totals = chosen.reduce(
@@ -411,16 +455,66 @@ export default function FoodPhotoScanner({
                                   {item.reference.portionCarbs} {t.unitG} {t.photoCarbsShort}
                                 </span>
                               </span>
-                              {item.grams !== item.reference.portionGrams && (
-                                <button
-                                  type="button"
-                                  onClick={() => setGrams(item.id, item.reference!.portionGrams)}
-                                  className="inline-flex min-h-7 items-center rounded-md border border-highlight/40 px-2 text-[11px] font-medium text-highlight transition hover:bg-highlight/10"
-                                >
-                                  {t.photoUsePortion}
-                                </button>
-                              )}
                             </div>
+                          )}
+                          {item.reference && (
+                            <div
+                              role="group"
+                              aria-label={t.photoPortions}
+                              className="mt-2 flex flex-wrap items-center gap-1"
+                            >
+                              {PORTION_STEPS.map((step) => {
+                                const grams = Math.round(step * item.reference!.portionGrams);
+                                const active = item.grams === grams;
+                                return (
+                                  <button
+                                    key={step}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => setGrams(item.id, grams)}
+                                    className={`inline-flex min-h-8 items-center rounded-md border px-2.5 text-xs font-medium tabular-nums transition ${active ? "border-highlight bg-highlight text-highlight-foreground" : "border-border text-muted-foreground hover:border-highlight/50 hover:text-foreground"}`}
+                                  >
+                                    {step === 0.5 ? "½" : step === 1.5 ? "1½" : step}×
+                                  </button>
+                                );
+                              })}
+                              <span className="ml-1 text-xs tabular-nums text-highlight">
+                                {Math.round(
+                                  (item.grams / item.reference.portionGrams) * item.reference.portionCarbs * 10,
+                                ) / 10}{" "}
+                                {t.unitG} {t.photoCarbsShort}
+                              </span>
+                            </div>
+                          )}
+                          {(item.alternatives?.length ?? 0) > 0 && pickerFor !== item.id && (
+                            <div className="mt-2 flex flex-wrap items-center gap-1">
+                              <span className="text-[11px] text-muted-foreground">{t.photoAlternatives}</span>
+                              {item.alternatives!.slice(0, 3).flatMap((altId) => {
+                                const alt = REFERENCE_BY_ID.get(altId);
+                                if (!alt) return [];
+                                return [
+                                  <button
+                                    key={altId}
+                                    type="button"
+                                    onClick={() => swapItem(item.id, alt)}
+                                    className="inline-flex min-h-7 items-center rounded-full bg-muted px-2.5 text-[11px] font-medium text-foreground transition hover:bg-accent"
+                                  >
+                                    {lang === "en" ? alt.nameEn : alt.nameEs}
+                                  </button>,
+                                ];
+                              })}
+                            </div>
+                          )}
+                          {pickerFor === item.id ? (
+                            <div className="mt-2">{picker((entry) => swapItem(item.id, entry))}</div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPickerFor(item.id)}
+                              className="mt-2 inline-flex min-h-7 items-center gap-1 rounded-md px-1 text-[11px] font-medium text-highlight underline-offset-2 transition hover:underline"
+                            >
+                              {t.photoChangeFood}
+                            </button>
                           )}
                           {item.reference?.warning === "lactose-free" && (
                             <p className="mt-1.5 flex items-start gap-1 text-xs text-chart-3 text-pretty">
@@ -471,6 +565,18 @@ export default function FoodPhotoScanner({
                   );
                 })}
               </ul>
+              {pickerFor === "new" ? (
+                picker(addItem)
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPickerFor("new")}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-highlight/50 px-4 text-sm font-medium text-highlight transition hover:bg-highlight/5"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {t.photoAddItem}
+                </button>
+              )}
             </div>
           )}
         </div>

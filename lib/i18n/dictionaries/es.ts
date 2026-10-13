@@ -223,6 +223,13 @@ const es = {
     photoLowConfidence: "Confirma",
     photoCarbsShort: "HC",
     photoUsePortion: "Usar porción",
+    photoPortions: "Porciones",
+    photoAlternatives: "¿Es otro?",
+    photoChangeFood: "Cambiar alimento",
+    photoAddItem: "Agregar alimento de la tabla",
+    photoSearchPlaceholder: "Buscar en la tabla…",
+    photoSearchEmpty: "Sin resultados en la tabla",
+    photoSearchClose: "Cerrar búsqueda",
     photoRefCarbsNote:
       "Carbohidratos según Tabla H. de C.; calorías, proteínas y grasas estimadas por IA.",
     photoWarnLactoseFree: "No utilizar leche sin lactosa (contiene glucosa).",

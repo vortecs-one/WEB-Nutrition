@@ -224,6 +224,13 @@ const en: Dictionary = {
     photoLowConfidence: "Confirm",
     photoCarbsShort: "carbs",
     photoUsePortion: "Use portion",
+    photoPortions: "Portions",
+    photoAlternatives: "Something else?",
+    photoChangeFood: "Change food",
+    photoAddItem: "Add food from the table",
+    photoSearchPlaceholder: "Search the table…",
+    photoSearchEmpty: "No matches in the table",
+    photoSearchClose: "Close search",
     photoRefCarbsNote:
       "Carbs from the Tabla H. de C. reference; calories, protein and fat are AI estimates.",
     photoWarnLactoseFree: "Avoid lactose-free milk (it contains glucose).",
