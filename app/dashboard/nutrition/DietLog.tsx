@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 import {
+  Check,
+  ScanBarcode,
   Egg,
   Soup,
   Pizza,
@@ -55,6 +58,58 @@ function pickDefaultBasis(p: FoodProduct): Basis {
   return hasBasis(p.nutrition, "serving") ? "serving" : "100g";
 }
 
+// ─── Picker sheet shell ───────────────────────────────────────────────────────
+
+type PickerSheetProps = {
+  label: string;
+  widthClass: string;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+// Portaled to <body> so it stacks above the add-food Modal instead of being
+// trapped inside its scroll container.
+function PickerSheet({ label, widthClass, onClose, children }: PickerSheetProps) {
+  useScrollLock(true);
+
+  useEffect(() => {
+    // Window capture runs before the parent Modal's document listener, so
+    // Escape closes only this picker.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
+      onClick={(e) => {
+        // React events bubble through portals; keep the click from reaching
+        // the parent Modal's backdrop.
+        e.stopPropagation();
+        onClose();
+      }}
+      role="presentation"
+    >
+      <div
+        className={`flex max-h-[92dvh] w-full ${widthClass} flex-col rounded-t-3xl border-t border-highlight/20 bg-card text-card-foreground shadow-2xl sm:max-h-[85dvh] sm:rounded-3xl sm:border`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted sm:hidden" aria-hidden="true" />
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ─── Meal-builder modal ───────────────────────────────────────────────────────
 
 type MealBuilderModalProps = {
@@ -73,7 +128,6 @@ function MealBuilderModal({
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { addMeals } = useDayLog();
-  useScrollLock(true);
 
   const { data: savedFoods = [], isLoading: foodsLoading } = useSWR(
     "saved-foods",
@@ -156,7 +210,7 @@ function MealBuilderModal({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
+    if (!q) return savedFoods;
     return savedFoods.filter(
       (f) =>
         f.name.toLowerCase().includes(q) ||
@@ -165,22 +219,18 @@ function MealBuilderModal({
   }, [query, savedFoods]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        className="w-full max-w-lg bg-card text-card-foreground rounded-t-3xl shadow-xl max-h-[92dvh] flex flex-col"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${t.addMeal} — ${label}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0">
-          <h3 className="text-base font-semibold">
-            {t.addMeal} — <span className="text-primary">{label}</span>
-          </h3>
+    <PickerSheet label={`${t.addMeal} — ${label}`} widthClass="max-w-lg" onClose={onClose}>
+        <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-border shrink-0 sm:pt-5">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold">
+              {t.addMeal} — <span className="text-highlight">{label}</span>
+            </h3>
+            {savedFoods.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t.savedFoodsCount.replace("{n}", String(savedFoods.length))}
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -198,8 +248,9 @@ function MealBuilderModal({
               aria-hidden="true"
             />
             <input
-              className="w-full rounded-xl border border-border bg-background pl-9 pr-10 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-xl border border-border bg-background pl-9 pr-10 min-h-12 text-base outline-none focus:border-highlight/60 focus:ring-2 focus:ring-highlight/40"
               value={query}
+              aria-label={t.savedFoods}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.foodSearchHint}
               autoComplete="off"
@@ -233,13 +284,17 @@ function MealBuilderModal({
               ))}
             </ul>
           ) : savedFoods.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {t.savedFoodsEmpty}
-            </p>
-          ) : !query.trim() ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {t.foodSearchHint}
-            </p>
+            <div className="flex flex-col items-center gap-4 py-10 text-center">
+              <p className="text-sm text-muted-foreground text-pretty">{t.savedFoodsEmpty}</p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center gap-2 rounded-xl border border-highlight/40 bg-highlight/10 px-4 min-h-11 text-sm font-semibold text-highlight hover:bg-highlight/20 active:scale-[0.98] transition"
+              >
+                <ScanBarcode className="h-5 w-5" aria-hidden="true" />
+                {t.savedFoodsEmptyCta}
+              </button>
+            </div>
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               {t.noNutritionData}
@@ -270,20 +325,27 @@ function MealBuilderModal({
                           </div>
                         )}
                       </div>
-                      {v.calories != null && (
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          {Math.round(v.calories)} {t.kcal}
-                        </span>
-                      )}
+                      <div className="shrink-0 text-right text-xs tabular-nums leading-tight">
+                        {v.calories != null && (
+                          <div className="font-medium text-foreground">
+                            {Math.round(v.calories)} {t.kcal}
+                          </div>
+                        )}
+                        {v.carbs != null && (
+                          <div className="text-muted-foreground">
+                            {v.carbs.toFixed(1)}{t.unitG} {t.macroCarbs}
+                          </div>
+                        )}
+                      </div>
                       <span
-                        className={`shrink-0 flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                        className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-full border transition ${
                           inCart
-                            ? "border-primary bg-primary text-primary-foreground"
+                            ? "border-highlight bg-highlight text-highlight-foreground"
                             : "border-border bg-background text-muted-foreground"
                         }`}
                       >
                         {inCart ? (
-                          <span className="text-[11px] font-bold leading-none">✓</span>
+                          <Check className="h-4 w-4" aria-hidden="true" />
                         ) : (
                           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                         )}
@@ -299,7 +361,7 @@ function MealBuilderModal({
                               onClick={() => setItemBasis(cartItem.key, "serving")}
                               className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
                                 cartItem.basis === "serving"
-                                  ? "bg-primary text-primary-foreground"
+                                  ? "bg-highlight text-highlight-foreground"
                                   : "text-muted-foreground"
                               }`}
                             >
@@ -310,7 +372,7 @@ function MealBuilderModal({
                               onClick={() => setItemBasis(cartItem.key, "100g")}
                               className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
                                 cartItem.basis === "100g"
-                                  ? "bg-primary text-primary-foreground"
+                                  ? "bg-highlight text-highlight-foreground"
                                   : "text-muted-foreground"
                               }`}
                             >
@@ -396,8 +458,7 @@ function MealBuilderModal({
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </PickerSheet>
   );
 }
 
@@ -412,7 +473,6 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { addSupplement } = useDayLog();
-  useScrollLock(true);
 
   const { data: savedFoods = [], isLoading: foodsLoading } = useSWR(
     "saved-foods",
@@ -436,7 +496,7 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
 
   const filtered = useMemo(() => {
     const q = suppName.trim().toLowerCase();
-    if (!q) return [];
+    if (!q) return savedFoods;
     return savedFoods.filter(
       (f) =>
         f.name.toLowerCase().includes(q) ||
@@ -445,19 +505,8 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
   }, [suppName, savedFoods]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        className="w-full max-w-md bg-card text-card-foreground rounded-t-3xl shadow-xl max-h-[92dvh] flex flex-col"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t.addSupplement}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0">
+    <PickerSheet label={t.addSupplement} widthClass="max-w-md" onClose={onClose}>
+        <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-border shrink-0 sm:pt-5">
           <h3 className="text-base font-semibold">{t.addSupplement}</h3>
           <button
             type="button"
@@ -477,8 +526,9 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
               aria-hidden="true"
             />
             <input
-              className="w-full rounded-xl border border-border bg-background pl-9 pr-10 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-xl border border-border bg-background pl-9 pr-10 min-h-12 text-base outline-none focus:border-highlight/60 focus:ring-2 focus:ring-highlight/40"
               value={suppName}
+              aria-label={t.supplementName}
               onChange={(e) => setSuppName(e.target.value)}
               autoComplete="off"
               placeholder={t.foodSearchHint}
@@ -509,9 +559,7 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
               ))}
             </ul>
           ) : savedFoods.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{t.savedFoodsEmpty}</p>
-          ) : !suppName.trim() ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{t.foodSearchHint}</p>
+            <p className="py-10 text-center text-sm text-muted-foreground text-pretty">{t.savedFoodsEmpty}</p>
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{t.noNutritionData}</p>
           ) : (
@@ -530,8 +578,8 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
                       )}
                     </div>
                     {suppName.trim().toLowerCase() === food.name.toLowerCase() && (
-                      <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground">
-                        <span className="text-[11px] font-bold leading-none">✓</span>
+                      <span className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full border border-highlight bg-highlight text-highlight-foreground">
+                        <Check className="h-4 w-4" aria-hidden="true" />
                       </span>
                     )}
                   </button>
@@ -574,8 +622,7 @@ function SupplementModal({ todayKey, onClose }: SupplementModalProps) {
             {t.add}
           </button>
         </form>
-      </div>
-    </div>
+    </PickerSheet>
   );
 }
 
@@ -651,7 +698,7 @@ export default function DietLog({
             : "bg-card text-card-foreground rounded-3xl border border-border shadow-sm p-5"
         }
       >
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
           {mealTypes.map(({ type, label, icon: Icon }) => {
             const total = caloriesFor(type);
             return (
@@ -659,17 +706,18 @@ export default function DietLog({
                 key={type}
                 type="button"
                 onClick={() => setAddType(type)}
-                className="flex flex-col items-center gap-2 rounded-2xl p-2 hover:bg-accent active:scale-[0.97] transition"
+                aria-label={total > 0 ? `${label}, ${total} ${t.kcal}` : `${t.addMeal} — ${label}`}
+                className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-highlight/50 active:scale-[0.97] transition sm:gap-2 sm:p-2"
               >
-                <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                  <Icon className="h-7 w-7" aria-hidden="true" />
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-highlight/15 text-highlight ring-1 ring-highlight/25 group-hover:bg-highlight/25 transition sm:h-14 sm:w-14">
+                  <Icon className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-highlight px-1 text-highlight-foreground ring-2 ring-card">
                     {total > 0
-                      ? <span className="text-[10px] font-bold leading-none">{total}</span>
+                      ? <span className="text-[10px] font-bold leading-none tabular-nums">{total}</span>
                       : <Plus className="h-3 w-3" aria-hidden="true" />}
                   </span>
                 </span>
-                <span className="flex min-h-8 items-center text-xs font-medium text-center leading-tight">
+                <span className="flex min-h-8 w-full items-center justify-center text-[11px] font-medium text-center leading-tight sm:text-xs">
                   {label}
                 </span>
               </button>
@@ -679,17 +727,18 @@ export default function DietLog({
           <button
             type="button"
             onClick={() => setSuppModalOpen(true)}
-            className="flex flex-col items-center gap-2 rounded-2xl p-2 hover:bg-accent active:scale-[0.97] transition"
+            aria-label={supplements.length > 0 ? `${t.supplements}, ${supplements.length}` : t.addSupplement}
+            className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-highlight/50 active:scale-[0.97] transition sm:gap-2 sm:p-2"
           >
-            <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
-              <Pill className="h-7 w-7" aria-hidden="true" />
-              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-highlight/15 text-highlight ring-1 ring-highlight/25 group-hover:bg-highlight/25 transition sm:h-14 sm:w-14">
+              <Pill className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+              <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-highlight px-1 text-highlight-foreground ring-2 ring-card">
                 {supplements.length > 0
-                  ? <span className="text-[10px] font-bold leading-none">{supplements.length}</span>
+                  ? <span className="text-[10px] font-bold leading-none tabular-nums">{supplements.length}</span>
                   : <Plus className="h-3 w-3" aria-hidden="true" />}
               </span>
             </span>
-            <span className="flex min-h-8 items-center text-xs font-medium text-center leading-tight">
+            <span className="flex min-h-8 w-full items-center justify-center text-[11px] font-medium text-center leading-tight sm:text-xs">
               {t.supplements}
             </span>
           </button>

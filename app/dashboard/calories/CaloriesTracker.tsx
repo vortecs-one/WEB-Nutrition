@@ -268,8 +268,12 @@ export default function CaloriesTracker() {
       >
         {dateKey && (
           <div className="space-y-5">
-            <DietLog todayKey={dateKey} embedded showHistory={false} />
-            <BarcodeLookup todayKey={dateKey} embedded autoStart />
+<BarcodeLookup
+  todayKey={dateKey}
+  embedded
+  autoStart
+  quickAdd={<DietLog todayKey={dateKey} embedded showHistory={false} />}
+/>
           </div>
         )}
       </Modal>

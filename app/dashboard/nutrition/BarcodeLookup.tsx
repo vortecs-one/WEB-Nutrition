@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 import {
   Barcode,
@@ -73,8 +73,12 @@ export default function BarcodeLookup({
   todayKey,
   embedded = false,
   autoStart = false,
+  quickAdd,
 }: {
   todayKey: string;
+  // Manual-entry launcher (e.g. the meal-type icon row) rendered under the
+  // camera frame in both tabs.
+  quickAdd?: ReactNode;
   // When embedded inside another card (e.g. the diet log), drop the outer
   // card chrome so it reads as a sub-section rather than a nested card.
   embedded?: boolean;
@@ -314,7 +318,14 @@ export default function BarcodeLookup({
       { label: t.macroProtein, value: `${fmt1(v.protein)}${t.unitG}` },
       { label: t.macroCarbs, value: `${fmt1(v.carbs)}${t.unitG}` },
       { label: t.macroFat, value: `${fmt1(v.fat)}${t.unitG}` },
-    ].filter((c) => !c.value.startsWith("—"));
+  ].filter((c) => !c.value.startsWith("—"));
+
+  const quickAddSection = quickAdd ? (
+    <section aria-label={t.orAddManually} className="flex flex-col gap-3 rounded-2xl border border-highlight/20 bg-highlight/5 p-3 sm:p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-highlight">{t.orAddManually}</p>
+      {quickAdd}
+    </section>
+  ) : null;
 
   return (
     <div
@@ -379,8 +390,9 @@ export default function BarcodeLookup({
       </div>
 
       {tab === "photo" ? (
-        <div role="tabpanel" id="addfood-panel-photo" aria-labelledby="addfood-tab-photo">
+        <div role="tabpanel" id="addfood-panel-photo" aria-labelledby="addfood-tab-photo" className="space-y-4">
           <FoodPhotoScanner onAdd={addPhotoItemsToCart} />
+          {quickAddSection}
         </div>
       ) : (
       <div role="tabpanel" id="addfood-panel-barcode" aria-labelledby="addfood-tab-barcode" className="space-y-4">
@@ -433,6 +445,8 @@ export default function BarcodeLookup({
         onActivate={() => setScannerOpen(true)}
       />
       </div>
+
+      {quickAddSection}
 
       {/* Status region. The live region itself stays mounted and only its
           contents swap — several screen readers won't announce content that
