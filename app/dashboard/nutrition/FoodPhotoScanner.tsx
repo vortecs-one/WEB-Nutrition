@@ -14,7 +14,14 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { analyzeFoodPhoto } from "@/lib/foods/vision";
-import { LOW_CONFIDENCE, type FoodPhotoItem } from "@/lib/foods/photo-types";
+import {
+  LOW_CONFIDENCE,
+  REFERENCE_MIN_CONFIDENCE,
+  type FoodPhotoItem,
+} from "@/lib/foods/photo-types";
+
+const isPreselected = (item: FoodPhotoItem) =>
+  item.confidence >= (item.reference ? REFERENCE_MIN_CONFIDENCE : LOW_CONFIDENCE);
 
 type Phase = "camera" | "analyzing" | "review" | "failed";
 type FailReason = "not-food" | "rate-limited" | "error";
@@ -126,9 +133,7 @@ export default function FoodPhotoScanner({
       const result = await analyzeFoodPhoto(dataUrl, locale === "en" ? "en" : "es");
       if (result.ok) {
         setItems(result.items);
-        setSelected(
-          new Set(result.items.filter((i) => i.confidence >= LOW_CONFIDENCE).map((i) => i.id)),
-        );
+        setSelected(new Set(result.items.filter(isPreselected).map((i) => i.id)));
         setPhase("review");
         return;
       }
@@ -371,6 +376,31 @@ export default function FoodPhotoScanner({
                               </span>
                             )}
                           </div>
+                          {item.reference && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                              <span className="tabular-nums">
+                                {item.reference.portion} · {item.reference.portionGrams} {t.unitG} ·{" "}
+                                <span className="font-medium text-highlight">
+                                  {item.reference.portionCarbs} {t.unitG} {t.photoCarbsShort}
+                                </span>
+                              </span>
+                              {item.grams !== item.reference.portionGrams && (
+                                <button
+                                  type="button"
+                                  onClick={() => setGrams(item.id, item.reference!.portionGrams)}
+                                  className="inline-flex min-h-7 items-center rounded-md border border-highlight/40 px-2 text-[11px] font-medium text-highlight transition hover:bg-highlight/10"
+                                >
+                                  {t.photoUsePortion}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {item.reference?.warning === "lactose-free" && (
+                            <p className="mt-1.5 flex items-start gap-1 text-xs text-chart-3 text-pretty">
+                              <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                              {t.photoWarnLactoseFree}
+                            </p>
+                          )}
                         </div>
                         <span className="shrink-0 text-sm font-semibold tabular-nums">
                           {Math.round(v.calories)} {t.kcal}
@@ -450,6 +480,17 @@ export default function FoodPhotoScanner({
             {t.addToMeal} ({chosen.length})
           </button>
 
+          {items.some((i) => i.reference) && (
+            <p className="flex items-start gap-2 text-xs leading-relaxed text-highlight text-pretty">
+              <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {t.photoRefCarbsNote}
+            </p>
+          )}
+          {items.some((i) => !i.reference) && (
+            <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
+              {t.photoPackagedHint}
+            </p>
+          )}
           <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground text-pretty">
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {t.photoDisclaimer}

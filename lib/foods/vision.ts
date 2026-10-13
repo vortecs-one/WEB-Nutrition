@@ -3,7 +3,8 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { auth } from "@/auth";
-import type { FoodPhotoItem, FoodPhotoResult } from "./photo-types";
+import type { FoodPhotoItem, FoodPhotoPer100g, FoodPhotoResult } from "./photo-types";
+import { REFERENCE_BY_ID, REFERENCE_CATALOG, REFERENCE_SOURCE } from "./reference-table";
 
 const VISION_MODEL = "google/gemini-3.5-flash";
 
@@ -23,6 +24,10 @@ const itemSchema = z.object({
   confidence: z
     .number()
     .describe("0 to 1: how confident you are in the identification and portion."),
+  referenceId: z
+    .string()
+    .nullable()
+    .describe("id from the reference table that matches this item, or null if none matches."),
   per100g: z.object({
     calories: z.number().describe("kcal per 100 g"),
     protein: z.number().describe("grams per 100 g"),
@@ -81,6 +86,14 @@ export async function analyzeFoodPhoto(
                 "Split mixed plates into their main components when they are visually separable.",
                 `Write food names in ${language}.`,
                 "If the photo shows no food, set isFood to false and return an empty items list.",
+                "",
+                `Reference table (${REFERENCE_SOURCE}, Chilean foods). Columns: id | name (aliases) | household portion | grams | carbs per portion.`,
+                "For each item set referenceId to the matching id, or null when nothing in the table matches.",
+                "Prefer matching a whole home-made dish (cazuela, pastel de choclo, empanada, charquicán…) as ONE item instead of splitting it into ingredients.",
+                "Use the table's portion weights as a scale hint when estimating grams.",
+                "Use null for packaged or branded products and for anything not in the table.",
+                "'Pepino dulce' is a sweet fruit: never match it to cucumber. 'Tuna' is prickly pear, not tuna fish.",
+                REFERENCE_CATALOG,
               ].join("\n"),
             },
             { type: "file", mediaType, data: base64 },
@@ -93,21 +106,50 @@ export async function analyzeFoodPhoto(
       return { ok: false, reason: "not-food" };
     }
 
-    const items: FoodPhotoItem[] = output.items.slice(0, 12).map((item, i) => ({
-      id: `ai-${now}-${i}`,
-      name: item.name.trim() || "—",
-      grams: Math.round(clamp(item.estimatedGrams, 1, 2000)),
-      confidence: clamp(item.confidence, 0, 1),
-      source: "ai",
-      per100g: {
-        calories: clamp(item.per100g.calories, 0, 950),
-        protein: clamp(item.per100g.protein, 0, 100),
-        carbs: clamp(item.per100g.carbs, 0, 100),
-        fat: clamp(item.per100g.fat, 0, 100),
-        fiber: clamp(item.per100g.fiber, 0, 100),
-        sugars: clamp(item.per100g.sugars, 0, 100),
-      },
-    }));
+    const items: FoodPhotoItem[] = output.items.slice(0, 12).map((item, i) => {
+      const base: FoodPhotoItem = {
+        id: `ai-${now}-${i}`,
+        name: item.name.trim() || "—",
+        grams: Math.round(clamp(item.estimatedGrams, 1, 2000)),
+        confidence: clamp(item.confidence, 0, 1),
+        source: "ai",
+        per100g: {
+          calories: clamp(item.per100g.calories, 0, 950),
+          protein: clamp(item.per100g.protein, 0, 100),
+          carbs: clamp(item.per100g.carbs, 0, 100),
+          fat: clamp(item.per100g.fat, 0, 100),
+          fiber: clamp(item.per100g.fiber, 0, 100),
+          sugars: clamp(item.per100g.sugars, 0, 100),
+        },
+      };
+
+      const ref = item.referenceId ? REFERENCE_BY_ID.get(item.referenceId) : undefined;
+      if (!ref) return base;
+
+      // The table is authoritative for carbs only; keep AI protein/fat and
+      // shift calories by the carb difference (4 kcal/g).
+      const carbs = ref.carbsPer100g;
+      const per100g: FoodPhotoPer100g = {
+        ...base.per100g,
+        carbs,
+        calories: Math.max(0, base.per100g.calories - 4 * (base.per100g.carbs - carbs)),
+        fiber: Math.min(base.per100g.fiber, carbs),
+        sugars: Math.min(base.per100g.sugars, carbs),
+      };
+
+      return {
+        ...base,
+        source: "reference",
+        per100g,
+        reference: {
+          id: ref.id,
+          portion: locale === "en" ? ref.portionEn : ref.portionEs,
+          portionGrams: ref.portionGrams,
+          portionCarbs: ref.portionCarbs,
+          ...(ref.warning ? { warning: ref.warning } : {}),
+        },
+      };
+    });
 
     return { ok: true, items };
   } catch (error) {

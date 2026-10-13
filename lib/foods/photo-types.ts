@@ -13,6 +13,14 @@ export type FoodPhotoPer100g = {
 // "reference" is reserved for items matched against the reference table.
 export type FoodPhotoSource = "ai" | "reference";
 
+export type FoodPhotoReference = {
+  id: string;
+  portion: string;
+  portionGrams: number;
+  portionCarbs: number;
+  warning?: "lactose-free";
+};
+
 export type FoodPhotoItem = {
   id: string;
   name: string;
@@ -20,7 +28,11 @@ export type FoodPhotoItem = {
   confidence: number;
   source: FoodPhotoSource;
   per100g: FoodPhotoPer100g;
+  reference?: FoodPhotoReference;
 };
+
+// Matched items are trusted for carbs, so they're pre-selected at a lower bar.
+export const REFERENCE_MIN_CONFIDENCE = 0.35;
 
 export type FoodPhotoResult =
   | { ok: true; items: FoodPhotoItem[] }

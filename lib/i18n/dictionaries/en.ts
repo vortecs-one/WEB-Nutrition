@@ -220,6 +220,13 @@ const en: Dictionary = {
     photoSourceAi: "AI estimate",
     photoSourceReference: "Reference table",
     photoLowConfidence: "Confirm",
+    photoCarbsShort: "carbs",
+    photoUsePortion: "Use portion",
+    photoRefCarbsNote:
+      "Carbs from the Tabla H. de C. reference; calories, protein and fat are AI estimates.",
+    photoWarnLactoseFree: "Avoid lactose-free milk (it contains glucose).",
+    photoPackagedHint:
+      "For packaged foods check the label or use the barcode tab.",
     photoDisclaimer:
       "AI-estimated values. Check portions before using the carbs to calculate insulin.",
   },

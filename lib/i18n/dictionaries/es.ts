@@ -219,6 +219,13 @@ const es = {
     photoSourceAi: "Estimación IA",
     photoSourceReference: "Tabla de referencia",
     photoLowConfidence: "Confirma",
+    photoCarbsShort: "HC",
+    photoUsePortion: "Usar porción",
+    photoRefCarbsNote:
+      "Carbohidratos según Tabla H. de C.; calorías, proteínas y grasas estimadas por IA.",
+    photoWarnLactoseFree: "No utilizar leche sin lactosa (contiene glucosa).",
+    photoPackagedHint:
+      "Para alimentos envasados revisa el etiquetado o usa la pestaña de código de barras.",
     photoDisclaimer:
       "Valores estimados por IA. Revisa las porciones antes de usar los carbohidratos para calcular insulina.",
   },
