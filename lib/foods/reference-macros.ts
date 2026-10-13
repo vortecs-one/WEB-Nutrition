@@ -103,7 +103,8 @@ export const REFERENCE_MACROS: Record<string, ReferenceMacros> = {
   "empanada-horno": est(9, 12, 1.8, 2),
   "empanada-frita": est(8, 18, 1.5, 2),
   "pizza-delgada": est(11, 10, 2.3, 3.5),
-  "pizza-gruesa": est(11, 10, 2.3, 3.5),
+  // Table gives 80 g carbs/100 g, so protein + fat must fit in the remaining 20 g.
+  "pizza-gruesa": est(9, 8, 2.3, 3.5),
   "guiso-acelga": est(5, 5, 2, 1),
   "guiso-zapallo-italiano-pan": est(5, 5, 1.2, 2),
   "guiso-zapallo-italiano": est(5, 5, 1, 2),

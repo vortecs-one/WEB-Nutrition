@@ -48,6 +48,27 @@ export function findReference(referenceId: string | null, name: string) {
   );
 }
 
+const localDateKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Reference ids of table foods the user logged in the last `days` days, matched by meal name.
+export function recentReferenceIds(
+  log: Record<string, { meals: { name: string }[] }>,
+  now = new Date(),
+  days = 14,
+): string[] {
+  const cutoff = localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days));
+  const ids = new Set<string>();
+  for (const [dateKey, day] of Object.entries(log)) {
+    if (dateKey < cutoff) continue;
+    for (const meal of day.meals) {
+      const ref = findReference(null, meal.name);
+      if (ref) ids.add(ref.id);
+    }
+  }
+  return [...ids];
+}
+
 const macroKcal = (v: FoodPhotoPer100g) => 4 * v.protein + 4 * v.carbs + 9 * v.fat;
 
 export function sanitizePer100g(raw: FoodPhotoPer100g, carbsOverride?: number): FoodPhotoPer100g {

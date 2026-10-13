@@ -27,6 +27,10 @@ const MIN_TOP_SCORE = 0.02;
 const MIN_SECONDARY_SCORE = 0.1;
 const SECONDARY_RATIO = 0.2;
 const PRIOR_BOOST = 1.1;
+// Combined with the meal-slot prior it stays a tie-breaker: at most ×1.19.
+const RECENT_BOOST = 1.08;
+
+export type LocalVisionOptions = { recentIds?: readonly string[] };
 
 type SiglipRuntime = {
   processor: Processor;
@@ -85,6 +89,12 @@ async function buildCrops(image: RawImageType) {
   return crops;
 }
 
+function combinedPrior(recentIds: readonly string[] = []): (id: string) => number {
+  const slot = mealSlotPrior();
+  const recent = new Set(recentIds);
+  return (id) => slot(id) * (recent.has(id) ? RECENT_BOOST : 1);
+}
+
 function mealSlotPrior(): (id: string) => number {
   const hour = new Date().getHours();
   const boosted = new Set<ReferenceEntry["group"]>(
@@ -127,7 +137,11 @@ function pickItems(ranked: ScoredEntry[]) {
   });
 }
 
-async function analyzeWithSiglip(dataUrl: string, locale: "es" | "en"): Promise<FoodPhotoResult> {
+async function analyzeWithSiglip(
+  dataUrl: string,
+  locale: "es" | "en",
+  options: LocalVisionOptions,
+): Promise<FoodPhotoResult> {
   const { processor, model, RawImage, file, text } = await getSiglip();
   const image = await RawImage.fromURL(dataUrl);
   const crops = await buildCrops(image);
@@ -140,7 +154,7 @@ async function analyzeWithSiglip(dataUrl: string, locale: "es" | "en"): Promise<
     vector: normalizeVector(data.slice(i * dim, (i + 1) * dim)),
   }));
 
-  const { ranked, food, nonFood } = scoreCrops(embeddings, file.prompts, text, mealSlotPrior());
+  const { ranked, food, nonFood } = scoreCrops(embeddings, file.prompts, text, combinedPrior(options.recentIds));
   const picks = pickItems(ranked);
   if (!picks || (nonFood > food && picks[0].score < MIN_SECONDARY_SCORE)) {
     return { ok: false, reason: "not-food" };
@@ -197,10 +211,11 @@ async function analyzeWithClip(dataUrl: string, locale: "es" | "en"): Promise<Fo
 export async function analyzeFoodPhotoLocally(
   dataUrl: string,
   locale: "es" | "en",
+  options: LocalVisionOptions = {},
 ): Promise<FoodPhotoResult> {
   if (!dataUrl.startsWith("data:image/")) return { ok: false, reason: "invalid-image" };
   try {
-    return await analyzeWithSiglip(dataUrl, locale);
+    return await analyzeWithSiglip(dataUrl, locale, options);
   } catch {
     try {
       return await analyzeWithClip(dataUrl, locale);

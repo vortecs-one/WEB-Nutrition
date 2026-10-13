@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
+import { fetchUserDayLog } from "@/lib/day-log/actions";
+import type { DayLog } from "@/lib/day-log/types";
 import {
   Camera,
   ImageUp,
@@ -20,7 +23,7 @@ import {
   type FoodPhotoItem,
   type FoodPhotoResult,
 } from "@/lib/foods/photo-types";
-import { referenceToItem } from "@/lib/foods/photo-postprocess";
+import { recentReferenceIds, referenceToItem } from "@/lib/foods/photo-postprocess";
 import { REFERENCE_BY_ID, type ReferenceEntry } from "@/lib/foods/reference-table";
 import ReferencePicker from "./ReferencePicker";
 
@@ -85,6 +88,11 @@ export default function FoodPhotoScanner({
 }) {
   const { dict, locale } = useI18n();
   const t = dict.nutritionUser;
+  // Same SWR key as DayLogProvider, so this reuses the already-loaded log.
+  const { data: dayLog } = useSWR<DayLog>("day-log", () => fetchUserDayLog(), {
+    revalidateOnFocus: false,
+  });
+  const recentIds = useMemo(() => recentReferenceIds(dayLog ?? {}), [dayLog]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -148,7 +156,7 @@ export default function FoodPhotoScanner({
       const result =
         cached && cached.dataUrl === dataUrl
           ? cached.result
-          : await analyzeFoodPhotoLocally(dataUrl, locale === "en" ? "en" : "es");
+          : await analyzeFoodPhotoLocally(dataUrl, locale === "en" ? "en" : "es", { recentIds });
       if (result.ok) lastResultRef.current = { dataUrl, result };
       if (result.ok) {
         setItems(result.items);
