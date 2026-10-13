@@ -13,7 +13,7 @@ import {
   Check,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
-import { analyzeFoodPhoto } from "@/lib/foods/vision";
+import { analyzeFoodPhotoLocally, preloadLocalFoodModel } from "@/lib/foods/local-vision";
 import {
   LOW_CONFIDENCE,
   REFERENCE_MIN_CONFIDENCE,
@@ -97,6 +97,7 @@ export default function FoodPhotoScanner({
   useEffect(() => {
     if (phase !== "camera") return;
     let cancelled = false;
+    preloadLocalFoodModel();
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraDenied(true);
       return;
@@ -136,7 +137,7 @@ export default function FoodPhotoScanner({
       const result =
         cached && cached.dataUrl === dataUrl
           ? cached.result
-          : await analyzeFoodPhoto(dataUrl, locale === "en" ? "en" : "es");
+          : await analyzeFoodPhotoLocally(dataUrl, locale === "en" ? "en" : "es");
       if (result.ok) lastResultRef.current = { dataUrl, result };
       if (result.ok) {
         setItems(result.items);
