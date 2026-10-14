@@ -55,6 +55,11 @@ export interface VirtualCharacter {
   rightsRisk: RightsRisk;
   /** Original artwork drawn from the public-domain source; null while withheld. */
   artwork: string | null;
+  /**
+   * Same artwork with the background removed (see scripts/cutout-pet.mjs),
+   * shown animated in the companion detail popup. Thumbnails keep `artwork`.
+   */
+  cutout?: string;
   enabled: boolean;
 }
 

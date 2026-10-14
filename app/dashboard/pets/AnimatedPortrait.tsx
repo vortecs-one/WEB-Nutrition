@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Heart } from "lucide-react";
 import type { CharacterMood, Locale, VirtualCharacter } from "@/lib/pets/types";
 import { getAnimationProfile } from "@/lib/pets/animations";
@@ -57,30 +58,61 @@ export function AnimatedPortrait({
     );
   }
 
+  // With a background-free cut-out, the character stands on a soft glow
+  // instead of its parchment card, and gets extra idle motion (graze, wander).
+  const cutout = character.cutout;
+
   return (
     <button
       type="button"
       onClick={() => setTapCount((n) => n + 1)}
       aria-label={petLabel}
-      className={`pet-anim group relative overflow-hidden rounded-2xl bg-sidebar-accent outline-none focus-visible:ring-2 focus-visible:ring-highlight ${className}`}
+      className={`pet-anim group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${
+        cutout ? "pet-stage" : "bg-sidebar-accent"
+      } ${className}`}
       data-idle={profile.idle}
     >
-      <span aria-hidden="true" className="pet-shadow" />
-
-      <span
-        key={tapCount}
-        className={`absolute inset-0 block ${tapCount > 0 ? "pet-hop" : ""}`}
-      >
-        <span className="pet-body absolute inset-0 block">
-          <CharacterPortrait
-            character={character}
-            locale={locale}
-            sizes={sizes}
-            priority
-            className="h-full w-full"
-          />
+      {cutout ? (
+        <span className="pet-wander absolute inset-0 block">
+          <span aria-hidden="true" className="pet-shadow" />
+          <span
+            key={tapCount}
+            className={`absolute inset-x-[6%] bottom-[4%] top-[8%] block ${tapCount > 0 ? "pet-hop" : ""}`}
+          >
+            <span className="pet-body absolute inset-0 block">
+              <span className="pet-graze absolute inset-0 block">
+                <Image
+                  src={cutout}
+                  alt={character.name[locale]}
+                  fill
+                  sizes={sizes}
+                  priority
+                  className="object-contain object-bottom"
+                />
+              </span>
+            </span>
+          </span>
         </span>
-      </span>
+      ) : (
+        <>
+          <span aria-hidden="true" className="pet-shadow" />
+
+          <span
+            key={tapCount}
+            className={`absolute inset-0 block ${tapCount > 0 ? "pet-hop" : ""}`}
+          >
+            <span className="pet-body absolute inset-0 block">
+              <CharacterPortrait
+                character={character}
+                locale={locale}
+                sizes={sizes}
+                priority
+                className="h-full w-full"
+              />
+            </span>
+          </span>
+        </>
+      )}
 
       {profile.particle === "leaf" &&
         LEAVES.map((leaf) => (
