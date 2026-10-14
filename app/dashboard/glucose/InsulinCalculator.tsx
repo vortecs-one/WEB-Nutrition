@@ -379,6 +379,7 @@ function DoseTable({
   const step = unit === "mmol" ? 0.1 * MGDL_PER_MMOL : 1;
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeCellRef = useRef<HTMLTableCellElement>(null);
+  const [showUnitsInfo, setShowUnitsInfo] = useState(false);
 
   const rows: { steps: number; label: string }[] = [];
   if (params.low - step > lowThreshold) {
@@ -434,7 +435,29 @@ function DoseTable({
             centered while the columns scroll under it. The left block matches
             the glucose column's fixed width (w-36) and continues its header. */}
         <div className="flex bg-highlight text-sm font-bold text-white">
-          <div aria-hidden="true" className="w-36 shrink-0 border-r border-sidebar-border" />
+          {/* Top-left corner: info icon with the units note (keeps the legend
+              below on a single line). Hover shows it via title; tap toggles. */}
+          <div className="relative flex w-36 shrink-0 items-center border-r border-sidebar-border px-2">
+            <button
+              type="button"
+              onClick={() => setShowUnitsInfo((v) => !v)}
+              onBlur={() => setShowUnitsInfo(false)}
+              aria-label={t.tableUnitsNote}
+              aria-expanded={showUnitsInfo}
+              title={t.tableUnitsNote}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-white/70 transition hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <Info className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {showUnitsInfo && (
+              <p
+                role="tooltip"
+                className="absolute left-2 top-full z-30 mt-1 w-max max-w-[14rem] rounded-lg bg-sidebar px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground shadow-lg ring-1 ring-sidebar-border"
+              >
+                {t.tableUnitsNote}
+              </p>
+            )}
+          </div>
           <div className="min-w-0 flex-1 px-3 py-2 text-center">
             {t.tableCarbsAxis.replace("{unit}", t.grams)}
           </div>
@@ -525,8 +548,7 @@ function DoseTable({
           </table>
         </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-sidebar-foreground/60">
-          <span>{t.tableUnitsNote}</span>
+        <div className="flex flex-nowrap items-center gap-x-4 whitespace-nowrap text-[11px] text-sidebar-foreground/60">
           {legend.map((z) => (
             <span key={z.label} className="flex items-center gap-1.5">
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: z.color }} />
