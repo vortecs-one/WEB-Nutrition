@@ -202,8 +202,6 @@ const es = {
     chartCreatine: "Creatina",
     chartOmega: "Omega-3",
     chartOtherSupp: "Otros suplem.",
-    noComposition:
-      "Registra comidas con macros o suplementos para ver tu composición.",
     tabBarcode: "Código",
     tabPhoto: "Foto IA",
     photoHint: "Encuadra todo el plato desde arriba",

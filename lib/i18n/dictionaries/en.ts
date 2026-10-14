@@ -203,8 +203,6 @@ const en: Dictionary = {
     chartCreatine: "Creatine",
     chartOmega: "Omega-3",
     chartOtherSupp: "Other supp.",
-    noComposition:
-      "Log meals with macros or supplements to see your composition.",
     tabBarcode: "Barcode",
     tabPhoto: "AI photo",
     photoHint: "Frame the whole plate from above",

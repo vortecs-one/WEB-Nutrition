@@ -36,6 +36,9 @@ const DARK_MODAL_RESET: CSSProperties = {
   "--muted-foreground": "#a2a6b0",
 } as CSSProperties;
 
+// Macro rows are always shown, even at 0 g, so the card keeps its layout.
+const MACRO_KEYS = new Set(["carbs", "protein", "fat"]);
+
 // Accepts an ISO date key so the Calories view can drive it by the
 // date selected in the navigator. If no dateKey is supplied it falls
 // back to today's date.
@@ -84,21 +87,19 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   // Nutrients without a natural "share of composition" %, shown against
   // standard 2000-kcal-diet daily value reference amounts instead.
   // Total sugars has no official daily value, so it's shown gram-only.
+  // Always listed — 0 when nothing logged — so the card keeps its layout.
   const extraNutrients = useMemo(() => {
     const DAILY_VALUE = { saturatedFat: 20, fiber: 28, sodium: 2300 };
-    const rows: { key: string; label: string; value: number; unit: string; pct: number | null }[] = [];
-    if (nutrientTotals.saturatedFat != null) {
-      rows.push({ key: "saturatedFat", label: t.satFat, value: nutrientTotals.saturatedFat, unit: t.unitG, pct: Math.round((nutrientTotals.saturatedFat / DAILY_VALUE.saturatedFat) * 100) });
-    }
-    if (nutrientTotals.sugars != null) {
-      rows.push({ key: "sugars", label: t.sugars, value: nutrientTotals.sugars, unit: t.unitG, pct: null });
-    }
-    if (nutrientTotals.fiber != null) {
-      rows.push({ key: "fiber", label: t.fiber, value: nutrientTotals.fiber, unit: t.unitG, pct: Math.round((nutrientTotals.fiber / DAILY_VALUE.fiber) * 100) });
-    }
-    if (nutrientTotals.sodium != null) {
-      rows.push({ key: "sodium", label: t.sodium, value: nutrientTotals.sodium, unit: t.unitMg, pct: Math.round((nutrientTotals.sodium / DAILY_VALUE.sodium) * 100) });
-    }
+    const saturatedFat = nutrientTotals.saturatedFat ?? 0;
+    const sugars = nutrientTotals.sugars ?? 0;
+    const fiber = nutrientTotals.fiber ?? 0;
+    const sodium = nutrientTotals.sodium ?? 0;
+    const rows: { key: string; label: string; value: number; unit: string; pct: number | null }[] = [
+      { key: "saturatedFat", label: t.satFat, value: saturatedFat, unit: t.unitG, pct: Math.round((saturatedFat / DAILY_VALUE.saturatedFat) * 100) },
+      { key: "sugars", label: t.sugars, value: sugars, unit: t.unitG, pct: null },
+      { key: "fiber", label: t.fiber, value: fiber, unit: t.unitG, pct: Math.round((fiber / DAILY_VALUE.fiber) * 100) },
+      { key: "sodium", label: t.sodium, value: sodium, unit: t.unitMg, pct: Math.round((sodium / DAILY_VALUE.sodium) * 100) },
+    ];
     return rows;
   }, [nutrientTotals, t]);
 
@@ -122,7 +123,8 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       { key: "creatine",  label: t.chartCreatine,   value: creatine,  fill: "var(--color-creatine)" },
       { key: "omega3",    label: t.chartOmega,      value: omega3,    fill: "var(--color-omega3)" },
       { key: "otherSupp", label: t.chartOtherSupp,  value: otherSupp, fill: "var(--color-otherSupp)" },
-    ].filter((d) => d.value > 0);
+      // Macros always stay listed (0 g on an empty day); supplements only when logged.
+    ].filter((d) => d.value > 0 || MACRO_KEYS.has(d.key));
   }, [meals, supplements, t]);
 
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
@@ -136,6 +138,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     [data],
   );
   const topPct = total > 0 ? Math.round((top.value / total) * 100) : 0;
+  const topLabel = total > 0 ? top.label : "";
 
   const chartConfig = {
     protein:   { label: t.macroProtein,  color: "var(--chart-1)" },
@@ -158,7 +161,11 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
     otherSupp: "var(--chart-7)",
   };
 
-  const hasData = total > 0 || extraNutrients.length > 0;
+  // Nothing logged yet: a single muted ring stands in for the slices.
+  const pieData =
+    total > 0
+      ? data
+      : [{ key: "empty", label: "", value: 1, fill: "var(--sidebar-foreground)" }];
 
   // Card view omits saturated fat and fiber; they're shown in the detail popup only.
   const cardExtraNutrients = useMemo(
@@ -171,33 +178,35 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   const renderDonut = (containerClassName: string) => (
     <ChartContainer config={chartConfig} className={containerClassName}>
       <PieChart>
-        <ChartTooltip
-          cursor={false}
-          content={
-            <ChartTooltipContent
-              nameKey="key"
-              formatter={(value, name) => {
-                const pct = Math.round((Number(value) / total) * 100);
-                const label =
-                  chartConfig[name as keyof typeof chartConfig]?.label ??
-                  name;
-                return `${label}: ${pct}%`;
-              }}
-            />
-          }
-        />
+        {total > 0 && (
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                nameKey="key"
+                formatter={(value, name) => {
+                  const pct = Math.round((Number(value) / total) * 100);
+                  const label =
+                    chartConfig[name as keyof typeof chartConfig]?.label ??
+                    name;
+                  return `${label}: ${pct}%`;
+                }}
+              />
+            }
+          />
+        )}
         <Pie
-          data={data}
+          data={pieData}
           dataKey="value"
           nameKey="key"
           innerRadius="56%"
           outerRadius="82%"
-          paddingAngle={2}
+          paddingAngle={total > 0 ? 2 : 0}
           strokeWidth={0}
           isAnimationActive={false}
         >
-          {data.map((d) => (
-            <Cell key={d.key} fill={d.fill} />
+          {pieData.map((d) => (
+            <Cell key={d.key} fill={d.fill} fillOpacity={total > 0 ? 1 : 0.15} />
           ))}
           <Label
             content={({ viewBox }) => {
@@ -217,7 +226,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
                     y={cy + 13}
                     className="fill-muted-foreground text-[9px] sm:text-[11px]"
                   >
-                    {top.label}
+                    {topLabel}
                   </tspan>
                 </text>
               );
@@ -231,29 +240,23 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   // Calorie summary rows — identical in the card and the detail popup.
   const calorieRows = (
     <>
-      {nutrientTotals.calories != null && (
-        <li className="flex items-center gap-2 text-[11px] sm:text-sm mb-0.5">
-          <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-            {t.caloriesConsumed}
-          </span>
-          <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
-            {nutrientTotals.calories} {t.kcal}
-          </span>
-        </li>
-      )}
-      {nutrientTotals.burned != null && (
-        <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-          <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-            {t.caloriesBurned}
-          </span>
-          <span className="shrink-0 tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
-            -{nutrientTotals.burned} {t.kcal}
-          </span>
-        </li>
-      )}
-      {(nutrientTotals.calories != null || nutrientTotals.burned != null) && data.length > 0 && (
-        <li role="separator" className="my-0.5 border-t border-sidebar-foreground/10" />
-      )}
+      <li className="flex items-center gap-2 text-[11px] sm:text-sm mb-0.5">
+        <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+          {t.caloriesConsumed}
+        </span>
+        <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
+          {nutrientTotals.calories ?? 0} {t.kcal}
+        </span>
+      </li>
+      <li className="flex items-center gap-2 text-[11px] sm:text-sm">
+        <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
+          {t.caloriesBurned}
+        </span>
+        <span className="shrink-0 tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
+          -{nutrientTotals.burned ?? 0} {t.kcal}
+        </span>
+      </li>
+      <li role="separator" className="my-0.5 border-t border-sidebar-foreground/10" />
     </>
   );
 
@@ -261,11 +264,11 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   // grams alongside the percentage. The donut itself (slices, center label,
   // tooltip) stays percentage-based regardless — only this text row changes.
   const renderMacroRow = (d: (typeof data)[number], detailed: boolean) => {
-    const pct = Math.round((d.value / total) * 100);
+    const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
     const grams =
-      d.key === "protein" ? nutrientTotals.protein :
-      d.key === "carbs"   ? nutrientTotals.carbs :
-      d.key === "fat"     ? nutrientTotals.fat :
+      d.key === "protein" ? nutrientTotals.protein ?? 0 :
+      d.key === "carbs"   ? nutrientTotals.carbs ?? 0 :
+      d.key === "fat"     ? nutrientTotals.fat ?? 0 :
       null;
     return (
       <li key={d.key} className="flex items-center gap-2 text-[11px] sm:text-sm">
@@ -317,33 +320,24 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
       {/* Header — on mobile the title sits on the left of this row; on desktop
           only the expand icon shows here (the title lives in the stack below).
           ml-auto keeps the icon right in both cases. */}
-      {hasData && (
-        <div className="flex items-center">
-          <h2 className={`md:hidden ${titleClasses}`}>{t.composition}</h2>
-          <button
-            type="button"
-            onClick={() => setShowDetail(true)}
-            aria-label={t.viewDetails}
-            className="ml-auto -mr-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-          >
-            <Maximize2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-      )}
+      <div className="flex items-center">
+        <h2 className={`md:hidden ${titleClasses}`}>{t.composition}</h2>
+        <button
+          type="button"
+          onClick={() => setShowDetail(true)}
+          aria-label={t.viewDetails}
+          className="ml-auto -mr-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+        >
+          <Maximize2 className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
 
-      {!hasData ? (
-        <>
-          <h2 className={`w-full text-center ${titleClasses}`}>{t.composition}</h2>
-          <p className="py-6 text-center text-sm text-sidebar-foreground/50">
-            {t.noComposition}
-          </p>
-        </>
-      ) : (
-        // @container on this wrapper (not the section) so the modal below —
-        // which is position:fixed — isn't captured by container-type.
-        // Mobile: donut (left) + macro list (right); the title is up in the
-        // header row. Desktop (md+): vertical stack — donut, title, list.
-        <div className="@container">
+      {/* @container on this wrapper (not the section) so the modal below —
+          which is position:fixed — isn't captured by container-type.
+          Mobile: donut (left) + macro list (right); the title is up in the
+          header row. Desktop (md+): vertical stack — donut, title, list.
+          Always rendered: an empty day shows a muted ring and 0 values. */}
+      <div className="@container">
           <div className="flex flex-row items-start gap-4 md:flex-col md:gap-3">
             {/* Donut chart — right half on mobile, sized in cqi (fraction of
                 the card width) to track the macro list's height (≈list height
@@ -357,7 +351,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
                 to 0 width. order-* swaps its position only on the mobile row;
                 md:order-1 restores its natural (first) place in the desktop
                 vertical stack. */}
-            {total > 0 && renderDonut("order-2 md:order-1 shrink-0 self-center md:self-auto aspect-square w-[clamp(6.5rem,29cqi,9.5rem)] md:h-40 md:w-40 md:flex-none")}
+            {renderDonut("order-2 md:order-1 shrink-0 self-center md:self-auto aspect-square w-[clamp(6.5rem,29cqi,9.5rem)] md:h-40 md:w-40 md:flex-none")}
 
             {/* Desktop title — between donut and list; hidden below md */}
             <h2 className={`hidden md:order-2 md:block w-full text-center ${titleClasses}`}>{t.composition}</h2>
@@ -378,8 +372,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
               {cardExtraNutrients.map((n) => renderExtraRow(n, false))}
             </ul>
           </div>
-        </div>
-      )}
+      </div>
 
       {/* Detail popup — same data, with quantities shown alongside percentages.
           The wrapper resets the palette back to dark so the popup keeps the
@@ -432,7 +425,7 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
         {activeTab === "composition" ? (
           <>
             <div className="flex flex-col items-center gap-4">
-              {total > 0 && renderDonut("aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0")}
+              {renderDonut("aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0")}
 
               <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
                 {calorieRows}
