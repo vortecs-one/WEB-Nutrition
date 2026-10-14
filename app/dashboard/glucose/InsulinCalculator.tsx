@@ -349,14 +349,12 @@ export default function InsulinCalculator({
 }
 
 // Row zone colors, matching the glucose chart's palette.
-const ZONE_LOW = "#ef4444"; // below the target range
-const ZONE_IN = "var(--color-lime-500)"; // in range
+const ZONE_IN = "var(--color-lime-500)"; // in range or below it
 const ZONE_HIGH = "#f59e0b"; // above range
 const ZONE_VERY_HIGH = "#ef4444"; // top correction rows
 
 function zoneColor(steps: number) {
-  if (steps < 0) return ZONE_LOW;
-  if (steps === 0) return ZONE_IN;
+  if (steps <= 0) return ZONE_IN;
   return steps >= 5 ? ZONE_VERY_HIGH : ZONE_HIGH;
 }
 
@@ -413,9 +411,9 @@ function DoseTable({
   }, [activeSteps, activeCarbSteps]);
 
   const legend = [
-    { color: ZONE_LOW, label: t.zoneLow },
     { color: ZONE_IN, label: t.zoneInRange },
     { color: ZONE_HIGH, label: t.zoneHigh },
+    { color: ZONE_VERY_HIGH, label: t.zoneVeryHigh },
   ];
 
   return (
@@ -431,29 +429,36 @@ function DoseTable({
       </summary>
       <div className="flex flex-col gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
         <p className="text-xs leading-relaxed text-sidebar-foreground/60">{t.tableHint}</p>
+        <div className="overflow-hidden rounded-xl border border-sidebar-border bg-sidebar">
+        {/* Pinned "Carbs" band: sits outside the scrolling area so it stays
+            centered while the columns scroll under it. The left block matches
+            the glucose column's fixed width (w-36) and continues its header. */}
+        <div className="flex bg-highlight text-sm font-bold text-white">
+          <div aria-hidden="true" className="w-36 shrink-0 border-r border-sidebar-border" />
+          <div className="min-w-0 flex-1 px-3 py-2 text-center">
+            {t.tableCarbsAxis.replace("{unit}", t.grams)}
+          </div>
+        </div>
         {/* Horizontal scroll only — all rows fit, so no nested vertical scroll. */}
-        <div ref={scrollRef} className="overflow-x-auto overscroll-x-contain rounded-xl border border-sidebar-border bg-sidebar">
+        <div ref={scrollRef} className="overflow-x-auto overscroll-x-contain">
           <table className="w-full border-separate border-spacing-0 text-center text-xs tabular-nums sm:text-sm">
             <caption className="sr-only">{t.tableTitle}</caption>
             <thead>
               <tr>
                 <th
                   scope="col"
-                  className="sticky left-0 z-20 border-b border-r border-sidebar-border bg-sidebar px-3 py-2 text-left align-bottom font-normal shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)]"
+                  className="sticky left-0 z-20 w-36 min-w-36 max-w-36 whitespace-nowrap border-b border-r border-sidebar-border bg-highlight px-2 py-1 text-left align-bottom text-xs font-bold leading-tight text-white shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)]"
                 >
-                  <span className="block text-[10px] leading-tight text-sidebar-foreground/60">
-                    {t.tableCarbsAxis.replace("{unit}", t.grams)}
-                  </span>
-                  <span className="block text-[10px] font-semibold leading-tight text-highlight">
-                    {t.tableGlucoseAxis.replace("{unit}", unitLabel(unit))}
-                  </span>
+                  {t.tableGlucoseAxis.replace("{unit}", unitLabel(unit))}
                 </th>
                 {columns.map((c) => (
                   <th
                     key={c}
                     scope="col"
-                    className={`min-w-9 border-b border-sidebar-border px-1 py-2 align-bottom font-semibold ${
-                      c === activeCarbSteps ? "bg-highlight/20 text-highlight" : "text-sidebar-foreground/70"
+                    // Gram labels are part of the purple header block (a shade
+                    // darker than the "Carbs" band); the active column inverts.
+                    className={`min-w-9 border-b border-t border-b-sidebar-border border-t-white/20 px-1 py-1 align-bottom font-bold ${
+                      c === activeCarbSteps ? "bg-white text-highlight" : "bg-highlight/80 text-white"
                     }`}
                   >
                     {Math.round(c * ratio * 10) / 10}
@@ -468,7 +473,7 @@ function DoseTable({
                   <tr key={row.steps}>
                     <th
                       scope="row"
-                      className={`sticky left-0 z-10 whitespace-nowrap border-b border-r border-sidebar-border px-3 py-2 text-left font-medium shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)] ${
+                      className={`sticky left-0 z-10 w-36 min-w-36 max-w-36 whitespace-nowrap border-b border-r border-sidebar-border px-3 py-2 text-left font-medium shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)] ${
                         rowActive ? "bg-sidebar-accent text-highlight" : "bg-sidebar text-sidebar-foreground/80"
                       }`}
                     >
@@ -518,6 +523,7 @@ function DoseTable({
               })}
             </tbody>
           </table>
+        </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-sidebar-foreground/60">
           <span>{t.tableUnitsNote}</span>

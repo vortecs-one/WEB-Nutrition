@@ -317,10 +317,10 @@ const es = {
       tableHint:
         "Filas: glucemia. Columnas: gramos de hidratos de carbono. Cada celda indica las unidades de insulina. Se resalta la celda que corresponde a tus valores actuales.",
       carbsRounded: "Calculado sobre {grams} g, la columna inferior más cercana de la tabla.",
-      tableGlucoseAxis: "Glucemia ↓ ({unit})",
-      tableCarbsAxis: "Carbohidratos → ({unit})",
+      tableGlucoseAxis: "Glucemia ({unit})",
+      tableCarbsAxis: "Carbohidratos ({unit})",
       tableUnitsNote: "Valores en unidades de insulina (U)",
-      zoneLow: "Bajo el rango",
+      zoneVeryHigh: "Muy alto",
       zoneInRange: "En rango",
       zoneHigh: "Sobre el rango",
       iob: "Insulina activa",
