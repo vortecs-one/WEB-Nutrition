@@ -320,6 +320,8 @@ const es = {
       iob: "Insulina activa",
       iobHint: "Unidades de bolos anteriores aún activas.",
       parameters: "Tus parámetros",
+      edit: "Editar",
+      done: "Listo",
       resultTitle: "Resultado",
       carbDose: "Dosis por carbohidratos",
       correctionDose: "Corrección",

@@ -321,6 +321,8 @@ const en: Dictionary = {
       iob: "Insulin on board",
       iobHint: "Units from earlier boluses still active.",
       parameters: "Your parameters",
+      edit: "Edit",
+      done: "Done",
       resultTitle: "Result",
       carbDose: "Carb dose",
       correctionDose: "Correction",

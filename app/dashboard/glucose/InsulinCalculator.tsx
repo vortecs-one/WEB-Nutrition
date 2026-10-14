@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
-import { AlertTriangle, ChevronDown, Info } from "lucide-react";
+import { useId, useRef, useState } from "react";
+import { AlertTriangle, Check, ChevronDown, Info, Pencil } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import {
@@ -128,6 +128,7 @@ export default function InsulinCalculator({
 
   const fmtU = (n: number) => `${n > 0 ? "+" : ""}${(Math.round(n * 10) / 10).toFixed(1)} ${t.units}`;
   const glucoseUnit = unitLabel(unit);
+  const lockLabels = { edit: t.edit, done: t.done };
   const glucoseStep = unit === "mmol" ? "0.1" : "1";
 
   const sectionTitle =
@@ -279,6 +280,27 @@ export default function InsulinCalculator({
           <legend className={`${sectionTitle} px-1`}>{t.parameters}</legend>
           <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-6 sm:gap-4">
             <NumberField
+              lockable={lockLabels}
+              id={`${ids}-low`}
+              label={t.rangeLow}
+              suffix={glucoseUnit}
+              value={rangeLow}
+              onChange={setRangeLow}
+              step={glucoseStep}
+              className="sm:col-span-3"
+            />
+            <NumberField
+              lockable={lockLabels}
+              id={`${ids}-high`}
+              label={t.rangeHigh}
+              suffix={glucoseUnit}
+              value={rangeHigh}
+              onChange={setRangeHigh}
+              step={glucoseStep}
+              className="sm:col-span-3"
+            />
+            <NumberField
+              lockable={lockLabels}
               id={`${ids}-ratio`}
               label={t.ratio}
               hint={t.ratioHint}
@@ -290,6 +312,7 @@ export default function InsulinCalculator({
               className="sm:col-span-2"
             />
             <NumberField
+              lockable={lockLabels}
               id={`${ids}-isf`}
               label={t.sensitivity}
               hint={t.sensitivityHint}
@@ -301,6 +324,7 @@ export default function InsulinCalculator({
               className="sm:col-span-2"
             />
             <NumberField
+              lockable={lockLabels}
               id={`${ids}-iob`}
               label={t.iob}
               hint={t.iobHint}
@@ -310,24 +334,6 @@ export default function InsulinCalculator({
               step="0.5"
               compactHint
               className="col-span-2"
-            />
-            <NumberField
-              id={`${ids}-low`}
-              label={t.rangeLow}
-              suffix={glucoseUnit}
-              value={rangeLow}
-              onChange={setRangeLow}
-              step={glucoseStep}
-              className="sm:col-span-3"
-            />
-            <NumberField
-              id={`${ids}-high`}
-              label={t.rangeHigh}
-              suffix={glucoseUnit}
-              value={rangeHigh}
-              onChange={setRangeHigh}
-              step={glucoseStep}
-              className="sm:col-span-3"
             />
           </div>
           <p className="text-xs text-sidebar-foreground/60">{t.sessionNote}</p>
@@ -477,6 +483,7 @@ function NumberField({
   step,
   large,
   compactHint,
+  lockable,
   className = "",
 }: {
   id: string;
@@ -488,29 +495,71 @@ function NumberField({
   step: string;
   large?: boolean;
   compactHint?: boolean;
+  /** Starts read-only with an edit button (labels for the edit/done buttons). */
+  lockable?: { edit: string; done: string };
   className?: string;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Lockable fields start locked; the state resets whenever the popup reopens
+  // because the modal unmounts its content when closed.
+  const [editing, setEditing] = useState(false);
+  const locked = !!lockable && !editing;
+
+  const unlock = () => {
+    setEditing(true);
+    // Focus after React re-renders the input without readOnly.
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   return (
     <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
       <label htmlFor={id} className="truncate text-sm font-medium" title={label}>
         {label}
       </label>
-      <div className="flex items-center gap-2 rounded-xl border border-transparent bg-sidebar-accent px-3 transition-colors focus-within:border-highlight focus-within:ring-2 focus-within:ring-highlight/40">
+      <div
+        className={`flex items-center gap-2 rounded-xl border border-transparent px-3 transition-colors ${
+          locked
+            ? "bg-sidebar-accent/50"
+            : "bg-sidebar-accent focus-within:border-highlight focus-within:ring-2 focus-within:ring-highlight/40"
+        }`}
+      >
         <input
+          ref={inputRef}
           id={id}
           type="number"
           inputMode="decimal"
           min="0"
           step={step}
           value={value}
+          readOnly={locked}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => {
+            if (!locked) e.target.select();
+          }}
+          onKeyDown={(e) => {
+            if (lockable && e.key === "Enter") setEditing(false);
+          }}
           aria-describedby={hint ? `${id}-hint` : undefined}
           className={`w-full min-w-0 bg-transparent py-2.5 tabular-nums outline-none ${
             large ? "text-2xl font-semibold" : "text-base"
-          }`}
+          } ${locked ? "cursor-default text-sidebar-foreground/70" : ""}`}
         />
         <span className="shrink-0 text-sm text-sidebar-foreground/60">{suffix}</span>
+        {lockable && (
+          <button
+            type="button"
+            onClick={locked ? unlock : () => setEditing(false)}
+            aria-label={locked ? `${lockable.edit} ${label}` : lockable.done}
+            title={locked ? lockable.edit : lockable.done}
+            className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/60 transition hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
+          >
+            {locked ? (
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Check className="h-4 w-4 text-highlight" aria-hidden="true" />
+            )}
+          </button>
+        )}
       </div>
       {hint && (
         <p
