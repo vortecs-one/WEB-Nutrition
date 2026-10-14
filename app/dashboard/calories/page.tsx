@@ -7,7 +7,8 @@ import GlucoseTracker from "../glucose/GlucoseTracker";
 import CaloriesTracker from "./CaloriesTracker";
 import CompanionCard from "../pets/CompanionCard";
 
-// Personal dashboard for normal users: calorie balance at top, then glucose monitoring.
+// Personal dashboard for normal users: calorie balance at top, then glucose
+// monitoring, with the companion card last.
 export default async function CaloriesPage() {
   const role = await getCurrentRole();
 
@@ -21,8 +22,8 @@ export default async function CaloriesPage() {
   return (
     <div className="space-y-6">
       <CaloriesTracker />
-      <CompanionCard />
       {showGlucose && <GlucoseTracker initialSettings={glucoseSettings} />}
+      <CompanionCard />
     </div>
   );
 }
