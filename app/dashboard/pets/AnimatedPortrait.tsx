@@ -59,8 +59,12 @@ export function AnimatedPortrait({
   }
 
   // With a background-free cut-out, the character stands on a soft glow
-  // instead of its parchment card, and gets extra idle motion (graze, wander).
-  const cutout = character.cutout;
+  // instead of its parchment card and also grazes. When the cut-out is split
+  // into layers, only the animal moves; the grass stays put on top of it.
+  const layers = character.layers;
+  const cutout = layers?.body ?? character.cutout;
+  // Both layers share one box so they line up pixel for pixel.
+  const stageBox = "absolute inset-x-[6%] bottom-[4%] top-[8%] block";
 
   return (
     <button
@@ -73,12 +77,14 @@ export function AnimatedPortrait({
       data-idle={profile.idle}
     >
       {cutout ? (
-        <span className="pet-wander absolute inset-0 block">
-          <span aria-hidden="true" className="pet-shadow" />
+        <>
+          {/* The shadow stays on the ground and shrinks while the pet jumps. */}
           <span
-            key={tapCount}
-            className={`absolute inset-x-[6%] bottom-[4%] top-[8%] block ${tapCount > 0 ? "pet-hop" : ""}`}
-          >
+            key={`shadow-${tapCount}`}
+            aria-hidden="true"
+            className={`pet-shadow ${tapCount > 0 ? "pet-shadow-hop" : ""}`}
+          />
+          <span key={tapCount} className={`${stageBox} ${tapCount > 0 ? "pet-hop" : ""}`}>
             <span className="pet-body absolute inset-0 block">
               <span className="pet-graze absolute inset-0 block">
                 <Image
@@ -92,7 +98,19 @@ export function AnimatedPortrait({
               </span>
             </span>
           </span>
-        </span>
+          {layers && (
+            <span aria-hidden="true" className={`${stageBox} pointer-events-none z-[2]`}>
+              <Image
+                src={layers.ground}
+                alt=""
+                fill
+                sizes={sizes}
+                priority
+                className="object-contain object-bottom"
+              />
+            </span>
+          )}
+        </>
       ) : (
         <>
           <span aria-hidden="true" className="pet-shadow" />

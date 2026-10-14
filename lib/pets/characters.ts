@@ -79,6 +79,7 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
     rightsRisk: "low",
     artwork: "/pets/bambi.png",
     cutout: "/pets/bambi-cutout.png",
+    layers: { body: "/pets/bambi-body.png", ground: "/pets/bambi-ground.png" },
     enabled: true,
   },
   {

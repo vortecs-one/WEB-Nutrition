@@ -338,8 +338,9 @@
 }
 
 /* Cut-out stage (character without its parchment background): a soft glow
-   to stand on, plus two slow idle motions — grazing (head dips forward from
-   the front hooves) and wandering (a small side step, shadow included). */
+   to stand on, plus a slow grazing motion. With split layers only the
+   animal moves; the grass layer above it stays still. Grazing pivots on the
+   hind hooves, so the head and front legs dip into the static grass. */
 .pet-anim.pet-stage {
   background: radial-gradient(
     ellipse 70% 55% at 50% 72%,
@@ -352,33 +353,31 @@
   width: 62%;
 }
 .pet-anim .pet-graze {
-  transform-origin: 30% 92%;
+  transform-origin: 82% 94%;
   animation: pet-graze 9s ease-in-out infinite;
 }
 .pet-anim[data-idle="sleepy"] .pet-graze {
   animation: none;
 }
-.pet-anim .pet-wander {
-  animation: pet-wander 16s ease-in-out infinite;
+.pet-anim .pet-shadow.pet-shadow-hop {
+  animation: pet-shadow-hop 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) 1;
 }
 @keyframes pet-graze {
   0%, 60%, 100% { rotate: 0deg; }
-  68%, 80%      { rotate: -5deg; }
-  73%           { rotate: -4deg; }
+  68%, 80%      { rotate: -3.5deg; }
+  73%           { rotate: -2.8deg; }
   88%           { rotate: 0deg; }
 }
-@keyframes pet-wander {
-  0%, 18%, 100% { translate: 0 0; }
-  30%, 48%      { translate: 3% 0; }
-  62%, 80%      { translate: -2.5% 0; }
+@keyframes pet-shadow-hop {
+  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 0.18; }
+  50%      { transform: translateX(-50%) scaleX(0.7); opacity: 0.1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pet-anim .pet-body,
   .pet-anim .pet-hop,
   .pet-anim .pet-shadow,
-  .pet-anim .pet-graze,
-  .pet-anim .pet-wander {
+  .pet-anim .pet-graze {
     animation: none;
   }
   .pet-anim .pet-leaf,

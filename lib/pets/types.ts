@@ -60,6 +60,11 @@ export interface VirtualCharacter {
    * shown animated in the companion detail popup. Thumbnails keep `artwork`.
    */
   cutout?: string;
+  /**
+   * The cut-out split into two aligned layers (same canvas): `body` moves,
+   * `ground` (grass, clovers…) stays still. Preferred over `cutout`.
+   */
+  layers?: { body: string; ground: string };
   enabled: boolean;
 }
 
