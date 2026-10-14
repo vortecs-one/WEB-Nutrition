@@ -16,6 +16,7 @@ interface AnimatedPortraitProps {
   className?: string;
 }
 
+// Where falling leaves (or snowflakes) start, across the top of the stage.
 const LEAVES = [
   { left: "12%", delay: "0s", duration: "7s" },
   { left: "38%", delay: "2.4s", duration: "8.5s" },
@@ -60,8 +61,14 @@ export function AnimatedPortrait({
   }
 
   // The background-free character stands on a soft glow. Only the body
-  // moves; when the art has a ground split, the grass stays put in front of
-  // it, with grass filled in behind the legs for when it jumps.
+  // moves; when the art has a ground split, the ground stays put in front of
+  // it, with ground filled in behind the legs for when it jumps.
+  const rustle = tapCount > 0 && profile.groundRustle ? "pet-rustle" : "";
+  // The ground goes over the body (grass the grazing head dips into) or under
+  // it (ice the jumping feet and tail must stay in front of). Either way it
+  // stays above the shadow and below the particles and hearts.
+  const bodyLayer = profile.groundInFront ? "" : "z-[2]";
+  const groundLayer = profile.groundInFront ? "z-[2]" : "z-[1]";
   // All layers share one box so they line up pixel for pixel.
   const stageBox = "absolute inset-x-[6%] bottom-[4%] top-[8%] block";
   const layerImage = (src: string, alt = "") => (
@@ -82,20 +89,20 @@ export function AnimatedPortrait({
         aria-hidden="true"
         className={`pet-shadow ${tapCount > 0 ? "pet-shadow-hop" : ""}`}
       />
-      {/* Grass behind the legs: hidden by the body at rest, it fills the gaps
-          in the grass while the pet is in the air. */}
+      {/* Ground behind the legs: hidden by the body at rest, it fills the
+          gaps in the ground while the pet is in the air. */}
       {layers.back && (
         <span
           key={`back-${tapCount}`}
           aria-hidden="true"
-          className={`${stageBox} pointer-events-none ${tapCount > 0 ? "pet-rustle" : ""}`}
+          className={`${stageBox} pointer-events-none ${rustle}`}
         >
           {layerImage(layers.back)}
         </span>
       )}
-      <span key={tapCount} className={`${stageBox} ${tapCount > 0 ? "pet-hop" : ""}`}>
+      <span key={tapCount} className={`${stageBox} ${bodyLayer} ${tapCount > 0 ? "pet-hop" : ""}`}>
         <span className="pet-body absolute inset-0 block">
-          <span className="pet-graze absolute inset-0 block">
+          <span className={`pet-${profile.motion} absolute inset-0 block`}>
             {layerImage(layers.body, character.name[locale])}
           </span>
         </span>
@@ -104,18 +111,18 @@ export function AnimatedPortrait({
         <span
           key={`ground-${tapCount}`}
           aria-hidden="true"
-          className={`${stageBox} pointer-events-none z-[2] ${tapCount > 0 ? "pet-rustle" : ""}`}
+          className={`${stageBox} pointer-events-none ${groundLayer} ${rustle}`}
         >
           {layerImage(layers.ground)}
         </span>
       )}
 
-      {profile.particle === "leaf" &&
+      {(profile.particle === "leaf" || profile.particle === "snow") &&
         LEAVES.map((leaf) => (
           <span
             key={leaf.left}
             aria-hidden="true"
-            className="pet-leaf"
+            className={profile.particle === "snow" ? "pet-snow" : "pet-leaf"}
             style={{
               left: leaf.left,
               animationDelay: leaf.delay,

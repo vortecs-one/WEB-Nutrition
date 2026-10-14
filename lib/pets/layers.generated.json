@@ -3,5 +3,10 @@
     "body": "/pets/bambi-body.9bd107eb.png",
     "ground": "/pets/bambi-ground.73f0c74c.png",
     "back": "/pets/bambi-ground-back.a4f04c9a.png"
+  },
+  "humboldt-penguin": {
+    "body": "/pets/humboldt-penguin-body.5d146d7f.png",
+    "ground": "/pets/humboldt-penguin-ground.9e5fb841.png",
+    "back": "/pets/humboldt-penguin-ground-back.a99f1121.png"
   }
 }

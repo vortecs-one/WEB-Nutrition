@@ -85,6 +85,8 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
     rightsRisk: "low",
     exclusive: true,
     artwork: "/pets/humboldt-penguin.png",
+    layers: petLayers("humboldt-penguin"),
+    scene: "ice",
     enabled: true,
   },
   {

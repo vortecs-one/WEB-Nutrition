@@ -1,21 +1,42 @@
-import type { CharacterMood, VirtualCharacter } from "./types";
+import type { CharacterMood, PetScene, VirtualCharacter } from "./types";
 
 export type IdleStyle = "default" | "bouncy" | "sleepy" | "low";
-export type AmbientParticle = "leaf" | "zzz";
+export type AmbientParticle = "leaf" | "snow" | "zzz";
+/** Character-specific idle motion layered on the shared breathing. */
+export type IdleMotion = "graze" | "waddle";
 
 export interface PetAnimationProfile {
   idle: IdleStyle;
   particle: AmbientParticle | null;
+  motion: IdleMotion;
+  /** Whether the ground sways once when the pet jumps (grass yes, ice no). */
+  groundRustle: boolean;
+  /**
+   * Whether the ground is drawn over the body: grass yes (the grazing head
+   * dips into it), ice no (the feet and tail would vanish behind the ice
+   * blocks while the pet jumps). At rest the two layers never overlap.
+   */
+  groundInFront: boolean;
 }
 
-const MOOD_PROFILES: Record<CharacterMood, PetAnimationProfile> = {
-  happy: { idle: "bouncy", particle: "leaf" },
-  proud: { idle: "bouncy", particle: "leaf" },
-  calm: { idle: "default", particle: "leaf" },
-  neutral: { idle: "default", particle: "leaf" },
+// The mood sets the idle style and whether the scene's ambient particle
+// ("ambient") shows; sleepy shows its "zzz" instead.
+const MOOD_PROFILES: Record<CharacterMood, { idle: IdleStyle; particle: "ambient" | "zzz" | null }> = {
+  happy: { idle: "bouncy", particle: "ambient" },
+  proud: { idle: "bouncy", particle: "ambient" },
+  calm: { idle: "default", particle: "ambient" },
+  neutral: { idle: "default", particle: "ambient" },
   worried: { idle: "low", particle: null },
   sad: { idle: "low", particle: null },
   sleepy: { idle: "sleepy", particle: "zzz" },
+};
+
+const SCENES: Record<
+  PetScene,
+  { ambient: AmbientParticle; motion: IdleMotion; groundRustle: boolean; groundInFront: boolean }
+> = {
+  meadow: { ambient: "leaf", motion: "graze", groundRustle: true, groundInFront: true },
+  ice: { ambient: "snow", motion: "waddle", groundRustle: false, groundInFront: false },
 };
 
 /**
@@ -27,5 +48,13 @@ export function getAnimationProfile(
   mood: CharacterMood,
 ): PetAnimationProfile | null {
   if (!character.layers) return null;
-  return MOOD_PROFILES[mood];
+  const { idle, particle } = MOOD_PROFILES[mood];
+  const scene = SCENES[character.scene ?? "meadow"];
+  return {
+    idle,
+    particle: particle === "ambient" ? scene.ambient : particle,
+    motion: scene.motion,
+    groundRustle: scene.groundRustle,
+    groundInFront: scene.groundInFront,
+  };
 }

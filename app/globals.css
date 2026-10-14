@@ -267,6 +267,22 @@
   animation-iteration-count: infinite;
   pointer-events: none;
 }
+/* Snowflakes reuse the leaf drift; the round shape hides the spin. */
+.pet-anim .pet-snow {
+  position: absolute;
+  top: -8%;
+  z-index: 2;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: #e6f2fb;
+  box-shadow: 0 0 0 1px rgb(120 160 195 / 0.35);
+  opacity: 0;
+  animation-name: pet-float;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  pointer-events: none;
+}
 
 .pet-anim .pet-zzz {
   position: absolute;
@@ -338,8 +354,8 @@
 }
 
 /* Cut-out stage (character without its parchment background): a soft glow
-   to stand on, plus a slow grazing motion. With split layers only the
-   animal moves; the grass layer above it stays still. Grazing pivots on the
+   to stand on, plus the character's idle motion. With split layers only the
+   animal moves; the ground layer above it stays still. Grazing pivots on the
    hind hooves, so the head and front legs dip into the static grass. */
 .pet-anim.pet-stage {
   background: radial-gradient(
@@ -368,6 +384,22 @@
   73%           { rotate: -2.8deg; }
   88%           { rotate: 0deg; }
 }
+/* Penguin: a few side-to-side rocks on its feet, then a pause. */
+.pet-anim .pet-waddle {
+  transform-origin: 50% 96%;
+  animation: pet-waddle 6s ease-in-out infinite;
+}
+.pet-anim[data-idle="sleepy"] .pet-waddle {
+  animation: none;
+}
+@keyframes pet-waddle {
+  0%, 45%, 100% { rotate: 0deg; }
+  52%           { rotate: -2.5deg; }
+  60%           { rotate: 2.5deg; }
+  68%           { rotate: -2deg; }
+  76%           { rotate: 1.5deg; }
+  84%           { rotate: 0deg; }
+}
 /* Grass layers (front and back-fill) rustle once per jump: a slight sway
    pivoting at the ground as the pet takes off, settling when it lands. At
    rest the grass is perfectly still. */
@@ -392,10 +424,12 @@
   .pet-anim .pet-hop,
   .pet-anim .pet-shadow,
   .pet-anim .pet-graze,
+  .pet-anim .pet-waddle,
   .pet-anim .pet-rustle {
     animation: none;
   }
   .pet-anim .pet-leaf,
+  .pet-anim .pet-snow,
   .pet-anim .pet-zzz,
   .pet-anim .pet-heart {
     display: none;
