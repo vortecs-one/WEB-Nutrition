@@ -41,6 +41,15 @@ export function isAvailableCharacter(id: string): boolean {
   );
 }
 
+/**
+ * Whether this user can pick the character: available in the catalog, and —
+ * for exclusive characters — only with exclusive access (decided server-side
+ * in lib/pets/access.ts and passed down to the UI).
+ */
+export function isSelectableFor(id: string, exclusiveAccess: boolean): boolean {
+  return isAvailableCharacter(id) && (charactersById.get(id)?.exclusive !== true || exclusiveAccess);
+}
+
 export const CHARACTER_MOODS = [
   "happy",
   "calm",

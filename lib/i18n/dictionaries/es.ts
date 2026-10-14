@@ -470,6 +470,8 @@ const es = {
     viewDetails: "Ver detalle",
     detailTitle: "Compañero virtual",
     galleryTitle: "Personajes disponibles",
+    exclusive: "Exclusivo",
+    exclusiveLocked: "Compañero exclusivo",
     changeCompanion: "Cambiar compañero",
     mood: "Ánimo",
     moodPending:

@@ -9,7 +9,8 @@ export type CharacterSpecies =
   | "bear"
   | "mouse"
   | "human"
-  | "puppet";
+  | "puppet"
+  | "penguin";
 
 export type CharacterTemperament =
   | "loyal"
@@ -57,8 +58,16 @@ export interface VirtualCharacter {
   species: CharacterSpecies;
   temperament: CharacterTemperament;
   description: Localized;
-  rights: PublicDomainInfo;
+  /** Public-domain source; absent for the app's own original characters. */
+  rights?: PublicDomainInfo;
+  /** Credit line for original characters (no public-domain source). */
+  origin?: Localized;
   rightsRisk: RightsRisk;
+  /**
+   * Shown to everyone (locked) but selectable only by the accounts allowed in
+   * lib/pets/access.ts; the server actions enforce it.
+   */
+  exclusive?: boolean;
   /** Original artwork drawn from the public-domain source; null while withheld. */
   artwork: string | null;
   /**

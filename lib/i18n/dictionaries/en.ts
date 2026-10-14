@@ -475,6 +475,8 @@ const en: Dictionary = {
     viewDetails: "View details",
     detailTitle: "Virtual companion",
     galleryTitle: "Available characters",
+    exclusive: "Exclusive",
+    exclusiveLocked: "Exclusive companion",
     changeCompanion: "Change companion",
     mood: "Mood",
     moodPending: "Soon its mood will react to your meals, water and glucose.",

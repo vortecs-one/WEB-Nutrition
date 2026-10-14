@@ -4,9 +4,10 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { petCompanions } from "@/drizzle/schema";
+import { canUseExclusivePets } from "./access";
 import {
-  isAvailableCharacter,
   isCharacterMood,
+  isSelectableFor,
   sanitizeNickname,
 } from "./manager";
 import type { CharacterState } from "./types";
@@ -25,10 +26,11 @@ async function getUserKey(): Promise<string | null> {
 
 type CompanionRow = typeof petCompanions.$inferSelect;
 
-function toState(row: CompanionRow): CharacterState | null {
-  // A stored character can become unavailable if the catalog changes; treat
-  // it as no companion rather than surfacing a locked character.
-  if (!isAvailableCharacter(row.characterId)) return null;
+function toState(row: CompanionRow, exclusiveAccess: boolean): CharacterState | null {
+  // A stored character can become unavailable (catalog change, or exclusive
+  // access removed); treat it as no companion rather than surfacing a
+  // locked character.
+  if (!isSelectableFor(row.characterId, exclusiveAccess)) return null;
   return {
     characterId: row.characterId,
     nickname: row.nickname,
@@ -47,7 +49,7 @@ export async function getCompanion(): Promise<CompanionResult> {
       .from(petCompanions)
       .where(eq(petCompanions.userKey, userKey))
       .limit(1);
-    return { ok: true, companion: row ? toState(row) : null };
+    return { ok: true, companion: row ? toState(row, await canUseExclusivePets()) : null };
   } catch (err) {
     console.error("[pets] getCompanion failed:", (err as Error).message);
     return { ok: false, error: "failed" };
@@ -59,7 +61,8 @@ export async function adoptCompanion(
 ): Promise<CompanionResult> {
   const userKey = await getUserKey();
   if (!userKey) return { ok: false, error: "unauthenticated" };
-  if (typeof characterId !== "string" || !isAvailableCharacter(characterId)) {
+  const exclusiveAccess = await canUseExclusivePets();
+  if (typeof characterId !== "string" || !isSelectableFor(characterId, exclusiveAccess)) {
     return { ok: false, error: "invalid" };
   }
   try {
@@ -85,7 +88,7 @@ export async function adoptCompanion(
         },
       })
       .returning();
-    return { ok: true, companion: toState(row) };
+    return { ok: true, companion: toState(row, exclusiveAccess) };
   } catch (err) {
     console.error("[pets] adoptCompanion failed:", (err as Error).message);
     return { ok: false, error: "failed" };
@@ -107,7 +110,7 @@ export async function renameCompanion(
       .where(eq(petCompanions.userKey, userKey))
       .returning();
     if (!row) return { ok: false, error: "invalid" };
-    return { ok: true, companion: toState(row) };
+    return { ok: true, companion: toState(row, await canUseExclusivePets()) };
   } catch (err) {
     console.error("[pets] renameCompanion failed:", (err as Error).message);
     return { ok: false, error: "failed" };
@@ -124,4 +127,10 @@ export async function releaseCompanion(): Promise<CompanionResult> {
     console.error("[pets] releaseCompanion failed:", (err as Error).message);
     return { ok: false, error: "failed" };
   }
+}
+
+// Whether the signed-in user may choose exclusive companions; the gallery
+// uses it to show them unlocked. Adoption re-checks on the server.
+export async function getExclusivePetAccess(): Promise<boolean> {
+  return canUseExclusivePets();
 }

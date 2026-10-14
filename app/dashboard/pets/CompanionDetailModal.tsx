@@ -144,14 +144,20 @@ export function CompanionDetailModal({
                 </div>
               </form>
 
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-sidebar-foreground/60">
-                <dt>{dict.pets.source}</dt>
-                <dd className="text-sidebar-foreground/80">
-                  {character.rights.sourceWork} — {character.rights.author} ({character.rights.firstPublished})
-                </dd>
-                <dt>{dict.pets.publicDomainSince}</dt>
-                <dd className="text-sidebar-foreground/80">{character.rights.publicDomainSince}</dd>
-              </dl>
+              {character.rights ? (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-sidebar-foreground/60">
+                  <dt>{dict.pets.source}</dt>
+                  <dd className="text-sidebar-foreground/80">
+                    {character.rights.sourceWork} — {character.rights.author} ({character.rights.firstPublished})
+                  </dd>
+                  <dt>{dict.pets.publicDomainSince}</dt>
+                  <dd className="text-sidebar-foreground/80">{character.rights.publicDomainSince}</dd>
+                </dl>
+              ) : (
+                character.origin && (
+                  <p className="text-xs text-sidebar-foreground/60">{character.origin[lang]}</p>
+                )
+              )}
             </div>
           </section>
         )}

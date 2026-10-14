@@ -22,7 +22,7 @@ export function CharacterPickerModal({
   onAdopted,
 }: CharacterPickerModalProps) {
   const { dict } = useI18n();
-  const { companion, adopt } = useCompanion();
+  const { companion, adopt, exclusiveAccess } = useCompanion();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +46,7 @@ export function CharacterPickerModal({
         <CharacterGallery
           currentId={companion?.characterId ?? null}
           pendingId={pendingId}
+          exclusiveAccess={exclusiveAccess}
           onAdopt={handleAdopt}
         />
         <p className="text-xs leading-relaxed text-sidebar-foreground/60">

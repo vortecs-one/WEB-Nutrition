@@ -68,6 +68,26 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
     enabled: true,
   },
   {
+    // The app's own original character (no public-domain source), exclusive
+    // to the accounts in lib/pets/access.ts; everyone else sees it locked.
+    id: "humboldt-penguin",
+    name: { es: "Pingüino de Humboldt", en: "Humboldt penguin" },
+    species: "penguin",
+    temperament: "cheerful",
+    description: {
+      es: "Un pingüino curioso de la costa del Pacífico de Chile y Perú, siempre listo para un chapuzón en agua fría.",
+      en: "A curious penguin from the Pacific coast of Chile and Peru, always ready for a dip in cold water.",
+    },
+    origin: {
+      es: "Personaje original de V-Healthy",
+      en: "Original V-Healthy character",
+    },
+    rightsRisk: "low",
+    exclusive: true,
+    artwork: "/pets/humboldt-penguin.png",
+    enabled: true,
+  },
+  {
     id: "bambi",
     name: { es: "Bambi", en: "Bambi" },
     species: "deer",
