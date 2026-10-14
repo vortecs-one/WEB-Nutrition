@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, Info, Pencil } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
@@ -348,6 +348,18 @@ export default function InsulinCalculator({
   );
 }
 
+// Row zone colors, matching the glucose chart's palette.
+const ZONE_LOW = "#ef4444"; // below the target range
+const ZONE_IN = "var(--color-lime-500)"; // in range
+const ZONE_HIGH = "#f59e0b"; // above range
+const ZONE_VERY_HIGH = "#ef4444"; // top correction rows
+
+function zoneColor(steps: number) {
+  if (steps < 0) return ZONE_LOW;
+  if (steps === 0) return ZONE_IN;
+  return steps >= 5 ? ZONE_VERY_HIGH : ZONE_HIGH;
+}
+
 function DoseTable({
   ratio,
   params,
@@ -367,6 +379,8 @@ function DoseTable({
   const t = dict.glucose.calculator;
   const fmt = (mgdl: number) => formatGlucose(mgdl, unit);
   const step = unit === "mmol" ? 0.1 * MGDL_PER_MMOL : 1;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeCellRef = useRef<HTMLTableCellElement>(null);
 
   const rows: { steps: number; label: string }[] = [];
   if (params.low - step > lowThreshold) {
@@ -384,6 +398,25 @@ function DoseTable({
   });
 
   const columns = Array.from({ length: MAX_CARB_STEPS + 1 }, (_, c) => c);
+  const maxDose = tableDose(MAX_CARB_STEPS, MAX_CORRECTION_STEPS);
+
+  // Keep the highlighted cell visible: the 16 carb columns overflow sideways.
+  // Only the table's own container scrolls, never the popup.
+  useEffect(() => {
+    const box = scrollRef.current;
+    const cell = activeCellRef.current;
+    if (!box || !cell) return;
+    box.scrollTo({
+      left: cell.offsetLeft - box.clientWidth / 2 + cell.offsetWidth / 2,
+      behavior: "smooth",
+    });
+  }, [activeSteps, activeCarbSteps]);
+
+  const legend = [
+    { color: ZONE_LOW, label: t.zoneLow },
+    { color: ZONE_IN, label: t.zoneInRange },
+    { color: ZONE_HIGH, label: t.zoneHigh },
+  ];
 
   return (
     <details open className="group rounded-2xl border border-highlight/20 bg-sidebar-accent">
@@ -398,19 +431,28 @@ function DoseTable({
       </summary>
       <div className="flex flex-col gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
         <p className="text-xs leading-relaxed text-sidebar-foreground/60">{t.tableHint}</p>
-        <div className="max-h-72 overflow-auto rounded-xl border border-sidebar-border">
-          <table className="w-full border-collapse text-center text-xs tabular-nums">
+        {/* Horizontal scroll only — all rows fit, so no nested vertical scroll. */}
+        <div ref={scrollRef} className="overflow-x-auto overscroll-x-contain rounded-xl border border-sidebar-border bg-sidebar">
+          <table className="w-full border-separate border-spacing-0 text-center text-xs tabular-nums sm:text-sm">
             <caption className="sr-only">{t.tableTitle}</caption>
             <thead>
-              <tr className="sticky top-0 z-10 bg-sidebar">
-                <th scope="col" className="sticky left-0 z-20 bg-sidebar px-2 py-1.5 text-left font-semibold text-highlight">
-                  {unitLabel(unit)} / {t.grams}
+              <tr>
+                <th
+                  scope="col"
+                  className="sticky left-0 z-20 border-b border-r border-sidebar-border bg-sidebar px-3 py-2 text-left align-bottom font-normal shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)]"
+                >
+                  <span className="block text-[10px] leading-tight text-sidebar-foreground/60">
+                    {t.tableCarbsAxis.replace("{unit}", t.grams)}
+                  </span>
+                  <span className="block text-[10px] font-semibold leading-tight text-highlight">
+                    {t.tableGlucoseAxis.replace("{unit}", unitLabel(unit))}
+                  </span>
                 </th>
                 {columns.map((c) => (
                   <th
                     key={c}
                     scope="col"
-                    className={`px-1.5 py-1.5 font-semibold ${
+                    className={`min-w-9 border-b border-sidebar-border px-1 py-2 align-bottom font-semibold ${
                       c === activeCarbSteps ? "bg-highlight/20 text-highlight" : "text-sidebar-foreground/70"
                     }`}
                   >
@@ -423,33 +465,51 @@ function DoseTable({
               {rows.map((row) => {
                 const rowActive = row.steps === activeSteps;
                 return (
-                  <tr key={row.steps} className="border-t border-sidebar-border">
+                  <tr key={row.steps}>
                     <th
                       scope="row"
-                      className={`sticky left-0 whitespace-nowrap px-2 py-1.5 text-left font-medium ${
-                        rowActive
-                          ? "bg-sidebar text-highlight shadow-[inset_3px_0_0_var(--highlight)]"
-                          : "bg-sidebar text-sidebar-foreground/70"
+                      className={`sticky left-0 z-10 whitespace-nowrap border-b border-r border-sidebar-border px-3 py-2 text-left font-medium shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)] ${
+                        rowActive ? "bg-sidebar-accent text-highlight" : "bg-sidebar text-sidebar-foreground/80"
                       }`}
                     >
-                      {row.label}
+                      <span className="flex items-center gap-2">
+                        <span
+                          aria-hidden="true"
+                          className="h-4 w-1 shrink-0 rounded-full"
+                          style={{ backgroundColor: zoneColor(row.steps) }}
+                        />
+                        {row.label}
+                      </span>
                     </th>
                     {columns.map((c) => {
+                      const dose = tableDose(c, row.steps);
                       const active = rowActive && c === activeCarbSteps;
                       const crossed = rowActive || c === activeCarbSteps;
+                      // Heat-map tint: stronger for bigger doses, none at 0.
+                      const tint = dose > 0 ? Math.round(6 + (dose / maxDose) * 30) : 0;
                       return (
                         <td
                           key={c}
+                          ref={active ? activeCellRef : undefined}
                           aria-current={active ? "true" : undefined}
-                          className={`px-1.5 py-1.5 ${
+                          className={`min-w-9 border-b border-sidebar-border px-1 py-2 ${
                             active
-                              ? "bg-primary font-semibold text-primary-foreground ring-2 ring-inset ring-highlight"
-                              : crossed
-                                ? "bg-highlight/10"
-                                : ""
-                          }`}
+                              ? "relative z-[5] rounded-md bg-highlight font-bold text-highlight-foreground ring-2 ring-inset ring-white/70"
+                              : dose === 0
+                                ? "text-sidebar-foreground/35"
+                                : "text-sidebar-foreground"
+                          } ${crossed && !active ? "font-semibold" : ""}`}
+                          style={
+                            active
+                              ? undefined
+                              : {
+                                  backgroundColor: `color-mix(in oklab, var(--highlight) ${
+                                    tint + (crossed ? 10 : 0)
+                                  }%, transparent)`,
+                                }
+                          }
                         >
-                          {tableDose(c, row.steps)}
+                          {dose}
                         </td>
                       );
                     })}
@@ -458,6 +518,15 @@ function DoseTable({
               })}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-sidebar-foreground/60">
+          <span>{t.tableUnitsNote}</span>
+          {legend.map((z) => (
+            <span key={z.label} className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: z.color }} />
+              {z.label}
+            </span>
+          ))}
         </div>
       </div>
     </details>

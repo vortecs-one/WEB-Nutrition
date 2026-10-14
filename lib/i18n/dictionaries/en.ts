@@ -318,6 +318,12 @@ const en: Dictionary = {
       tableHint:
         "Rows: glucose. Columns: grams of carbs. Each cell shows insulin units. The cell matching your current values is highlighted.",
       carbsRounded: "Calculated on {grams} g, the nearest lower column in the table.",
+      tableGlucoseAxis: "Glucose ↓ ({unit})",
+      tableCarbsAxis: "Carbs → ({unit})",
+      tableUnitsNote: "Values in insulin units (U)",
+      zoneLow: "Below range",
+      zoneInRange: "In range",
+      zoneHigh: "Above range",
       iob: "Insulin on board",
       iobHint: "Units from earlier boluses still active.",
       parameters: "Your parameters",
