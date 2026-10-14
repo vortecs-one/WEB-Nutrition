@@ -809,7 +809,7 @@ export default function GlucoseTracker({
         <button
           type="button"
           onClick={() => setShowCalculator(true)}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-sidebar-accent px-4 py-3 text-sm font-medium transition hover:bg-sidebar-accent/70 active:scale-[0.99]"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-purple-500 active:scale-[0.99]"
         >
           <Syringe className="h-4 w-4" aria-hidden="true" />
           {t.calculator.open}
