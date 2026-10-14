@@ -469,6 +469,7 @@ const en: Dictionary = {
     viewDetails: "View details",
     detailTitle: "Virtual companion",
     galleryTitle: "Available characters",
+    changeCompanion: "Change companion",
     mood: "Mood",
     moodPending: "Soon its mood will react to your meals, water and glucose.",
     moodHappy: "Happy",

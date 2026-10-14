@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { RefreshCw } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { displayName, getCharacter } from "@/lib/pets/manager";
 import type { CharacterMood, Locale } from "@/lib/pets/types";
 import type { Dictionary } from "@/lib/i18n/dictionaries/es";
 import { AnimatedPortrait } from "./AnimatedPortrait";
-import { CharacterGallery } from "./CharacterGallery";
 import { CompanionHealthStats } from "./CompanionHealthStats";
 import { useCompanion } from "./use-companion";
 
@@ -27,25 +27,22 @@ export function moodLabel(dict: Dictionary, mood: CharacterMood): string {
 interface CompanionDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Opens the "Available characters" popup on top of this one. */
+  onChangeCompanion: () => void;
 }
 
-export function CompanionDetailModal({ isOpen, onClose }: CompanionDetailModalProps) {
+export function CompanionDetailModal({
+  isOpen,
+  onClose,
+  onChangeCompanion,
+}: CompanionDetailModalProps) {
   const { dict, locale } = useI18n();
   const lang = locale as Locale;
-  const { companion, adopt, rename, release } = useCompanion();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const { companion, rename, release } = useCompanion();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const character = companion ? getCharacter(companion.characterId) : undefined;
-
-  async function handleAdopt(characterId: string) {
-    setPendingId(characterId);
-    setError(null);
-    const ok = await adopt(characterId);
-    if (!ok) setError(dict.pets.errorGeneric);
-    setPendingId(null);
-  }
 
   async function handleRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,8 +58,10 @@ export function CompanionDetailModal({ isOpen, onClose }: CompanionDetailModalPr
     setIsSaving(true);
     setError(null);
     const ok = await release();
-    if (!ok) setError(dict.pets.errorGeneric);
     setIsSaving(false);
+    // Nothing left to show here; the card offers to choose a new companion.
+    if (ok) onClose();
+    else setError(dict.pets.errorGeneric);
   }
 
   return (
@@ -70,14 +69,26 @@ export function CompanionDetailModal({ isOpen, onClose }: CompanionDetailModalPr
       <div className="flex flex-col gap-6">
         {companion && character && (
           <section className="flex flex-col gap-5 sm:flex-row">
-            <AnimatedPortrait
-              character={character}
-              mood={companion.mood}
-              locale={lang}
-              petLabel={dict.pets.petAction.replace("{name}", displayName(companion, lang))}
-              sizes="(min-width: 640px) 240px, 90vw"
-              className="aspect-square w-full shrink-0 rounded-2xl sm:w-60 sm:self-start"
-            />
+            {/* The portrait is itself a button (tap to pet), so the change
+                button sits beside it in this wrapper, layered on top. */}
+            <div className="relative aspect-square w-full shrink-0 sm:w-60 sm:self-start">
+              <AnimatedPortrait
+                character={character}
+                mood={companion.mood}
+                locale={lang}
+                petLabel={dict.pets.petAction.replace("{name}", displayName(companion, lang))}
+                sizes="(min-width: 640px) 240px, 90vw"
+                className="h-full w-full rounded-2xl"
+              />
+              <button
+                type="button"
+                onClick={onChangeCompanion}
+                className="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                {dict.pets.changeCompanion}
+              </button>
+            </div>
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <div className="flex flex-col gap-1">
                 <h3 className="text-balance text-2xl font-semibold">
@@ -146,18 +157,6 @@ export function CompanionDetailModal({ isOpen, onClose }: CompanionDetailModalPr
         )}
 
         {companion && <CompanionHealthStats />}
-
-        <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold">{dict.pets.galleryTitle}</h3>
-          <CharacterGallery
-            currentId={companion?.characterId ?? null}
-            pendingId={pendingId}
-            onAdopt={handleAdopt}
-          />
-          <p className="text-xs leading-relaxed text-sidebar-foreground/60">
-            {dict.pets.rightsNote} {dict.pets.lockedNote}
-          </p>
-        </section>
 
         {error && (
           <p role="alert" className="text-sm text-destructive">

@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useId, type ReactNode } from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -16,18 +16,33 @@ const sizeClass: Record<NonNullable<ModalProps["size"]>, string> = {
   lg: "sm:max-w-4xl",
 };
 
+// Open modals, innermost last. When one opens on top of another (e.g. the
+// character picker over the companion detail), Escape closes only the top one.
+const openModals: string[] = [];
+
 export function Modal({ isOpen, onClose, children, title, size = "md" }: ModalProps) {
   const titleId = useId();
+  // Callers pass inline onClose functions; keeping them out of the effect's
+  // dependencies stops it from re-registering (and reordering openModals)
+  // on every render.
+  const closeOnEscape = useEffectEvent(() => onClose());
 
-  // Close on Escape key
+  // Close on Escape key (topmost modal only)
   useEffect(() => {
     if (!isOpen) return;
+    openModals.push(titleId);
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && openModals[openModals.length - 1] === titleId) {
+        closeOnEscape();
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      const index = openModals.lastIndexOf(titleId);
+      if (index !== -1) openModals.splice(index, 1);
+    };
+  }, [isOpen, titleId]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {

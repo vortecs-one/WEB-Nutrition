@@ -464,6 +464,7 @@ const es = {
     viewDetails: "Ver detalle",
     detailTitle: "Compañero virtual",
     galleryTitle: "Personajes disponibles",
+    changeCompanion: "Cambiar compañero",
     mood: "Ánimo",
     moodPending:
       "Pronto su ánimo reaccionará a tus comidas, agua y glucosa.",

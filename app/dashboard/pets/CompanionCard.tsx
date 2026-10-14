@@ -5,6 +5,7 @@ import { ChevronRight, Sparkles } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { displayName, getCharacter } from "@/lib/pets/manager";
 import type { Locale } from "@/lib/pets/types";
+import { CharacterPickerModal } from "./CharacterPickerModal";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { CompanionDetailModal, moodLabel } from "./CompanionDetailModal";
 import { useCompanion } from "./use-companion";
@@ -13,7 +14,8 @@ export default function CompanionCard() {
   const { dict, locale } = useI18n();
   const lang = locale as Locale;
   const { companion, isLoading, error } = useCompanion();
-  const [isOpen, setIsOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (error) return null;
 
@@ -26,7 +28,9 @@ export default function CompanionCard() {
     >
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        // Without a companion the detail popup would be empty, so go straight
+        // to choosing one.
+        onClick={() => (companion ? setDetailOpen(true) : setPickerOpen(true))}
         disabled={isLoading}
         className="flex w-full items-center gap-4 rounded-2xl text-left transition hover:bg-sidebar-accent/60 disabled:opacity-60"
       >
@@ -77,7 +81,20 @@ export default function CompanionCard() {
         </span>
       </button>
 
-      <CompanionDetailModal isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      <CompanionDetailModal
+        isOpen={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        onChangeCompanion={() => setPickerOpen(true)}
+      />
+      {/* Rendered after the detail popup so it stacks on top of it. */}
+      <CharacterPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onAdopted={() => {
+          setPickerOpen(false);
+          setDetailOpen(true);
+        }}
+      />
     </section>
   );
 }
