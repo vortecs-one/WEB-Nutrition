@@ -1,12 +1,14 @@
 import type { PetLayers, VirtualCharacter } from "./types";
+import generatedLayers from "./layers.generated.json";
 
-// Paths of the layers scripts/cutout-pet.mjs writes for a companion, by its
-// naming convention. `ground` adds the static grass and its back-fill.
-function petLayers(id: string, { ground }: { ground: boolean }): PetLayers {
-  const base = `/pets/${id}`;
-  return ground
-    ? { body: `${base}-body.png`, ground: `${base}-ground.png`, back: `${base}-ground-back.png` }
-    : { body: `${base}-body.png` };
+// Popup layers written by scripts/cutout-pet.mjs, under content-hashed file
+// names recorded in layers.generated.json (a regenerated image gets a new
+// URL, so no image cache can serve a stale one). Fails loudly if the script
+// hasn't been run for this companion yet.
+function petLayers(id: string): PetLayers {
+  const layers = (generatedLayers as Record<string, PetLayers>)[id];
+  if (!layers) throw new Error(`No popup layers for "${id}": run node scripts/cutout-pet.mjs ${id}`);
+  return layers;
 }
 
 /**
@@ -87,7 +89,7 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
     },
     rightsRisk: "low",
     artwork: "/pets/bambi.png",
-    layers: petLayers("bambi", { ground: true }),
+    layers: petLayers("bambi"),
     enabled: true,
   },
   {

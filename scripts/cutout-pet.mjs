@@ -5,17 +5,21 @@
 //      writes nothing — handy to check it's usable before adding the entry.)
 //   2. node scripts/cutout-pet.mjs <id>
 //   3. Check the preview images it prints (ground only / jump pose / rest).
-//   4. In lib/pets/characters.ts set `layers: petLayers("<id>", { ground })`.
+//   4. In lib/pets/characters.ts set `layers: petLayers("<id>")`.
 //
 // Reads public/pets/<id>.png and writes, all on the same canvas so they stack:
-//   <id>-cutout.png       the drawing without its paper background
-//   <id>-body.png         the part that moves (the whole cut-out without ground)
-//   <id>-ground.png       static grass drawn in front of the body   (grass mode)
-//   <id>-ground-back.png  grass filled in behind the legs, revealed
-//                         while the body jumps                      (grass mode)
+//   <id>-body.<hash>.png         the part that moves (the whole cut-out
+//                                without ground)
+//   <id>-ground.<hash>.png       static grass in front of the body (grass mode)
+//   <id>-ground-back.<hash>.png  grass filled in behind the legs, revealed
+//                                while the body jumps            (grass mode)
+// and records their paths in lib/pets/layers.generated.json. The content hash
+// in each name means a regenerated image gets a new URL, so image caches
+// (Next's optimizer, browsers, the CDN) can't keep serving the old one.
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { copyFile, mkdir } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { DEFAULTS, PETS } from "./pet-layers.config.mjs";
 
@@ -37,12 +41,43 @@ if (cfg.background !== "paper") {
 }
 
 const SRC = `public/pets/${id}.png`;
+const PETS_DIR = "public/pets";
+const MANIFEST = "lib/pets/layers.generated.json";
+// Layers are built in the preview folder first, then published to
+// public/pets under content-hashed names (see publish() below).
+const previewDir = path.join(os.tmpdir(), "pet-previews");
+await mkdir(previewDir, { recursive: true });
 const OUT = {
-  cutout: `public/pets/${id}-cutout.png`,
-  body: `public/pets/${id}-body.png`,
-  ground: `public/pets/${id}-ground.png`,
-  back: `public/pets/${id}-ground-back.png`,
+  cutout: path.join(previewDir, `${id}-cutout.png`),
+  body: path.join(previewDir, `${id}-body.png`),
+  ground: path.join(previewDir, `${id}-ground.png`),
+  back: path.join(previewDir, `${id}-ground-back.png`),
 };
+
+// Copies the built layers into public/pets as <id>-<layer>.<hash>.png,
+// removing that companion's previous versions (hashed or legacy unhashed),
+// and records the new paths in the manifest read by lib/pets/characters.ts.
+async function publish(layers) {
+  const stale = new RegExp(`^${id}-(cutout|body|ground|ground-back)(\\.[0-9a-f]{8})?\\.png$`);
+  for (const file of await readdir(PETS_DIR)) {
+    if (stale.test(file)) await unlink(path.join(PETS_DIR, file));
+  }
+  const entry = {};
+  for (const [key, [name, file]] of Object.entries(layers)) {
+    const buf = await readFile(file);
+    const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 8);
+    const publicName = `${id}-${name}.${hash}.png`;
+    await writeFile(path.join(PETS_DIR, publicName), buf);
+    entry[key] = `/pets/${publicName}`;
+  }
+  let manifest = {};
+  try { manifest = JSON.parse(await readFile(MANIFEST, "utf8")); } catch { /* first run */ }
+  manifest[id] = entry;
+  const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
+  await writeFile(MANIFEST, JSON.stringify(sorted, null, 2) + "\n");
+  for (const p of Object.values(entry)) console.log(`published: public${p}`);
+  console.log(`manifest: ${MANIFEST}`);
+}
 
 const { data, info } = await sharp(SRC).removeAlpha().raw().toBuffer({ resolveWithObject: true });
 const { width: W, height: H } = info;
@@ -204,8 +239,8 @@ await writeLayer(OUT.cutout, () => true);
 console.log(`${OUT.cutout}: kept ${(keptShare * 100).toFixed(1)}% of the image`);
 
 if (!cfg.ground) {
-  await copyFile(OUT.cutout, OUT.body);
-  console.log(`${OUT.body}: no ground split — the whole cut-out moves`);
+  // No ground split: the whole cut-out is the moving body.
+  await publish({ body: ["body", OUT.cutout] });
   process.exit(0);
 }
 if (cfg.ground.mode !== "grass") {
@@ -274,11 +309,12 @@ console.log(`${OUT.body} / ${OUT.ground}: body is ${(animal.reduce((a, b) => a +
 // === 3. Back-fill the grass behind the legs ======================================
 // The ground layer has leg-shaped gaps. This layer sits behind the body and
 // fills them row by row: each horizontal run of gap pixels (one leg at that
-// row) is filled — only if real grass grows right beside it on that row, so
-// the fill follows the local grass height — with the best-matching strip of
-// grass from the same row anywhere on the ground. Clean, dense grass scores
-// highest; other gaps, clover leaves and pale stems (which would look copied)
-// score low; staying on the row above's offset keeps blades continuous.
+// row) is filled — only if ground grows right beside it on that row, so the
+// fill follows the local ground height — with the best-matching strip of
+// grass from the same row (or a few rows lower) anywhere on the ground.
+// Clean, dense grass scores highest; other gaps, clover leaves and pale
+// stems (which would look copied) score low; staying on the row above's
+// offset keeps blades continuous.
 const gap = dilate(animal, 2).map((v, p) => (v && ((p / W) | 0) >= GROUND_TOP ? 1 : 0));
 const groundAlpha = (p) => (removed[p] || animal[p] ? 0 : feathered[p]);
 const distinctiveRaw = new Uint8Array(N);
@@ -303,9 +339,11 @@ const gapLabel = new Int32Array(N).fill(-1);
 }
 const stats = new Map(); // gap label -> { x0, x1, needed, filled }
 const back = Buffer.alloc(N * 4);
-let prevDxAt = new Int32Array(W);
+// Offset (dx, dy) used at each column in the row above, for continuity.
+let prevAt = new Array(W).fill(null);
+const DY_STEPS = [0, 8, 16, 24, 32]; // also borrow grass from a few rows lower
 for (let y = GROUND_TOP; y < H; y++) {
-  const rowDx = new Int32Array(W);
+  const rowAt = new Array(W).fill(null);
   const row = y * W;
   let x = 0;
   while (x < W) {
@@ -313,45 +351,51 @@ for (let y = GROUND_TOP; y < H; y++) {
     const a = x;
     while (x < W && gap[row + x]) x++;
     const b = x - 1, L = b - a + 1;
-    // Is there real grass right beside this run on this row? Clovers and
-    // pale stems don't count, so the fill follows the grass, not them.
-    let grassBeside = false;
-    for (let k = 1; k <= NEIGHBOR_PX && !grassBeside; k++) {
+    // Is there ground right beside this run on this row (grass, or a clover
+    // or stem)? Then the fill follows the real ground silhouette here.
+    let groundBeside = false;
+    for (let k = 1; k <= NEIGHBOR_PX && !groundBeside; k++) {
       for (const sx of [a - k, b + k]) {
-        if (sx >= 0 && sx < W && !gap[row + sx] && !distinctive[row + sx] && groundAlpha(row + sx) > 128) grassBeside = true;
+        if (sx >= 0 && sx < W && !gap[row + sx] && groundAlpha(row + sx) > 128) groundBeside = true;
       }
     }
     const s = stats.get(gapLabel[row + a]) ?? { x0: W, x1: 0, needed: 0, filled: 0 };
     s.x0 = Math.min(s.x0, a); s.x1 = Math.max(s.x1, b);
     stats.set(gapLabel[row + a], s);
-    if (!grassBeside) continue;
+    if (!groundBeside) continue;
     s.needed += L;
 
-    const prev = prevDxAt[a] || prevDxAt[(a + b) >> 1] || prevDxAt[b];
-    let best = 0, bestScore = -Infinity;
-    const consider = (dx) => {
+    // Best source strip: same row or a few rows lower, anywhere on the ground.
+    const prev = prevAt[a] ?? prevAt[(a + b) >> 1] ?? prevAt[b];
+    let best = null, bestScore = -Infinity;
+    const consider = (dx, dy) => {
+      const sy = y + dy;
+      if (sy >= H) return;
       let score = 0;
       for (let xx = a; xx <= b; xx++) {
         const sx = xx + dx;
         if (sx < 0 || sx >= W) { score -= 2; continue; }
-        const src = row + sx;
+        const src = sy * W + sx;
         if (gap[src]) score -= 2;
         else if (distinctive[src]) score -= 3;
         else if (groundAlpha(src) > 128) score += 1;
         else score -= 0.5; // empty source, but grass is needed here
       }
-      if (dx === prev) score += L * 0.6; // continuity with the row above
-      score -= Math.abs(dx) * 0.004; // nearer grass looks more natural
-      if (score > bestScore) { bestScore = score; best = dx; }
+      if (prev && dx === prev.dx && dy === prev.dy) score += L * 0.6; // continuity with the row above
+      score -= Math.abs(dx) * 0.004 + dy * 0.01; // nearer grass looks more natural
+      if (score > bestScore) { bestScore = score; best = { dx, dy }; }
     };
-    if (prev) consider(prev);
-    for (let d = L + 2; d < W; d += 2) { consider(d); consider(-d); }
+    if (prev) consider(prev.dx, prev.dy);
+    for (const dy of DY_STEPS) {
+      for (let d = L + 2; d < W; d += 2) { consider(d, dy); consider(-d, dy); }
+    }
+    if (!best) continue;
 
     for (let xx = a; xx <= b; xx++) {
-      rowDx[xx] = best;
-      const sx = xx + best;
-      if (sx < 0 || sx >= W) continue;
-      const p = row + xx, src = row + sx;
+      rowAt[xx] = best;
+      const sx = xx + best.dx, sy = y + best.dy;
+      if (sx < 0 || sx >= W || sy >= H) continue;
+      const p = row + xx, src = sy * W + sx;
       // Never copy a gap, a clover leaf or a pale stem.
       const alphaSrc = gap[src] || distinctive[src] ? 0 : groundAlpha(src);
       if (!alphaSrc) continue;
@@ -360,20 +404,24 @@ for (let y = GROUND_TOP; y < H; y++) {
       s.filled++;
     }
   }
-  prevDxAt = rowDx;
+  prevAt = rowAt;
 }
 await writeRgba(OUT.back, back);
 console.log(`${OUT.back}:`);
 for (const s of [...stats.values()].sort((u, v) => u.x0 - v.x0)) {
   const pct = s.needed ? Math.round((s.filled / s.needed) * 100) : 100;
-  console.log(`  leg gap x ${s.x0}-${s.x1}: filled ${pct}% of the rows with grass beside it`);
+  console.log(`  leg gap x ${s.x0}-${s.x1}: filled ${pct}% of the rows with ground beside it`);
 }
+
+await publish({
+  body: ["body", OUT.body],
+  ground: ["ground", OUT.ground],
+  back: ["ground-back", OUT.back],
+});
 
 // === 4. Previews ===================================================================
 // Ground only, jump pose (body lifted 9%) and rest pose on a dark background,
 // to check the result before using it in the app.
-const previewDir = path.join(os.tmpdir(), "pet-previews");
-await mkdir(previewDir, { recursive: true });
 const meta = await sharp(OUT.body).metadata();
 const dark = { r: 30, g: 32, b: 38, alpha: 1 };
 const stage = () => sharp({ create: { width: meta.width, height: meta.height, channels: 4, background: dark } });
@@ -387,7 +435,8 @@ const previews = {
   rest: [OUT.back, OUT.body, OUT.ground],
 };
 for (const [name, layers] of Object.entries(previews)) {
-  const file = path.join(previewDir, `${id}-${name}.png`);
+  // Own names: the layer files in this folder must not be overwritten.
+  const file = path.join(previewDir, `${id}-preview-${name}.png`);
   await stage().composite(layers.map((input) => ({ input }))).png().toFile(file);
   console.log(`preview: ${file}`);
 }
