@@ -44,9 +44,10 @@ export function AnimatedPortrait({
   className = "",
 }: AnimatedPortraitProps) {
   const [tapCount, setTapCount] = useState(0);
-  const profile = getAnimationProfile(character.id, mood);
+  const profile = getAnimationProfile(character, mood);
+  const layers = character.layers;
 
-  if (!profile) {
+  if (!profile || !layers) {
     return (
       <CharacterPortrait
         character={character}
@@ -58,78 +59,55 @@ export function AnimatedPortrait({
     );
   }
 
-  // With a background-free cut-out, the character stands on a soft glow
-  // instead of its parchment card and also grazes. When the cut-out is split
-  // into layers, only the animal moves; the grass stays put on top of it.
-  const layers = character.layers;
-  const cutout = layers?.body ?? character.cutout;
-  // Both layers share one box so they line up pixel for pixel.
+  // The background-free character stands on a soft glow. Only the body
+  // moves; when the art has a ground split, the grass stays put in front of
+  // it, with grass filled in behind the legs for when it jumps.
+  // All layers share one box so they line up pixel for pixel.
   const stageBox = "absolute inset-x-[6%] bottom-[4%] top-[8%] block";
+  const layerImage = (src: string, alt = "") => (
+    <Image src={src} alt={alt} fill sizes={sizes} priority className="object-contain object-bottom" />
+  );
 
   return (
     <button
       type="button"
       onClick={() => setTapCount((n) => n + 1)}
       aria-label={petLabel}
-      className={`pet-anim group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${
-        cutout ? "pet-stage" : "bg-sidebar-accent"
-      } ${className}`}
+      className={`pet-anim pet-stage group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${className}`}
       data-idle={profile.idle}
     >
-      {cutout ? (
-        <>
-          {/* The shadow stays on the ground and shrinks while the pet jumps. */}
-          <span
-            key={`shadow-${tapCount}`}
-            aria-hidden="true"
-            className={`pet-shadow ${tapCount > 0 ? "pet-shadow-hop" : ""}`}
-          />
-          <span key={tapCount} className={`${stageBox} ${tapCount > 0 ? "pet-hop" : ""}`}>
-            <span className="pet-body absolute inset-0 block">
-              <span className="pet-graze absolute inset-0 block">
-                <Image
-                  src={cutout}
-                  alt={character.name[locale]}
-                  fill
-                  sizes={sizes}
-                  priority
-                  className="object-contain object-bottom"
-                />
-              </span>
-            </span>
+      {/* The shadow stays on the ground and shrinks while the pet jumps. */}
+      <span
+        key={`shadow-${tapCount}`}
+        aria-hidden="true"
+        className={`pet-shadow ${tapCount > 0 ? "pet-shadow-hop" : ""}`}
+      />
+      {/* Grass behind the legs: hidden by the body at rest, it fills the gaps
+          in the grass while the pet is in the air. */}
+      {layers.back && (
+        <span
+          key={`back-${tapCount}`}
+          aria-hidden="true"
+          className={`${stageBox} pointer-events-none ${tapCount > 0 ? "pet-rustle" : ""}`}
+        >
+          {layerImage(layers.back)}
+        </span>
+      )}
+      <span key={tapCount} className={`${stageBox} ${tapCount > 0 ? "pet-hop" : ""}`}>
+        <span className="pet-body absolute inset-0 block">
+          <span className="pet-graze absolute inset-0 block">
+            {layerImage(layers.body, character.name[locale])}
           </span>
-          {layers && (
-            <span aria-hidden="true" className={`${stageBox} pointer-events-none z-[2]`}>
-              <Image
-                src={layers.ground}
-                alt=""
-                fill
-                sizes={sizes}
-                priority
-                className="object-contain object-bottom"
-              />
-            </span>
-          )}
-        </>
-      ) : (
-        <>
-          <span aria-hidden="true" className="pet-shadow" />
-
-          <span
-            key={tapCount}
-            className={`absolute inset-0 block ${tapCount > 0 ? "pet-hop" : ""}`}
-          >
-            <span className="pet-body absolute inset-0 block">
-              <CharacterPortrait
-                character={character}
-                locale={locale}
-                sizes={sizes}
-                priority
-                className="h-full w-full"
-              />
-            </span>
-          </span>
-        </>
+        </span>
+      </span>
+      {layers.ground && (
+        <span
+          key={`ground-${tapCount}`}
+          aria-hidden="true"
+          className={`${stageBox} pointer-events-none z-[2] ${tapCount > 0 ? "pet-rustle" : ""}`}
+        >
+          {layerImage(layers.ground)}
+        </span>
       )}
 
       {profile.particle === "leaf" &&

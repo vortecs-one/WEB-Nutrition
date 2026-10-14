@@ -1,4 +1,13 @@
-import type { VirtualCharacter } from "./types";
+import type { PetLayers, VirtualCharacter } from "./types";
+
+// Paths of the layers scripts/cutout-pet.mjs writes for a companion, by its
+// naming convention. `ground` adds the static grass and its back-fill.
+function petLayers(id: string, { ground }: { ground: boolean }): PetLayers {
+  const base = `/pets/${id}`;
+  return ground
+    ? { body: `${base}-body.png`, ground: `${base}-ground.png`, back: `${base}-ground-back.png` }
+    : { body: `${base}-body.png` };
+}
 
 /**
  * Only the original public-domain versions may be depicted. Artwork must be
@@ -78,8 +87,7 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
     },
     rightsRisk: "low",
     artwork: "/pets/bambi.png",
-    cutout: "/pets/bambi-cutout.png",
-    layers: { body: "/pets/bambi-body.png", ground: "/pets/bambi-ground.png" },
+    layers: petLayers("bambi", { ground: true }),
     enabled: true,
   },
   {

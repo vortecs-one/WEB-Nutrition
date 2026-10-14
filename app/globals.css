@@ -368,6 +368,20 @@
   73%           { rotate: -2.8deg; }
   88%           { rotate: 0deg; }
 }
+/* Grass layers (front and back-fill) rustle once per jump: a slight sway
+   pivoting at the ground as the pet takes off, settling when it lands. At
+   rest the grass is perfectly still. */
+.pet-anim .pet-rustle {
+  transform-origin: 50% 100%;
+  animation: pet-rustle 0.8s ease-out 1;
+}
+@keyframes pet-rustle {
+  0%, 100% { transform: skewX(0deg); }
+  15%      { transform: skewX(2deg); }
+  40%      { transform: skewX(-1.5deg); }
+  65%      { transform: skewX(1deg); }
+  85%      { transform: skewX(-0.4deg); }
+}
 @keyframes pet-shadow-hop {
   0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 0.18; }
   50%      { transform: translateX(-50%) scaleX(0.7); opacity: 0.1; }
@@ -377,7 +391,8 @@
   .pet-anim .pet-body,
   .pet-anim .pet-hop,
   .pet-anim .pet-shadow,
-  .pet-anim .pet-graze {
+  .pet-anim .pet-graze,
+  .pet-anim .pet-rustle {
     animation: none;
   }
   .pet-anim .pet-leaf,
