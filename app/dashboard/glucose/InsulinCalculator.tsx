@@ -435,29 +435,7 @@ function DoseTable({
             centered while the columns scroll under it. The left block matches
             the glucose column's fixed width (w-36) and continues its header. */}
         <div className="flex bg-highlight text-sm font-bold text-white">
-          {/* Top-left corner: info icon with the units note (keeps the legend
-              below on a single line). Hover shows it via title; tap toggles. */}
-          <div className="relative flex w-36 shrink-0 items-center border-r border-sidebar-border px-2">
-            <button
-              type="button"
-              onClick={() => setShowUnitsInfo((v) => !v)}
-              onBlur={() => setShowUnitsInfo(false)}
-              aria-label={t.tableUnitsNote}
-              aria-expanded={showUnitsInfo}
-              title={t.tableUnitsNote}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-white/70 transition hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-            >
-              <Info className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {showUnitsInfo && (
-              <p
-                role="tooltip"
-                className="absolute left-2 top-full z-30 mt-1 w-max max-w-[14rem] rounded-lg bg-sidebar px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground shadow-lg ring-1 ring-sidebar-border"
-              >
-                {t.tableUnitsNote}
-              </p>
-            )}
-          </div>
+          <div aria-hidden="true" className="w-36 shrink-0 border-r border-sidebar-border" />
           <div className="min-w-0 flex-1 px-3 py-2 text-center">
             {t.tableCarbsAxis.replace("{unit}", t.grams)}
           </div>
@@ -470,9 +448,32 @@ function DoseTable({
               <tr>
                 <th
                   scope="col"
-                  className="sticky left-0 z-20 w-36 min-w-36 max-w-36 whitespace-nowrap border-b border-r border-sidebar-border bg-highlight px-2 py-1 text-left align-bottom text-xs font-bold leading-tight text-white shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)]"
+                  className="sticky left-0 z-20 w-36 min-w-36 max-w-36 border-b border-r border-sidebar-border bg-highlight px-2 py-1 text-left align-bottom text-xs font-bold leading-tight text-white shadow-[4px_0_6px_-4px_rgba(0,0,0,0.5)]"
                 >
-                  {t.tableGlucoseAxis.replace("{unit}", unitLabel(unit))}
+                  {/* Units note behind an info icon, left of the label. Hover
+                      shows it via title; tap toggles the bubble. */}
+                  <span className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowUnitsInfo((v) => !v)}
+                      onBlur={() => setShowUnitsInfo(false)}
+                      aria-label={t.tableUnitsNote}
+                      aria-expanded={showUnitsInfo}
+                      title={t.tableUnitsNote}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white/70 transition hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                    >
+                      <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                    <span>{t.tableGlucoseAxis.replace("{unit}", unitLabel(unit))}</span>
+                  </span>
+                  {showUnitsInfo && (
+                    <span
+                      role="tooltip"
+                      className="absolute left-2 top-full z-30 mt-1 w-max max-w-[14rem] rounded-lg bg-sidebar px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground shadow-lg ring-1 ring-sidebar-border"
+                    >
+                      {t.tableUnitsNote}
+                    </span>
+                  )}
                 </th>
                 {columns.map((c) => (
                   <th
