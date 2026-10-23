@@ -49,7 +49,6 @@ import {
   formatGlucose,
   glucoseStatus,
   minutesAgo,
-  mgdlToMmol,
   unitLabel,
   STALE_MINUTES,
   sensorExpiresAt,
@@ -57,6 +56,7 @@ import {
   sensorWarmUpEndsAt,
   splitDuration,
 } from "@/lib/glucose/types";
+import { mgdlToMmol } from "@/lib/health-formulas";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";

@@ -36,6 +36,7 @@ import {
   sumValues,
   roundOrUndef,
 } from "@/lib/foods/nutrition";
+import { sodiumToMg } from "@/lib/health-formulas";
 import NutritionFacts from "./NutritionFacts";
 import BarcodeScanner from "./BarcodeScanner";
 import FoodPhotoScanner from "./FoodPhotoScanner";
@@ -296,7 +297,7 @@ export default function BarcodeLookup({
       saturatedFat: roundOrUndef(v.saturatedFat),
       sugars: roundOrUndef(v.sugars),
       fiber: roundOrUndef(v.fiber),
-      sodium: roundOrUndef(v.sodium == null ? null : v.sodium * 1000),
+      sodium: roundOrUndef(sodiumToMg(v.sodium)),
     };
   };
 

@@ -35,6 +35,7 @@ import {
   sumValues,
   roundOrUndef,
 } from "@/lib/foods/nutrition";
+import { sodiumToMg } from "@/lib/health-formulas";
 
 // ─── Cart helpers (mirrors BarcodeLookup) ─────────────────────────────────────
 
@@ -196,7 +197,7 @@ function MealBuilderModal({
       saturatedFat: roundOrUndef(v.saturatedFat),
       sugars: roundOrUndef(v.sugars),
       fiber: roundOrUndef(v.fiber),
-      sodium: roundOrUndef(v.sodium == null ? null : v.sodium * 1000),
+      sodium: roundOrUndef(sodiumToMg(v.sodium)),
     };
   };
 

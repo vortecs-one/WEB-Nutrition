@@ -113,8 +113,3 @@ export function sumValues(list: NutrientValues[]): NutrientValues {
 export function roundOrUndef(v: number | null): number | undefined {
   return v == null ? undefined : Math.round(v);
 }
-
-// Grams of sodium -> milligrams (the API returns sodium in grams).
-export function sodiumToMg(gramsValue: number | null): number | null {
-  return gramsValue == null ? null : gramsValue * 1000;
-}

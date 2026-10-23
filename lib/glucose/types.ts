@@ -3,6 +3,8 @@
 // All values are handled internally in mg/dL; conversion to mmol/L happens
 // only at display time.
 
+import { mgdlToMmol } from "@/lib/health-formulas";
+
 // Nightscout trend directions (from the `direction` field on SGV entries).
 export type TrendDirection =
   | "DoubleUp"
@@ -125,12 +127,6 @@ export type GlucoseFetchResult =
   | { ok: false; error: GlucoseFetchError };
 
 // --- Unit helpers -----------------------------------------------------------
-
-const MGDL_PER_MMOL = 18.0182;
-
-export function mgdlToMmol(mgdl: number): number {
-  return Math.round((mgdl / MGDL_PER_MMOL) * 10) / 10;
-}
 
 /** Format a mg/dL value in the requested display unit. */
 export function formatGlucose(mgdl: number, unit: GlucoseUnit): string {

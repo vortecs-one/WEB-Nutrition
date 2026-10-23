@@ -10,51 +10,41 @@ import {
   formatGlucose,
   unitLabel,
 } from "@/lib/glucose/types";
-
-const MGDL_PER_MMOL = 18.0182;
+import {
+  type SheetParams,
+  MGDL_PER_MMOL,
+  SHEET_MAX_CARB_STEPS,
+  SHEET_MAX_CORRECTION_STEPS,
+  bolusDose,
+  carbsToReach,
+  mgdlToMmol,
+  roundDownHalf,
+  sheetCarbSteps,
+  sheetCorrectionSteps,
+  sheetDose,
+  toMgdl,
+} from "@/lib/health-formulas";
 
 // Defaults taken from the patient's dosing sheet (RATIO / SENSIBILIDAD /
-// RANGO MENOR / RANGO MAYOR).
+// RANGO MENOR / RANGO MAYOR). The formula's target defaults to the top of
+// that range, where the sheet starts correcting.
 const DEFAULT_RATIO_G = 7;
 const DEFAULT_ISF_MGDL = 35;
 const DEFAULT_RANGE_LOW_MGDL = 100;
 const DEFAULT_RANGE_HIGH_MGDL = 120;
+const DEFAULT_TARGET_MGDL = 120;
 
-// The sheet has 8 correction rows above the target range (121–155 … 366+)
-// and 16 carb columns (0 … 15 × ratio).
-const MAX_CORRECTION_STEPS = 8;
-const MAX_CARB_STEPS = 15;
-
-const roundDownHalf = (u: number) => Math.floor(u * 2) / 2;
+// "formula": continuous bolus formula. "sheet": the care team's dose table.
+type Method = "formula" | "sheet";
+const METHODS: Method[] = ["formula", "sheet"];
 
 const parse = (s: string) => {
   const n = Number.parseFloat(s.replace(",", "."));
   return Number.isFinite(n) ? n : NaN;
 };
 
-const toMgdl = (value: number, unit: GlucoseUnit) =>
-  unit === "mmol" ? value * MGDL_PER_MMOL : value;
-
 const fromMgdl = (mgdl: number, unit: GlucoseUnit) =>
-  unit === "mmol" ? String(Math.round((mgdl / MGDL_PER_MMOL) * 10) / 10) : String(Math.round(mgdl));
-
-type TableParams = { isf: number; low: number; high: number };
-
-/** Row of the sheet the glucose falls in: -1 below range, 0 in range, 1+ above. */
-function correctionSteps(glucose: number, { isf, low, high }: TableParams) {
-  if (glucose > high) return Math.ceil((glucose - high) / isf);
-  if (glucose < low) return -1;
-  return 0;
-}
-
-/**
- * Units from the sheet. With carbs, each ratio-sized portion adds 1 U on top
- * of the row's correction. In the 0 g column the sheet is one unit more
- * conservative (pure correction without a meal).
- */
-function tableDose(carbSteps: number, steps: number) {
-  return carbSteps === 0 ? Math.max(0, steps - 1) : Math.max(0, carbSteps + steps);
-}
+  unit === "mmol" ? String(mgdlToMmol(mgdl)) : String(Math.round(mgdl));
 
 type Props = {
   isOpen: boolean;
@@ -79,9 +69,11 @@ export default function InsulinCalculator({
   // Glucose-valued fields are kept as typed strings in the unit they were
   // entered in, so decimals like "5." survive while typing in mmol/L.
   const [fieldUnit, setFieldUnit] = useState<GlucoseUnit>(unit);
+  const [method, setMethod] = useState<Method>("formula");
   const [carbs, setCarbs] = useState("0");
   const [ratio, setRatio] = useState(String(DEFAULT_RATIO_G));
   const [sensitivity, setSensitivity] = useState(fromMgdl(DEFAULT_ISF_MGDL, unit));
+  const [target, setTarget] = useState(fromMgdl(DEFAULT_TARGET_MGDL, unit));
   const [rangeLow, setRangeLow] = useState(fromMgdl(DEFAULT_RANGE_LOW_MGDL, unit));
   const [rangeHigh, setRangeHigh] = useState(fromMgdl(DEFAULT_RANGE_HIGH_MGDL, unit));
   const [iob, setIob] = useState("0");
@@ -94,39 +86,56 @@ export default function InsulinCalculator({
     };
     setFieldUnit(unit);
     setSensitivity(convert(sensitivity));
+    setTarget(convert(target));
     setRangeLow(convert(rangeLow));
     setRangeHigh(convert(rangeHigh));
     setManualGlucose(convert(manualGlucose));
   }
 
+  const isFormula = method === "formula";
   const glucoseMgdl = currentMgdl ?? toMgdl(parse(manualGlucose), unit);
   const carbsG = Math.max(0, parse(carbs) || 0);
   const ratioG = parse(ratio);
-  const params: TableParams = {
+  const targetMgdl = toMgdl(parse(target), unit);
+  const params: SheetParams = {
     isf: toMgdl(parse(sensitivity), unit),
     low: toMgdl(parse(rangeLow), unit),
     high: toMgdl(parse(rangeHigh), unit),
   };
   const iobU = Math.max(0, parse(iob) || 0);
 
-  const paramsValid = ratioG > 0 && params.isf > 0 && params.low > 0 && params.high >= params.low;
+  const paramsValid = isFormula
+    ? ratioG > 0 && params.isf > 0 && targetMgdl > 0
+    : ratioG > 0 && params.isf > 0 && params.low > 0 && params.high >= params.low;
   const hasGlucose = Number.isFinite(glucoseMgdl) && glucoseMgdl > 0;
   const ready = paramsValid && hasGlucose;
 
   const isHypo = ready && glucoseMgdl < settings.lowThreshold;
-  // Small epsilon so 14 / 7 doesn't floor to 1.999…
-  const carbSteps = ready ? Math.floor(carbsG / ratioG + 1e-9) : 0;
-  const steps = ready ? correctionSteps(glucoseMgdl, params) : 0;
-  const sheetDose = ready ? tableDose(carbSteps, steps) : 0;
-  const correction = sheetDose - carbSteps;
-  const iobApplied = Math.min(iobU, sheetDose);
-  const total = isHypo ? 0 : roundDownHalf(Math.max(0, sheetDose - iobU));
+
+  // Formula: exact bolus, rounded down to the pen's 0.5 U only for the total.
+  const bolus =
+    ready && isFormula
+      ? bolusDose({ carbsG, ratioG, glucoseMgdl, targetMgdl, isfMgdl: params.isf, iobU })
+      : null;
+
+  // Sheet: whole-unit dose from the care team's table.
+  const sheetReady = ready && !isFormula;
+  const carbSteps = sheetReady ? sheetCarbSteps(carbsG, ratioG) : 0;
+  const steps = sheetReady ? sheetCorrectionSteps(glucoseMgdl, params) : 0;
+  const sheetUnits = sheetReady ? sheetDose(carbSteps, steps) : 0;
+  const correction = sheetUnits - carbSteps;
+
+  const iobApplied = bolus ? bolus.iobApplied : Math.min(iobU, sheetUnits);
+  const total = isHypo
+    ? 0
+    : roundDownHalf(bolus ? bolus.theoretical : Math.max(0, sheetUnits - iobU));
 
   const carbsNeeded = isHypo
-    ? Math.max(15, Math.ceil(((params.low - glucoseMgdl) * ratioG) / params.isf))
+    ? carbsToReach(glucoseMgdl, isFormula ? targetMgdl : params.low, ratioG, params.isf)
     : 0;
 
-  const fmtU = (n: number) => `${n > 0 ? "+" : ""}${(Math.round(n * 10) / 10).toFixed(1)} ${t.units}`;
+  const fmtU = (n: number, digits = 1) =>
+    `${n > 0 ? "+" : ""}${(Math.round(n * 10 ** digits) / 10 ** digits).toFixed(digits)} ${t.units}`;
   const glucoseUnit = unitLabel(unit);
   const lockLabels = { edit: t.edit, done: t.done };
   const glucoseStep = unit === "mmol" ? "0.1" : "1";
@@ -137,6 +146,33 @@ export default function InsulinCalculator({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t.title}>
       <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <div
+            role="group"
+            aria-label={t.method}
+            className="flex self-start rounded-full bg-sidebar-accent p-1"
+          >
+            {METHODS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                aria-pressed={method === m}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  method === m
+                    ? "bg-sidebar text-sidebar-foreground shadow-sm"
+                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+                }`}
+              >
+                {m === "formula" ? t.methodFormula : t.methodSheet}
+              </button>
+            ))}
+          </div>
+          <p className="px-1 text-xs text-sidebar-foreground/60">
+            {isFormula ? t.methodFormulaHint : t.methodSheetHint}
+          </p>
+        </div>
+
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <section
@@ -213,7 +249,7 @@ export default function InsulinCalculator({
 
           {!ready ? (
             <p className="rounded-2xl bg-sidebar-accent p-4 text-sm text-sidebar-foreground/70">
-              {hasGlucose ? t.invalid : t.noReading}
+              {hasGlucose ? (isFormula ? t.invalidFormula : t.invalid) : t.noReading}
             </p>
           ) : isHypo ? (
             <div
@@ -246,13 +282,46 @@ export default function InsulinCalculator({
                 </div>
 
                 <dl className="flex min-w-0 flex-col justify-center divide-y divide-highlight/20 rounded-2xl border border-highlight/20 bg-sidebar-accent px-3 sm:px-4">
-                  <ResultRow label={t.carbDose} value={fmtU(carbSteps)} />
-                  <ResultRow label={t.correctionDose} value={fmtU(correction)} />
-                  {iobApplied > 0 && <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied)} />}
+                  {bolus ? (
+                    <>
+                      <ResultRow label={t.carbDose} value={fmtU(bolus.carb, 2)} />
+                      <ResultRow label={t.correctionDose} value={fmtU(bolus.correction, 2)} />
+                      {iobApplied > 0 && (
+                        <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied, 2)} />
+                      )}
+                      <ResultRow
+                        label={t.theoreticalDose}
+                        value={`${bolus.theoretical.toFixed(2)} ${t.units}`}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <ResultRow label={t.carbDose} value={fmtU(carbSteps)} />
+                      <ResultRow label={t.correctionDose} value={fmtU(correction)} />
+                      {iobApplied > 0 && <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied)} />}
+                    </>
+                  )}
                 </dl>
               </div>
 
-              {carbsG > 0 && carbsG % ratioG > 1e-9 && (
+              {/* Worked formula, as on the care team's infographic:
+                  40 g ÷ 10 = 4.00 U · (220 − 120) ÷ 80 = 1.25 U */}
+              {bolus && (
+                <p className="px-1 text-xs tabular-nums text-sidebar-foreground/60">
+                  {`${carbsG} ${t.grams} ÷ ${ratioG} = ${bolus.carb.toFixed(2)} ${t.units}`}
+                  {" · "}
+                  {`(${formatGlucose(glucoseMgdl, unit)} − ${parse(target)}) ÷ ${parse(sensitivity)} = ${bolus.correction.toFixed(2)} ${t.units}`}
+                </p>
+              )}
+
+              {bolus && bolus.correction < 0 && (
+                <p className="px-1 text-xs text-sidebar-foreground/70">
+                  <span className="font-semibold">{t.lowTitle}.</span>{" "}
+                  {t.belowTargetNote.replace("{units}", Math.abs(bolus.correction).toFixed(2))}
+                </p>
+              )}
+
+              {!bolus && carbsG > 0 && carbsG % ratioG > 1e-9 && (
                 <p className="px-1 text-xs text-sidebar-foreground/60">
                   {t.carbsRounded.replace("{grams}", String(carbSteps * ratioG))}
                 </p>
@@ -265,40 +334,55 @@ export default function InsulinCalculator({
           )}
         </section>
 
-        {paramsValid && (
+        {!isFormula && paramsValid && (
           <DoseTable
             ratio={ratioG}
             params={params}
             lowThreshold={settings.lowThreshold}
             unit={unit}
-            activeSteps={ready && !isHypo ? Math.min(steps, MAX_CORRECTION_STEPS) : null}
-            activeCarbSteps={ready && !isHypo ? Math.min(carbSteps, MAX_CARB_STEPS) : null}
+            activeSteps={ready && !isHypo ? Math.min(steps, SHEET_MAX_CORRECTION_STEPS) : null}
+            activeCarbSteps={ready && !isHypo ? Math.min(carbSteps, SHEET_MAX_CARB_STEPS) : null}
           />
         )}
 
         <fieldset className="flex min-w-0 flex-col gap-4 rounded-2xl border border-highlight/25 bg-sidebar-accent/40 p-3 sm:p-4">
           <legend className={`${sectionTitle} px-1`}>{t.parameters}</legend>
           <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-6 sm:gap-4">
-            <NumberField
-              lockable={lockLabels}
-              id={`${ids}-low`}
-              label={t.rangeLow}
-              suffix={glucoseUnit}
-              value={rangeLow}
-              onChange={setRangeLow}
-              step={glucoseStep}
-              className="sm:col-span-3"
-            />
-            <NumberField
-              lockable={lockLabels}
-              id={`${ids}-high`}
-              label={t.rangeHigh}
-              suffix={glucoseUnit}
-              value={rangeHigh}
-              onChange={setRangeHigh}
-              step={glucoseStep}
-              className="sm:col-span-3"
-            />
+            {isFormula ? (
+              <NumberField
+                lockable={lockLabels}
+                id={`${ids}-target`}
+                label={t.target}
+                suffix={glucoseUnit}
+                value={target}
+                onChange={setTarget}
+                step={glucoseStep}
+                className="col-span-2 sm:col-span-6"
+              />
+            ) : (
+              <>
+                <NumberField
+                  lockable={lockLabels}
+                  id={`${ids}-low`}
+                  label={t.rangeLow}
+                  suffix={glucoseUnit}
+                  value={rangeLow}
+                  onChange={setRangeLow}
+                  step={glucoseStep}
+                  className="sm:col-span-3"
+                />
+                <NumberField
+                  lockable={lockLabels}
+                  id={`${ids}-high`}
+                  label={t.rangeHigh}
+                  suffix={glucoseUnit}
+                  value={rangeHigh}
+                  onChange={setRangeHigh}
+                  step={glucoseStep}
+                  className="sm:col-span-3"
+                />
+              </>
+            )}
             <NumberField
               lockable={lockLabels}
               id={`${ids}-ratio`}
@@ -367,7 +451,7 @@ function DoseTable({
   activeCarbSteps,
 }: {
   ratio: number;
-  params: TableParams;
+  params: SheetParams;
   lowThreshold: number;
   unit: GlucoseUnit;
   activeSteps: number | null;
@@ -386,18 +470,18 @@ function DoseTable({
     rows.push({ steps: -1, label: `${fmt(lowThreshold + step)}–${fmt(params.low - step)}` });
   }
   rows.push({ steps: 0, label: `${fmt(params.low)}–${fmt(params.high)}` });
-  for (let k = 1; k < MAX_CORRECTION_STEPS; k++) {
+  for (let k = 1; k < SHEET_MAX_CORRECTION_STEPS; k++) {
     const from = params.high + (k - 1) * params.isf + step;
     const to = params.high + k * params.isf;
     rows.push({ steps: k, label: `${fmt(from)}–${fmt(to)}` });
   }
   rows.push({
-    steps: MAX_CORRECTION_STEPS,
-    label: `${fmt(params.high + (MAX_CORRECTION_STEPS - 1) * params.isf + step)}+`,
+    steps: SHEET_MAX_CORRECTION_STEPS,
+    label: `${fmt(params.high + (SHEET_MAX_CORRECTION_STEPS - 1) * params.isf + step)}+`,
   });
 
-  const columns = Array.from({ length: MAX_CARB_STEPS + 1 }, (_, c) => c);
-  const maxDose = tableDose(MAX_CARB_STEPS, MAX_CORRECTION_STEPS);
+  const columns = Array.from({ length: SHEET_MAX_CARB_STEPS + 1 }, (_, c) => c);
+  const maxDose = sheetDose(SHEET_MAX_CARB_STEPS, SHEET_MAX_CORRECTION_STEPS);
 
   // Keep the highlighted cell visible: the 16 carb columns overflow sideways.
   // Only the table's own container scrolls, never the popup.
@@ -511,7 +595,7 @@ function DoseTable({
                       </span>
                     </th>
                     {columns.map((c) => {
-                      const dose = tableDose(c, row.steps);
+                      const dose = sheetDose(c, row.steps);
                       const active = rowActive && c === activeCarbSteps;
                       const crossed = rowActive || c === activeCarbSteps;
                       // Heat-map tint: stronger for bigger doses, none at 0.

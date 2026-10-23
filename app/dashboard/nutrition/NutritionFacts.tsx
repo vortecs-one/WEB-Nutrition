@@ -3,6 +3,7 @@
 import { Leaf, Sprout } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import type { FoodProduct } from "@/lib/foods/types";
+import { sodiumToMg } from "@/lib/health-formulas";
 
 // A full nutrition-facts panel for a product: a per-serving / per-100g table
 // covering every nutrient the API returned, plus product metadata (serving
@@ -40,7 +41,7 @@ export default function NutritionFacts({ product }: { product: FoodProduct }) {
     { label: t.fiber, serving: n.fiberServing, per100g: n.fiber100g, unit: g, decimals: 1 },
     { label: t.macroProtein, serving: n.proteinServing, per100g: n.protein100g, unit: g, decimals: 1, strong: true },
     { label: t.salt, serving: n.saltServing, per100g: n.salt100g, unit: g, decimals: 2 },
-    { label: t.sodium, serving: n.sodiumServing != null ? n.sodiumServing * 1000 : null, per100g: n.sodium100g != null ? n.sodium100g * 1000 : null, unit: mg, decimals: 0 },
+    { label: t.sodium, serving: sodiumToMg(n.sodiumServing), per100g: sodiumToMg(n.sodium100g), unit: mg, decimals: 0 },
   ].filter((r) => r.serving != null || r.per100g != null);
 
   const fmt = (v: number | null, decimals: number, unit: string) =>

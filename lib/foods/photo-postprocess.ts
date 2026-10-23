@@ -1,6 +1,7 @@
 import type { FoodPhotoItem, FoodPhotoPer100g } from "./photo-types";
 import { REFERENCE_BY_ID, REFERENCE_TABLE, type ReferenceEntry } from "./reference-table";
 import { macrosFor } from "./reference-macros";
+import { kcalFromMacros } from "@/lib/health-formulas";
 
 export type RawPhotoItem = {
   name: string;
@@ -69,8 +70,6 @@ export function recentReferenceIds(
   return [...ids];
 }
 
-const macroKcal = (v: FoodPhotoPer100g) => 4 * v.protein + 4 * v.carbs + 9 * v.fat;
-
 export function sanitizePer100g(raw: FoodPhotoPer100g, carbsOverride?: number): FoodPhotoPer100g {
   let protein = clamp(raw.protein, 0, 100);
   let carbs = carbsOverride ?? clamp(raw.carbs, 0, 100);
@@ -94,7 +93,7 @@ export function sanitizePer100g(raw: FoodPhotoPer100g, carbsOverride?: number): 
 
   const fiber = Math.min(clamp(raw.fiber, 0, 100), carbs);
   const sugars = Math.min(clamp(raw.sugars, 0, 100), carbs);
-  const computed = macroKcal({ protein, carbs, fat, fiber, sugars, calories: 0 });
+  const computed = kcalFromMacros({ protein, carbs, fat });
   const reported = clamp(raw.calories, 0, MAX_KCAL_PER_100G);
 
   const calories =

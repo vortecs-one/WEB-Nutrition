@@ -12,6 +12,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
+import { DAILY_VALUE, percentOfDailyValue } from "@/lib/health-formulas";
 import DietLog from "./DietLog";
 
 // Light-gray palette for this card. All descendants are styled with the
@@ -89,16 +90,15 @@ export default function NutritionChart({ dateKey }: { dateKey: string }) {
   // Total sugars has no official daily value, so it's shown gram-only.
   // Always listed — 0 when nothing logged — so the card keeps its layout.
   const extraNutrients = useMemo(() => {
-    const DAILY_VALUE = { saturatedFat: 20, fiber: 28, sodium: 2300 };
     const saturatedFat = nutrientTotals.saturatedFat ?? 0;
     const sugars = nutrientTotals.sugars ?? 0;
     const fiber = nutrientTotals.fiber ?? 0;
     const sodium = nutrientTotals.sodium ?? 0;
     const rows: { key: string; label: string; value: number; unit: string; pct: number | null }[] = [
-      { key: "saturatedFat", label: t.satFat, value: saturatedFat, unit: t.unitG, pct: Math.round((saturatedFat / DAILY_VALUE.saturatedFat) * 100) },
+      { key: "saturatedFat", label: t.satFat, value: saturatedFat, unit: t.unitG, pct: percentOfDailyValue(saturatedFat, DAILY_VALUE.saturatedFat) },
       { key: "sugars", label: t.sugars, value: sugars, unit: t.unitG, pct: null },
-      { key: "fiber", label: t.fiber, value: fiber, unit: t.unitG, pct: Math.round((fiber / DAILY_VALUE.fiber) * 100) },
-      { key: "sodium", label: t.sodium, value: sodium, unit: t.unitMg, pct: Math.round((sodium / DAILY_VALUE.sodium) * 100) },
+      { key: "fiber", label: t.fiber, value: fiber, unit: t.unitG, pct: percentOfDailyValue(fiber, DAILY_VALUE.fiber) },
+      { key: "sodium", label: t.sodium, value: sodium, unit: t.unitMg, pct: percentOfDailyValue(sodium, DAILY_VALUE.sodium) },
     ];
     return rows;
   }, [nutrientTotals, t]);
