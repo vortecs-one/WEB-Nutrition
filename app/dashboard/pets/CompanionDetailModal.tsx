@@ -3,11 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { useGlucoseStatus } from "@/lib/glucose/status-provider";
 import { useI18n } from "@/lib/i18n/provider";
 import { displayName, getCharacter } from "@/lib/pets/manager";
 import type { CharacterMood, Locale } from "@/lib/pets/types";
 import type { Dictionary } from "@/lib/i18n/dictionaries/es";
 import { AnimatedPortrait } from "./AnimatedPortrait";
+import { GlucoseReading } from "./GlucoseReading";
 import { useCompanion } from "./use-companion";
 
 export function moodLabel(dict: Dictionary, mood: CharacterMood): string {
@@ -38,6 +40,8 @@ export function CompanionDetailModal({
   const { dict, locale } = useI18n();
   const lang = locale as Locale;
   const { companion, rename, release } = useCompanion();
+  // The latest glucose reading's status: the pet is ringed in its color.
+  const glucoseStatus = useGlucoseStatus();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"companion" | "details">("companion");
@@ -122,7 +126,8 @@ export function CompanionDetailModal({
           {tab === "companion" ? (
             <div role="tabpanel" id="companion-panel-companion" aria-labelledby="companion-tab-companion">
               {/* The portrait is itself a button (tap to pet), so the change
-                  button sits beside it in this wrapper, layered on top. */}
+                  button and the glucose readout sit beside it in this wrapper,
+                  layered on top. */}
               {character && (
                 <div className="relative mx-auto aspect-square w-full max-w-md">
                   <AnimatedPortrait
@@ -132,7 +137,9 @@ export function CompanionDetailModal({
                     petLabel={dict.pets.petAction.replace("{name}", displayName(companion, lang))}
                     sizes="(min-width: 640px) 448px, 90vw"
                     className="h-full w-full rounded-2xl"
+                    aura={glucoseStatus}
                   />
+                  <GlucoseReading />
                   <button
                     type="button"
                     onClick={onChangeCompanion}

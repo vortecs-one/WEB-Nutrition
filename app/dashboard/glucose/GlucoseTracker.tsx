@@ -16,15 +16,7 @@ import {
   Settings2,
   Info,
   Maximize2,
-  ArrowUp,
-  ArrowDown,
-  ArrowRight,
-  ArrowUpRight,
-  ArrowDownRight,
-  ChevronsUp,
-  ChevronsDown,
   Syringe,
-  type LucideIcon,
 } from "lucide-react";
 import {
   AreaChart,
@@ -45,7 +37,6 @@ import {
   type GlucoseSettings,
   type GlucoseStatus,
   type GlucoseUnit,
-  type TrendDirection,
   formatGlucose,
   glucoseStatus,
   minutesAgo,
@@ -56,7 +47,8 @@ import {
   sensorWarmUpEndsAt,
   splitDuration,
 } from "@/lib/glucose/types";
-import { usePublishGlucoseStatus } from "@/lib/glucose/status-provider";
+import { usePublishGlucose } from "@/lib/glucose/status-provider";
+import { TREND_ICON } from "@/lib/glucose/trend-icons";
 import { mgdlToMmol } from "@/lib/health-formulas";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
@@ -67,22 +59,6 @@ const RANGES = [3, 6, 12, 24] as const;
 type RangeHours = (typeof RANGES)[number];
 
 const REFRESH_MS = 60_000;
-
-// Trend direction → lucide arrow icon. Double arrows use chevrons, 45° trends
-// use the diagonal arrows, flat uses a straight right arrow. Non-computable /
-// none directions render no icon.
-const TREND_ICON: Record<TrendDirection, LucideIcon | null> = {
-  DoubleUp: ChevronsUp,
-  SingleUp: ArrowUp,
-  FortyFiveUp: ArrowUpRight,
-  Flat: ArrowRight,
-  FortyFiveDown: ArrowDownRight,
-  SingleDown: ArrowDown,
-  DoubleDown: ChevronsDown,
-  "NOT COMPUTABLE": null,
-  "RATE OUT OF RANGE": null,
-  NONE: null,
-};
 
 // Status → card accent classes (background + text pairs kept together for
 // contrast, per design guidelines).
@@ -218,12 +194,22 @@ export default function GlucoseTracker({
 
   const unit = settings?.unit ?? "mgdl";
   const current = data?.current ?? null;
-  // null while there's no reading to classify. Also published for the
-  // companion card, which takes its color from it.
+  // null while there's no reading to classify. The reading is also published
+  // for the companion, which takes its colors and its corner readout from it.
   const liveStatus: GlucoseStatus | null =
     current && settings ? glucoseStatus(current.sgv, settings) : null;
   const currentStatus: GlucoseStatus = liveStatus ?? "in-range";
-  usePublishGlucoseStatus(liveStatus);
+  usePublishGlucose(
+    current && liveStatus
+      ? {
+          status: liveStatus,
+          sgv: current.sgv,
+          unit,
+          direction: current.direction,
+          date: current.date,
+        }
+      : null,
+  );
   const currentMins = current ? minutesAgo(current.date) : null;
   const isStale = currentMins !== null && currentMins > STALE_MINUTES;
   const TrendIcon = current ? TREND_ICON[current.direction] : null;

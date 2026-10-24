@@ -458,13 +458,62 @@
   100% { transform: translateX(-50%) scale(1.2); opacity: 0; }
 }
 
+/* Glucose aura: the pet is ringed in the color of the latest glucose reading
+   (the glucose card's pill colors, chosen through data-aura): a neon rim that
+   hugs its silhouette (stacked drop-shadows on the cut-out, so it follows the
+   idle motion for free; the filter itself never animates) and a halo behind
+   it that slowly breathes. */
+[data-aura="in-range"] {
+  --pet-aura: var(--color-chart-2);
+}
+[data-aura="high"],
+[data-aura="low"] {
+  --pet-aura: var(--color-amber-500);
+}
+[data-aura="urgent"] {
+  --pet-aura: var(--color-destructive);
+}
+/* A tight pair of drop-shadows in a lighter shade of the color makes the
+   tube-like core of the edge, then one soft glow. Each drop-shadow blurs the
+   result of the previous one, so alpha piles up: a wider glow stage would
+   fill the small pocket between the legs with a solid patch, so the wide
+   aura is the halo behind the pet instead. */
+.pet-anim[data-aura] .pet-body img {
+  filter:
+    drop-shadow(0 0 0.3cqi color-mix(in oklab, var(--pet-aura), white 35%))
+    drop-shadow(0 0 0.3cqi color-mix(in oklab, var(--pet-aura), white 35%))
+    drop-shadow(0 0 1.2cqi color-mix(in oklab, var(--pet-aura) 70%, transparent));
+}
+.pet-anim .pet-aura {
+  position: absolute;
+  inset: 1% 2% 8%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--pet-aura) 50%, transparent),
+    color-mix(in oklab, var(--pet-aura) 17%, transparent) 68%,
+    transparent
+  );
+  opacity: 0.8;
+  animation: pet-aura 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pet-aura {
+  0%, 100% { opacity: 0.6; transform: scale(0.95); }
+  50%      { opacity: 1; transform: scale(1.04); }
+}
+/* The meadow's violet stage glow would mix with the aura's color. */
+.pet-anim.pet-stage[data-aura]:not([data-floor]) {
+  background: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pet-anim .pet-body,
   .pet-anim .pet-hop,
   .pet-anim .pet-shadow,
   .pet-anim .pet-graze,
   .pet-anim .pet-waddle,
-  .pet-anim .pet-rustle {
+  .pet-anim .pet-rustle,
+  .pet-anim .pet-aura {
     animation: none;
   }
   .pet-anim .pet-leaf,

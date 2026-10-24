@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Heart } from "lucide-react";
+import type { GlucoseStatus } from "@/lib/glucose/types";
 import type { CharacterMood, Locale, VirtualCharacter } from "@/lib/pets/types";
 import { getAnimationProfile } from "@/lib/pets/animations";
 import { CharacterPortrait } from "./CharacterPortrait";
@@ -15,6 +16,8 @@ interface AnimatedPortraitProps {
   petLabel: string;
   sizes: string;
   className?: string;
+  /** Glucose status whose color rings the pet (neon rim + halo); none when null. */
+  aura?: GlucoseStatus | null;
 }
 
 // Where falling leaves (or snowflakes) start, across the top of the stage.
@@ -35,7 +38,9 @@ const HEARTS = [
  * Animates the existing artwork with CSS transforms only (breathing, sway,
  * mood-specific idle, tap hop). Falls back to the static portrait for
  * characters without an animation profile. All motion is disabled under
- * prefers-reduced-motion in globals.css.
+ * prefers-reduced-motion in globals.css. With an `aura`, the pet gets a neon
+ * rim and a breathing halo in that glucose status's color (also in
+ * globals.css).
  */
 export function AnimatedPortrait({
   character,
@@ -44,6 +49,7 @@ export function AnimatedPortrait({
   petLabel,
   sizes,
   className = "",
+  aura = null,
 }: AnimatedPortraitProps) {
   const [tapCount, setTapCount] = useState(0);
   const profile = getAnimationProfile(character, mood);
@@ -90,8 +96,11 @@ export function AnimatedPortrait({
       className={`pet-anim pet-stage group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${className}`}
       data-idle={profile.idle}
       data-floor={floor ?? undefined}
+      data-aura={aura ?? undefined}
     >
       {floor === "ice" && <IceFloor className={`${stageBox} pointer-events-none`} />}
+      {/* Above the floor, below the shadow, the pet and the particles. */}
+      {aura && <span aria-hidden="true" className="pet-aura" />}
       {/* The shadow stays on the ground and shrinks while the pet jumps. */}
       <span
         key={`shadow-${tapCount}`}
