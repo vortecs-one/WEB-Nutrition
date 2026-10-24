@@ -501,6 +501,8 @@ const en: Dictionary = {
     choose: "Choose",
     viewDetails: "View details",
     detailTitle: "Virtual companion",
+    tabCompanion: "Companion",
+    tabDetails: "Details",
     galleryTitle: "Available characters",
     exclusive: "Exclusive",
     exclusiveLocked: "Exclusive companion",

@@ -246,7 +246,8 @@
   height: 7%;
   border-radius: 9999px;
   background: var(--foreground);
-  opacity: 0.18;
+  --pet-shadow-opacity: 0.18;
+  opacity: var(--pet-shadow-opacity);
   filter: blur(8px);
   transform: translateX(-50%);
   animation: pet-shadow 3.6s ease-in-out infinite;
@@ -328,8 +329,8 @@
   100% { transform: translateY(0) scale(1, 1); }
 }
 @keyframes pet-shadow {
-  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 0.18; }
-  50%      { transform: translateX(-50%) scaleX(1.06); opacity: 0.24; }
+  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: var(--pet-shadow-opacity); }
+  50%      { transform: translateX(-50%) scaleX(1.06); opacity: calc(var(--pet-shadow-opacity) * 1.33); }
 }
 @keyframes pet-float {
   0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
@@ -415,8 +416,46 @@
   85%      { transform: skewX(-0.4deg); }
 }
 @keyframes pet-shadow-hop {
-  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 0.18; }
-  50%      { transform: translateX(-50%) scaleX(0.7); opacity: 0.1; }
+  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: var(--pet-shadow-opacity); }
+  50%      { transform: translateX(-50%) scaleX(0.7); opacity: calc(var(--pet-shadow-opacity) * 0.55); }
+}
+
+/* Ice scene (the floe drawn by IceFloor.tsx): an icy glow instead of the
+   violet one, a dark-blue contact shadow on the ice (the theme's foreground
+   would be a pale halo here), seated at the penguin's feet, and two rings
+   slowly spreading across the water around the floe. */
+.pet-anim.pet-stage[data-floor="ice"] {
+  background: radial-gradient(
+    ellipse 80% 38% at 50% 86%,
+    rgb(120 195 240 / 0.18),
+    transparent 70%
+  );
+}
+.pet-anim[data-floor="ice"] .pet-shadow {
+  --pet-shadow-opacity: 0.55;
+  left: 53%;
+  bottom: 11.2%;
+  width: 37%;
+  height: 7.2%;
+  background: oklch(0.28 0.07 250);
+}
+.pet-anim .pet-ripple {
+  position: absolute;
+  left: 51%;
+  bottom: 5.3%;
+  width: 80%;
+  height: 14.4%;
+  border: 1.5px solid rgb(190 228 250 / 0.5);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translateX(-50%) scale(0.88);
+  animation: pet-ripple 7s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes pet-ripple {
+  0%   { transform: translateX(-50%) scale(0.88); opacity: 0; }
+  18%  { opacity: 0.4; }
+  100% { transform: translateX(-50%) scale(1.2); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -431,7 +470,8 @@
   .pet-anim .pet-leaf,
   .pet-anim .pet-snow,
   .pet-anim .pet-zzz,
-  .pet-anim .pet-heart {
+  .pet-anim .pet-heart,
+  .pet-anim .pet-ripple {
     display: none;
   }
 }

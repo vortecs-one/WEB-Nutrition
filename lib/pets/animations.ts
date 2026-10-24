@@ -4,11 +4,18 @@ export type IdleStyle = "default" | "bouncy" | "sleepy" | "low";
 export type AmbientParticle = "leaf" | "snow" | "zzz";
 /** Character-specific idle motion layered on the shared breathing. */
 export type IdleMotion = "graze" | "waddle";
+/** A floor drawn in code (app/dashboard/pets/IceFloor.tsx). */
+export type PetFloor = "ice";
 
 export interface PetAnimationProfile {
   idle: IdleStyle;
   particle: AmbientParticle | null;
   motion: IdleMotion;
+  /**
+   * The scene's drawn floor, used when the companion's art has no ground
+   * layers of its own (the meadow's grass comes from the art instead).
+   */
+  floor: PetFloor | null;
   /** Whether the ground sways once when the pet jumps (grass yes, ice no). */
   groundRustle: boolean;
   /**
@@ -33,10 +40,16 @@ const MOOD_PROFILES: Record<CharacterMood, { idle: IdleStyle; particle: "ambient
 
 const SCENES: Record<
   PetScene,
-  { ambient: AmbientParticle; motion: IdleMotion; groundRustle: boolean; groundInFront: boolean }
+  {
+    ambient: AmbientParticle;
+    motion: IdleMotion;
+    floor: PetFloor | null;
+    groundRustle: boolean;
+    groundInFront: boolean;
+  }
 > = {
-  meadow: { ambient: "leaf", motion: "graze", groundRustle: true, groundInFront: true },
-  ice: { ambient: "snow", motion: "waddle", groundRustle: false, groundInFront: false },
+  meadow: { ambient: "leaf", motion: "graze", floor: null, groundRustle: true, groundInFront: true },
+  ice: { ambient: "snow", motion: "waddle", floor: "ice", groundRustle: false, groundInFront: false },
 };
 
 /**
@@ -54,6 +67,7 @@ export function getAnimationProfile(
     idle,
     particle: particle === "ambient" ? scene.ambient : particle,
     motion: scene.motion,
+    floor: scene.floor,
     groundRustle: scene.groundRustle,
     groundInFront: scene.groundInFront,
   };

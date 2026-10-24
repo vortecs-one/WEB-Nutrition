@@ -56,6 +56,7 @@ import {
   sensorWarmUpEndsAt,
   splitDuration,
 } from "@/lib/glucose/types";
+import { usePublishGlucoseStatus } from "@/lib/glucose/status-provider";
 import { mgdlToMmol } from "@/lib/health-formulas";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
@@ -217,8 +218,12 @@ export default function GlucoseTracker({
 
   const unit = settings?.unit ?? "mgdl";
   const current = data?.current ?? null;
-  const currentStatus: GlucoseStatus =
-    current && settings ? glucoseStatus(current.sgv, settings) : "in-range";
+  // null while there's no reading to classify. Also published for the
+  // companion card, which takes its color from it.
+  const liveStatus: GlucoseStatus | null =
+    current && settings ? glucoseStatus(current.sgv, settings) : null;
+  const currentStatus: GlucoseStatus = liveStatus ?? "in-range";
+  usePublishGlucoseStatus(liveStatus);
   const currentMins = current ? minutesAgo(current.date) : null;
   const isStale = currentMins !== null && currentMins > STALE_MINUTES;
   const TrendIcon = current ? TREND_ICON[current.direction] : null;

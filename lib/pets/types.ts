@@ -46,7 +46,11 @@ export interface PublicDomainInfo {
  */
 export type RightsRisk = "low" | "high";
 
-/** Setting of the animated popup: the idle motion, particles and ground. */
+/**
+ * Setting of the animated popup: the idle motion, particles and ground. The
+ * meadow takes its grass from the artwork's ground layers; the ice has a floor
+ * drawn in code (see lib/pets/animations.ts).
+ */
 export type PetScene = "meadow" | "ice";
 
 export interface PetLayers {

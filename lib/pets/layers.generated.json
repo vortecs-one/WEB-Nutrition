@@ -5,8 +5,6 @@
     "back": "/pets/bambi-ground-back.a4f04c9a.png"
   },
   "humboldt-penguin": {
-    "body": "/pets/humboldt-penguin-body.5d146d7f.png",
-    "ground": "/pets/humboldt-penguin-ground.9e5fb841.png",
-    "back": "/pets/humboldt-penguin-ground-back.a99f1121.png"
+    "body": "/pets/humboldt-penguin-body.5d146d7f.png"
   }
 }

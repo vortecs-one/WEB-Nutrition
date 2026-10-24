@@ -496,6 +496,8 @@ const es = {
     choose: "Elegir",
     viewDetails: "Ver detalle",
     detailTitle: "Compañero virtual",
+    tabCompanion: "Compañero",
+    tabDetails: "Detalles",
     galleryTitle: "Personajes disponibles",
     exclusive: "Exclusivo",
     exclusiveLocked: "Compañero exclusivo",

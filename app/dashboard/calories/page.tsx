@@ -3,12 +3,14 @@ import { getCurrentRole } from "@/lib/role/server";
 import { redirect } from "next/navigation";
 import { fetchGlucoseSettings } from "@/lib/glucose/actions";
 import { canAccessGlucose } from "@/lib/glucose/access";
+import { GlucoseStatusProvider } from "@/lib/glucose/status-provider";
 import GlucoseTracker from "../glucose/GlucoseTracker";
 import CaloriesTracker from "./CaloriesTracker";
 import CompanionCard from "../pets/CompanionCard";
 
 // Personal dashboard for normal users: calorie balance at top, then glucose
-// monitoring, with the companion card last.
+// monitoring, with the companion card last (it takes its color from the
+// glucose card's latest reading).
 export default async function CaloriesPage() {
   const role = await getCurrentRole();
 
@@ -22,8 +24,10 @@ export default async function CaloriesPage() {
   return (
     <div className="space-y-6">
       <CaloriesTracker />
-      {showGlucose && <GlucoseTracker initialSettings={glucoseSettings} />}
-      <CompanionCard />
+      <GlucoseStatusProvider>
+        {showGlucose && <GlucoseTracker initialSettings={glucoseSettings} />}
+        <CompanionCard />
+      </GlucoseStatusProvider>
     </div>
   );
 }

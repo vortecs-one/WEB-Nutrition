@@ -16,6 +16,9 @@
 //   distinctive (both modes) — ground pixels never copied into the back-fill,
 //     because a copy would look duplicated: "green" (clover leaves), "pale"
 //     (light stems). Default ["green", "pale"].
+//   bodyOnly (both modes) — publish just the body, with no ground or back-fill
+//     layers: the companion stands on a floor drawn in code (the ice floe,
+//     app/dashboard/pets/IceFloor.tsx). The split still decides what is body.
 //   null — no split: the whole cut-out moves together.
 // Any value in DEFAULTS can be overridden in a companion's entry.
 
@@ -69,8 +72,8 @@ export const PETS = {
         [565, 725], [590, 712], [640, 730], [700, 730], [700, 690],
       ],
       holes: [[[473, 816], [498, 808], [501, 822], [503, 838], [488, 840], [474, 838]]],
-      // The rocks are pale: they're the texture the back-fill copies.
-      distinctive: ["green"],
+      // The sketched rocks and snow aren't used: the popup draws an ice floe.
+      bodyOnly: true,
     },
   },
   pinocchio: { background: "paper", ground: null },

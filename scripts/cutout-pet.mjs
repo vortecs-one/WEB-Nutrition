@@ -13,7 +13,8 @@
 //   <id>-ground.<hash>.png       static ground in front of the body
 //   <id>-ground-back.<hash>.png  ground filled in behind the legs, revealed
 //                                while the body jumps
-// (the ground layers only with a ground split: grass or outline mode)
+// (the ground layers only with a ground split: grass or outline mode, and not
+// with `bodyOnly`: the companion then stands on a floor drawn in code)
 // and records their paths in lib/pets/layers.generated.json. The content hash
 // in each name means a regenerated image gets a new URL, so image caches
 // (Next's optimizer, browsers, the CDN) can't keep serving the old one.
@@ -351,6 +352,11 @@ let animal = new Uint8Array(N);
   for (let p = 0; p < N; p++) animal[p] = closed[p] && kept(p) && allowed(p) ? 1 : 0;
 }
 await writeLayer(OUT.body, (p) => animal[p] === 1);
+if (cfg.ground.bodyOnly) {
+  // The split only cuts the ground off the body; the floor is drawn in code.
+  await publish({ body: ["body", OUT.body] });
+  process.exit(0);
+}
 await writeLayer(OUT.ground, (p) => animal[p] === 0);
 console.log(`${OUT.body} / ${OUT.ground}: body is ${(animal.reduce((a, b) => a + b, 0) / N * 100).toFixed(1)}% of the image`);
 

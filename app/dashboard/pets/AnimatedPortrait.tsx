@@ -6,6 +6,7 @@ import { Heart } from "lucide-react";
 import type { CharacterMood, Locale, VirtualCharacter } from "@/lib/pets/types";
 import { getAnimationProfile } from "@/lib/pets/animations";
 import { CharacterPortrait } from "./CharacterPortrait";
+import { IceFloor } from "./IceFloor";
 
 interface AnimatedPortraitProps {
   character: VirtualCharacter;
@@ -62,7 +63,11 @@ export function AnimatedPortrait({
 
   // The background-free character stands on a soft glow. Only the body
   // moves; when the art has a ground split, the ground stays put in front of
-  // it, with ground filled in behind the legs for when it jumps.
+  // it, with ground filled in behind the legs for when it jumps. Art without
+  // ground layers stands on the scene's drawn floor instead (the ice floe),
+  // which sits under everything else and gets room below the feet for its
+  // edge and the water, so the stage is a little higher and smaller.
+  const floor = layers.ground ? null : profile.floor;
   const rustle = tapCount > 0 && profile.groundRustle ? "pet-rustle" : "";
   // The ground goes over the body (grass the grazing head dips into) or under
   // it (ice the jumping feet and tail must stay in front of). Either way it
@@ -70,7 +75,9 @@ export function AnimatedPortrait({
   const bodyLayer = profile.groundInFront ? "" : "z-[2]";
   const groundLayer = profile.groundInFront ? "z-[2]" : "z-[1]";
   // All layers share one box so they line up pixel for pixel.
-  const stageBox = "absolute inset-x-[6%] bottom-[4%] top-[8%] block";
+  const stageBox = floor
+    ? "absolute inset-x-[6%] bottom-[10%] top-[4%] block"
+    : "absolute inset-x-[6%] bottom-[4%] top-[8%] block";
   const layerImage = (src: string, alt = "") => (
     <Image src={src} alt={alt} fill sizes={sizes} priority className="object-contain object-bottom" />
   );
@@ -82,7 +89,9 @@ export function AnimatedPortrait({
       aria-label={petLabel}
       className={`pet-anim pet-stage group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${className}`}
       data-idle={profile.idle}
+      data-floor={floor ?? undefined}
     >
+      {floor === "ice" && <IceFloor className={`${stageBox} pointer-events-none`} />}
       {/* The shadow stays on the ground and shrinks while the pet jumps. */}
       <span
         key={`shadow-${tapCount}`}
