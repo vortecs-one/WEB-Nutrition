@@ -230,11 +230,13 @@
   animation:
     pet-breathe 4.8s ease-in-out infinite,
     pet-sway 10s ease-in-out infinite;
-  opacity: 0.88;
 }
 
+/* Applied only while airborne (HOP_MS in AnimatedPortrait), so the idle
+   animations underneath never restart. Pivots at the feet. */
 .pet-anim .pet-hop {
-  animation: pet-hop 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) 1;
+  transform-origin: 50% 100%;
+  animation: pet-hop 0.8s linear 1;
 }
 
 .pet-anim .pet-shadow {
@@ -321,11 +323,14 @@
   86%           { translate: 0 0; }
   91%           { translate: 0 -2%; }
 }
+/* Crouch, launch (decelerating), fall (accelerating), landing squash, settle. */
 @keyframes pet-hop {
-  0%   { transform: translateY(0) scale(1, 1); }
-  20%  { transform: translateY(0) scale(1.04, 0.95); }
-  50%  { transform: translateY(-9%) scale(0.98, 1.03); }
-  80%  { transform: translateY(0) scale(1.03, 0.97); }
+  0%   { transform: translateY(0) scale(1, 1); animation-timing-function: ease-out; }
+  15%  { transform: translateY(0) scale(1.06, 0.92); animation-timing-function: cubic-bezier(0.2, 0.7, 0.35, 1); }
+  50%  { transform: translateY(-10%) scale(0.97, 1.05); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5); }
+  78%  { transform: translateY(0) scale(0.98, 1.03); animation-timing-function: ease-out; }
+  88%  { transform: translateY(0) scale(1.07, 0.9); animation-timing-function: ease-out; }
+  94%  { transform: translateY(0) scale(0.99, 1.015); animation-timing-function: ease-in-out; }
   100% { transform: translateY(0) scale(1, 1); }
 }
 @keyframes pet-shadow {
@@ -375,6 +380,10 @@
 .pet-anim .pet-pose-in {
   animation: pet-pose-in 0.35s ease-out 1 both;
 }
+/* Swaps into or out of the jumping pose, quick enough to keep up with the hop. */
+.pet-anim .pet-pose-in.pet-pose-in-fast {
+  animation-duration: 0.12s;
+}
 @keyframes pet-pose-in {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }
@@ -412,7 +421,9 @@
   animation: none;
 }
 .pet-anim .pet-shadow.pet-shadow-hop {
-  animation: pet-shadow-hop 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) 1;
+  animation:
+    pet-shadow 3.6s ease-in-out infinite,
+    pet-shadow-hop 0.8s linear 1;
 }
 @keyframes pet-graze {
   0%, 60%, 100% { rotate: 0deg; }
@@ -450,9 +461,16 @@
   65%      { transform: skewX(1deg); }
   85%      { transform: skewX(-0.4deg); }
 }
+/* Individual `scale` and `filter`, so it runs alongside the idle pet-shadow
+   (which animates transform and opacity) instead of replacing it. */
 @keyframes pet-shadow-hop {
-  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: var(--pet-shadow-opacity); }
-  50%      { transform: translateX(-50%) scaleX(0.7); opacity: calc(var(--pet-shadow-opacity) * 0.55); }
+  0%   { scale: 1 1;       filter: blur(8px);  animation-timing-function: ease-out; }
+  15%  { scale: 1.06 1;    filter: blur(8px);  animation-timing-function: cubic-bezier(0.2, 0.7, 0.35, 1); }
+  50%  { scale: 0.7 1;     filter: blur(12px); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5); }
+  78%  { scale: 1 1;       filter: blur(8px);  animation-timing-function: ease-out; }
+  88%  { scale: 1.08 1;    filter: blur(7px);  animation-timing-function: ease-out; }
+  94%  { scale: 0.98 1;    filter: blur(8px);  animation-timing-function: ease-in-out; }
+  100% { scale: 1 1;       filter: blur(8px); }
 }
 
 /* Ice scene (the floe drawn by IceFloor.tsx): an icy glow instead of the
@@ -461,9 +479,10 @@
    slowly spreading across the water around the floe. */
 .pet-anim.pet-stage[data-floor="ice"] {
   background: radial-gradient(
-    ellipse 80% 38% at 50% 86%,
-    rgb(120 195 240 / 0.18),
-    transparent 70%
+    ellipse 46% 11% at 51% 87%,
+    rgb(40 195 240 / 0.42),
+    rgb(25 150 215 / 0.2) 55%,
+    transparent 100%
   );
 }
 .pet-anim[data-floor="ice"] .pet-shadow {
@@ -480,7 +499,8 @@
   bottom: 5.3%;
   width: 80%;
   height: 14.4%;
-  border: 1.5px solid rgb(190 228 250 / 0.5);
+  border: 1.5px solid rgb(100 225 255 / 0.7);
+  box-shadow: 0 0 10px rgb(50 200 245 / 0.35);
   border-radius: 50%;
   opacity: 0;
   transform: translateX(-50%) scale(0.88);
@@ -489,8 +509,68 @@
 }
 @keyframes pet-ripple {
   0%   { transform: translateX(-50%) scale(0.88); opacity: 0; }
-  18%  { opacity: 0.4; }
+  18%  { opacity: 0.55; }
   100% { transform: translateX(-50%) scale(1.2); opacity: 0; }
+}
+
+/* Landing on the floe: floe, pet and shadow dip together (individual
+   translate/rotate, so they compose with the hop's transform and the idle
+   motion), rebound and settle, and a ring spreads across the water. Starts at
+   the landing contact of the 0.8s hop; the -a/-b copies alternate per hop so
+   each one restarts it. */
+.pet-anim .pet-bob-box {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pet-anim .pet-bob-a,
+.pet-anim .pet-bob-b {
+  transform-origin: 50% 100%;
+  animation-duration: 1.7s;
+  animation-delay: 0.62s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: 1;
+}
+.pet-anim .pet-bob-a { animation-name: pet-bob-a; }
+.pet-anim .pet-bob-b { animation-name: pet-bob-b; }
+.pet-anim .pet-splash {
+  position: absolute;
+  left: 51%;
+  bottom: 5.3%;
+  width: 80%;
+  height: 14.4%;
+  border: 2px solid rgb(120 230 255 / 0.85);
+  box-shadow: 0 0 12px rgb(50 200 245 / 0.5);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translateX(-50%) scale(0.7);
+  pointer-events: none;
+}
+.pet-anim .pet-splash.pet-bob-a { animation-name: pet-splash-a; animation-duration: 1.3s; animation-timing-function: ease-out; }
+.pet-anim .pet-splash.pet-bob-b { animation-name: pet-splash-b; animation-duration: 1.3s; animation-timing-function: ease-out; }
+@keyframes pet-bob-a {
+  0%, 100% { translate: 0 0;       rotate: 0deg; }
+  14%      { translate: 0 1.5cqh;  rotate: -0.8deg; }
+  34%      { translate: 0 -0.6cqh; rotate: 0.5deg; }
+  56%      { translate: 0 0.35cqh; rotate: -0.25deg; }
+  78%      { translate: 0 -0.12cqh; rotate: 0.08deg; }
+}
+@keyframes pet-bob-b {
+  0%, 100% { translate: 0 0;       rotate: 0deg; }
+  14%      { translate: 0 1.5cqh;  rotate: -0.8deg; }
+  34%      { translate: 0 -0.6cqh; rotate: 0.5deg; }
+  56%      { translate: 0 0.35cqh; rotate: -0.25deg; }
+  78%      { translate: 0 -0.12cqh; rotate: 0.08deg; }
+}
+@keyframes pet-splash-a {
+  0%   { transform: translateX(-50%) scale(0.7); opacity: 0; }
+  12%  { opacity: 0.85; }
+  100% { transform: translateX(-50%) scale(1.25); opacity: 0; }
+}
+@keyframes pet-splash-b {
+  0%   { transform: translateX(-50%) scale(0.7); opacity: 0; }
+  12%  { opacity: 0.85; }
+  100% { transform: translateX(-50%) scale(1.25); opacity: 0; }
 }
 
 /* Glucose aura: the pet is ringed in the color of the latest glucose reading
@@ -545,12 +625,15 @@
   .pet-anim .pet-body,
   .pet-anim .pet-hop,
   .pet-anim .pet-shadow,
+  .pet-anim .pet-shadow.pet-shadow-hop,
   .pet-anim .pet-graze,
   .pet-anim .pet-waddle,
   .pet-anim .pet-rustle,
   .pet-anim .pet-aura,
   .pet-anim .pet-emote,
-  .pet-anim .pet-pose-in {
+  .pet-anim .pet-pose-in,
+  .pet-anim .pet-bob-a,
+  .pet-anim .pet-bob-b {
     animation: none;
   }
   .pet-anim .pet-leaf,
@@ -558,6 +641,7 @@
   .pet-anim .pet-zzz,
   .pet-anim .pet-heart,
   .pet-anim .pet-ripple,
+  .pet-anim .pet-splash,
   .pet-anim .pet-pose-prev {
     display: none;
   }

@@ -18,7 +18,7 @@ import { useId } from "react";
 // an uneven front wall, snow mounds, cracks and frost); edit the numbers
 // directly to retune. The two rings are plain CSS (.pet-ripple in globals.css),
 // animated on their own so the SVG itself never repaints.
-export function IceFloor({ className = "" }: { className?: string }) {
+export function IceFloor({ className = "", bob = "" }: { className?: string; bob?: string }) {
   // Unique per instance, so the gradient and clip ids never collide.
   const id = useId();
 
@@ -27,7 +27,9 @@ export function IceFloor({ className = "" }: { className?: string }) {
       {/* Rings first, so the floe paints over them. */}
       <span aria-hidden="true" className="pet-ripple" />
       <span aria-hidden="true" className="pet-ripple" style={{ animationDelay: "-3.5s" }} />
-      <span aria-hidden="true" className={className}>
+      {/* One ring thrown out when the pet lands (bob restarts it per hop). */}
+      <span aria-hidden="true" className={`pet-splash ${bob}`} />
+      <span aria-hidden="true" className={`${className} ${bob}`}>
         <svg
           viewBox="0 0 686 768"
           preserveAspectRatio="xMidYMax meet"
@@ -36,13 +38,13 @@ export function IceFloor({ className = "" }: { className?: string }) {
         >
           <defs>
             <radialGradient id={`${id}-pool`} cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0" stopColor="#5aa2d6" stopOpacity="0.32" />
-              <stop offset="0.55" stopColor="#3f86bd" stopOpacity="0.15" />
-              <stop offset="1" stopColor="#2b6aa3" stopOpacity="0" />
+              <stop offset="0" stopColor="#2fc4f0" stopOpacity="0.6" />
+              <stop offset="0.55" stopColor="#1f9fdc" stopOpacity="0.34" />
+              <stop offset="1" stopColor="#1580c4" stopOpacity="0" />
             </radialGradient>
             <radialGradient id={`${id}-deep`} cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0" stopColor="#0c3157" stopOpacity="0.55" />
-              <stop offset="1" stopColor="#0c3157" stopOpacity="0" />
+              <stop offset="0" stopColor="#0a4a7c" stopOpacity="0.6" />
+              <stop offset="1" stopColor="#0a4a7c" stopOpacity="0" />
             </radialGradient>
             <radialGradient id={`${id}-top`} cx="0.4" cy="0.3" r="0.75">
               <stop offset="0" stopColor="#fbfdff" />
@@ -83,7 +85,7 @@ export function IceFloor({ className = "" }: { className?: string }) {
             </clipPath>
           </defs>
           {/* Water: a soft pool around the floe and the shadow of its submerged ice */}
-          <ellipse cx="352" cy="774" rx="372" ry="96" fill={`url(#${id}-pool)`} />
+          <ellipse cx="352" cy="780" rx="360" ry="58" fill={`url(#${id}-pool)`} />
           <ellipse cx="352" cy="814" rx="287.04" ry="30" fill={`url(#${id}-deep)`} />
           {/* Front wall: facets shaded by direction (lit from the upper left), a depth shade, ink hatching on the darker side, striations and bevels */}
           <g stroke="#3f5778" strokeOpacity="0.6" strokeWidth="1.3" strokeLinejoin="round">

@@ -36,8 +36,10 @@ const HEARTS = [
   { left: "64%", delay: "0.24s" },
 ];
 
-// How long a tap shows the jumping pose (when the companion has one).
-const TAP_JUMP_MS = 1200;
+// Length of the hop (keep in sync with pet-hop in globals.css). The jumping
+// pose (when the companion has one) goes back at about the landing contact.
+const HOP_MS = 800;
+const JUMP_POSE_MS = HOP_MS * 0.85;
 
 /**
  * Animates the existing artwork with CSS transforms only (breathing, sway,
@@ -60,9 +62,15 @@ export function AnimatedPortrait({
 }: AnimatedPortraitProps) {
   const [tapCount, setTapCount] = useState(0);
   const [jumping, setJumping] = useState(false);
+  const [airborne, setAirborne] = useState(false);
+  // Hops so far; the floe's landing bob alternates between two identical
+  // keyframes by parity, which restarts it for each hop.
+  const [hops, setHops] = useState(0);
   const jumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (jumpTimer.current) clearTimeout(jumpTimer.current);
+    if (hopTimer.current) clearTimeout(hopTimer.current);
   }, []);
   const profile = getAnimationProfile(character, mood);
   const layers = character.layers;
@@ -76,12 +84,26 @@ export function AnimatedPortrait({
     setBodies({ current: bodySrc, previous: bodies.current, loaded: false });
   }
 
+  // A tap while already in the air only adds hearts and extends the jumping
+  // pose: restarting the hop mid-air would snap the pet back to the ground.
+  // Swaps into or out of the jumping pose cross-fade quickly, to keep up with the hop.
+  const jumpSrc = poses?.jumping;
+  const poseIn =
+    jumpSrc && (bodies.current === jumpSrc || bodies.previous === jumpSrc)
+      ? "pet-pose-in pet-pose-in-fast"
+      : "pet-pose-in";
+
   function handleTap() {
     setTapCount((n) => n + 1);
+    if (!airborne) {
+      setAirborne(true);
+      setHops((n) => n + 1);
+      hopTimer.current = setTimeout(() => setAirborne(false), HOP_MS);
+    }
     if (!poses?.jumping) return;
     setJumping(true);
     if (jumpTimer.current) clearTimeout(jumpTimer.current);
-    jumpTimer.current = setTimeout(() => setJumping(false), TAP_JUMP_MS);
+    jumpTimer.current = setTimeout(() => setJumping(false), JUMP_POSE_MS);
   }
 
   if (!profile || !layers) {
@@ -108,6 +130,9 @@ export function AnimatedPortrait({
   // it (ice the jumping feet and tail must stay in front of). Either way it
   // stays above the shadow and below the particles and hearts.
   const bodyLayer = profile.groundInFront ? "" : "z-[2]";
+  // On the ice, the floe, the pet and its shadow all dip together when the pet
+  // lands (see pet-bob in globals.css).
+  const bob = floor === "ice" && hops > 0 ? (hops % 2 ? "pet-bob-a" : "pet-bob-b") : "";
   const groundLayer = profile.groundInFront ? "z-[2]" : "z-[1]";
   // All layers share one box so they line up pixel for pixel.
   const stageBox = floor
@@ -120,22 +145,24 @@ export function AnimatedPortrait({
   return (
     <button
       type="button"
-      onClick={handleTap}
+      onPointerDown={handleTap}
+      // Pointer taps already fired on press; click only covers the keyboard.
+      onClick={(e) => {
+        if (e.detail === 0) handleTap();
+      }}
       aria-label={petLabel}
       className={`pet-anim pet-stage group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${className}`}
       data-idle={profile.idle}
       data-floor={floor ?? undefined}
       data-aura={aura ?? undefined}
     >
-      {floor === "ice" && <IceFloor className={`${stageBox} pointer-events-none`} />}
+      {floor === "ice" && <IceFloor className={`${stageBox} pointer-events-none`} bob={bob} />}
       {/* Above the floor, below the shadow, the pet and the particles. */}
       {aura && <span aria-hidden="true" className="pet-aura" />}
       {/* The shadow stays on the ground and shrinks while the pet jumps. */}
-      <span
-        key={`shadow-${tapCount}`}
-        aria-hidden="true"
-        className={`pet-shadow ${tapCount > 0 ? "pet-shadow-hop" : ""}`}
-      />
+      <span aria-hidden="true" className={`pet-bob-box ${bob}`}>
+        <span className={`pet-shadow ${airborne ? "pet-shadow-hop" : ""}`} />
+      </span>
       {/* Ground behind the legs: hidden by the body at rest, it fills the
           gaps in the ground while the pet is in the air. */}
       {layers.back && (
@@ -147,36 +174,44 @@ export function AnimatedPortrait({
           {layerImage(layers.back)}
         </span>
       )}
-      <span key={tapCount} className={`${stageBox} ${bodyLayer} ${tapCount > 0 ? "pet-hop" : ""}`}>
-        <span className="pet-body absolute inset-0 block">
-          <span className={`pet-${profile.motion} absolute inset-0 block`}>
-            {bodies.previous && (
-              <span aria-hidden="true" className="pet-pose-prev absolute inset-0 block">
-                {layerImage(bodies.previous)}
+      <span className={`${stageBox} ${bodyLayer} ${bob}`}>
+        <span className={`absolute inset-0 block ${airborne ? "pet-hop" : ""}`}>
+          <span className="pet-body absolute inset-0 block">
+            <span className={`pet-${profile.motion} absolute inset-0 block`}>
+              {bodies.previous && (
+                <span aria-hidden="true" className="pet-pose-prev absolute inset-0 block">
+                  {layerImage(bodies.previous)}
+                </span>
+              )}
+              <span
+                key={bodies.current}
+                className={`absolute inset-0 block ${
+                  bodies.previous ? (bodies.loaded ? poseIn : "opacity-0") : ""
+                }`}
+                onAnimationEnd={(e) => {
+                  if (e.animationName === "pet-pose-in") setBodies((b) => ({ ...b, previous: null }));
+                }}
+              >
+                <Image
+                  src={bodies.current}
+                  alt={character.name[locale]}
+                  fill
+                  sizes={sizes}
+                  priority
+                  className="object-contain object-bottom"
+                  onLoad={() => setBodies((b) => (b.loaded ? b : { ...b, loaded: true }))}
+                />
               </span>
-            )}
-            <span
-              key={bodies.current}
-              className={`absolute inset-0 block ${
-                bodies.previous ? (bodies.loaded ? "pet-pose-in" : "opacity-0") : ""
-              }`}
-              onAnimationEnd={(e) => {
-                if (e.animationName === "pet-pose-in") setBodies((b) => ({ ...b, previous: null }));
-              }}
-            >
-              <Image
-                src={bodies.current}
-                alt={character.name[locale]}
-                fill
-                sizes={sizes}
-                priority
-                className="object-contain object-bottom"
-                onLoad={() => setBodies((b) => (b.loaded ? b : { ...b, loaded: true }))}
-              />
             </span>
           </span>
         </span>
       </span>
+      {/* Preloads the jumping pose so the first tap doesn't wait on the download. */}
+      {jumpSrc && jumpSrc !== bodies.current && jumpSrc !== bodies.previous && (
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-0">
+          {layerImage(jumpSrc)}
+        </span>
+      )}
       {layers.ground && (
         <span
           key={`ground-${tapCount}`}

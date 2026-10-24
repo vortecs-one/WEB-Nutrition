@@ -231,8 +231,10 @@ export function CompositionDetails({ dateKey }: { dateKey: string }) {
       : [{ key: "empty", label: "", value: 1, fill: "var(--sidebar-foreground)" }];
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-      <ChartContainer config={chartConfig} className="aspect-square h-48 w-48 shrink-0">
+    // Reversed: the list reads first and the donut sits to its right, also on
+    // phones (where the donut shrinks to leave the list its room).
+    <div className="flex flex-row-reverse items-center gap-3 sm:gap-6">
+      <ChartContainer config={chartConfig} className="aspect-square h-32 w-32 shrink-0 sm:h-48 sm:w-48">
         <PieChart>
           {total > 0 && (
             <ChartTooltip
