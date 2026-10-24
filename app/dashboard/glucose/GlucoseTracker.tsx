@@ -195,18 +195,21 @@ export default function GlucoseTracker({
   const unit = settings?.unit ?? "mgdl";
   const current = data?.current ?? null;
   // null while there's no reading to classify. The reading is also published
-  // for the companion, which takes its colors and its corner readout from it.
+  // for the companion, which takes its colors, its corner readout and its mood
+  // from it.
   const liveStatus: GlucoseStatus | null =
     current && settings ? glucoseStatus(current.sgv, settings) : null;
   const currentStatus: GlucoseStatus = liveStatus ?? "in-range";
   usePublishGlucose(
-    current && liveStatus
+    current && liveStatus && settings
       ? {
           status: liveStatus,
           sgv: current.sgv,
           unit,
           direction: current.direction,
           date: current.date,
+          targetLow: settings.targetLow,
+          targetHigh: settings.targetHigh,
         }
       : null,
   );

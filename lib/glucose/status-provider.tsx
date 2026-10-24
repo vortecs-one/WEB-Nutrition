@@ -20,10 +20,13 @@ export type GlucoseSnapshot = {
   direction: TrendDirection;
   /** When the reading was taken (epoch ms). */
   date: number;
+  /** The user's target range (mg/dL): tells a very low reading from a very high one. */
+  targetLow: number;
+  targetHigh: number;
 };
 
 // Shares the latest glucose reading with the rest of the page (the companion
-// takes its colors and its corner readout from it). The glucose card owns the
+// takes its colors, its corner readout and its mood from it). The glucose card owns the
 // data and its polling; it only publishes the reading here, so nothing else has
 // to fetch glucose again.
 const SnapshotContext = createContext<GlucoseSnapshot | null>(null);
@@ -39,7 +42,9 @@ function same(a: GlucoseSnapshot | null, b: GlucoseSnapshot | null) {
     a.sgv === b.sgv &&
     a.unit === b.unit &&
     a.direction === b.direction &&
-    a.date === b.date
+    a.date === b.date &&
+    a.targetLow === b.targetLow &&
+    a.targetHigh === b.targetHigh
   );
 }
 

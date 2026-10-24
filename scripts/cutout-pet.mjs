@@ -18,12 +18,24 @@
 // and records their paths in lib/pets/layers.generated.json. The content hash
 // in each name means a regenerated image gets a new URL, so image caches
 // (Next's optimizer, browsers, the CDN) can't keep serving the old one.
-import crypto from "node:crypto";
+//
+// Companions drawn on character sheets (a `sheets` entry in the config) are
+// built by scripts/pet-sheet.mjs instead: one popup pose per sheet cell plus
+// the dashboard's close-up faces.
 import os from "node:os";
 import path from "node:path";
 import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { DEFAULTS, PETS } from "./pet-layers.config.mjs";
+import {
+  PETS_DIR,
+  contentHash,
+  feather,
+  imageOps,
+  removePaper,
+  writeManifestEntry,
+} from "./pet-cutout-lib.mjs";
+import { cutoutSheets } from "./pet-sheet.mjs";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -41,10 +53,12 @@ if (cfg.background !== "paper") {
   console.error(`Unsupported background mode "${cfg.background}" (only "paper" for now).`);
   process.exit(1);
 }
+if (cfg.sheets) {
+  await cutoutSheets(id, cfg);
+  process.exit(0);
+}
 
 const SRC = `public/pets/${id}.png`;
-const PETS_DIR = "public/pets";
-const MANIFEST = "lib/pets/layers.generated.json";
 // Layers are built in the preview folder first, then published to
 // public/pets under content-hashed names (see publish() below).
 const previewDir = path.join(os.tmpdir(), "pet-previews");
@@ -67,18 +81,12 @@ async function publish(layers) {
   const entry = {};
   for (const [key, [name, file]] of Object.entries(layers)) {
     const buf = await readFile(file);
-    const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 8);
-    const publicName = `${id}-${name}.${hash}.png`;
+    const publicName = `${id}-${name}.${contentHash(buf)}.png`;
     await writeFile(path.join(PETS_DIR, publicName), buf);
     entry[key] = `/pets/${publicName}`;
   }
-  let manifest = {};
-  try { manifest = JSON.parse(await readFile(MANIFEST, "utf8")); } catch { /* first run */ }
-  manifest[id] = entry;
-  const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
-  await writeFile(MANIFEST, JSON.stringify(sorted, null, 2) + "\n");
   for (const p of Object.values(entry)) console.log(`published: public${p}`);
-  console.log(`manifest: ${MANIFEST}`);
+  await writeManifestEntry(id, entry);
 }
 
 const { data, info } = await sharp(SRC).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -86,45 +94,8 @@ const { width: W, height: H } = info;
 const N = W * H;
 
 // --- helpers -----------------------------------------------------------------
-const queue = new Int32Array(N);
-const neighbors4 = (p) => {
-  const x = p % W, y = (p / W) | 0;
-  return [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1];
-};
-// Visits the 4-connected region of `start` where `inside(q)` holds, marking
-// `visited`; returns the region's pixel count (pixels are left in `queue`).
-function flood(start, inside, visited) {
-  let head = 0, tail = 0;
-  queue[tail++] = start; visited[start] = 1;
-  while (head < tail) {
-    for (const q of neighbors4(queue[head++])) {
-      if (q >= 0 && !visited[q] && inside(q)) { visited[q] = 1; queue[tail++] = q; }
-    }
-  }
-  return tail;
-}
-// Separable box dilation of a 0/1 mask by radius r.
-function dilate(mask, r) {
-  const tmp = new Uint8Array(N), out = new Uint8Array(N);
-  for (let y = 0; y < H; y++) {
-    let count = 0;
-    for (let x = -r; x < W + r; x++) {
-      if (x + r < W && x + r >= 0 && mask[y * W + x + r]) count++;
-      if (x - r - 1 >= 0 && x - r - 1 < W && mask[y * W + x - r - 1]) count--;
-      if (x >= 0 && x < W) tmp[y * W + x] = count > 0 ? 1 : 0;
-    }
-  }
-  for (let x = 0; x < W; x++) {
-    let count = 0;
-    for (let y = -r; y < H + r; y++) {
-      if (y + r < H && y + r >= 0 && tmp[(y + r) * W + x]) count++;
-      if (y - r - 1 >= 0 && y - r - 1 < H && tmp[(y - r - 1) * W + x]) count--;
-      if (y >= 0 && y < H) out[y * W + x] = count > 0 ? 1 : 0;
-    }
-  }
-  return out;
-}
-const invert = (mask) => mask.map((v) => (v ? 0 : 1));
+const ops = imageOps(W, H);
+const { queue, flood, dilate, invert } = ops;
 const hueOf = (r, g, b) => {
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
   if (d === 0) return 0;
@@ -136,73 +107,8 @@ const hueOf = (r, g, b) => {
 };
 const rgb = (p) => [data[p * 3], data[p * 3 + 1], data[p * 3 + 2]];
 
-const luma = new Float32Array(N);
-const isPaper = new Uint8Array(N);
-for (let p = 0; p < N; p++) {
-  const [r, g, b] = rgb(p);
-  luma[p] = 0.299 * r + 0.587 * g + 0.114 * b;
-  isPaper[p] =
-    luma[p] >= cfg.paperMinLuma && Math.max(r, g, b) - Math.min(r, g, b) <= cfg.paperMaxChroma &&
-    r - b >= cfg.paperMinWarmth ? 1 : 0;
-}
-
-// === 1. Remove the paper background ===========================================
-// The artwork is ink-outlined on light paper: a flood fill from the image
-// border over paper pixels removes the background and stops at the outline.
-const removed = new Uint8Array(N);
-{
-  // With outlineGapPx, breaks in the outline up to twice that wide are closed
-  // for the flood (paper that close to the drawing is skipped), then the
-  // removal grows back over that skipped paper.
-  const gapPx = cfg.outlineGapPx;
-  const nearInk = gapPx > 0 ? dilate(invert(isPaper), gapPx) : null;
-  const floodable = (q) => isPaper[q] && !(nearInk && nearInk[q]);
-  const visited = new Uint8Array(N);
-  for (let x = 0; x < W; x++) for (const p of [x, (H - 1) * W + x]) {
-    if (floodable(p) && !visited[p]) {
-      const n = flood(p, floodable, visited);
-      for (let i = 0; i < n; i++) removed[queue[i]] = 1;
-    }
-  }
-  for (let y = 0; y < H; y++) for (const p of [y * W, y * W + W - 1]) {
-    if (floodable(p) && !visited[p]) {
-      const n = flood(p, floodable, visited);
-      for (let i = 0; i < n; i++) removed[queue[i]] = 1;
-    }
-  }
-  for (let step = 0; gapPx > 0 && step <= gapPx; step++) {
-    const grow = [];
-    for (let p = 0; p < N; p++) {
-      if (!removed[p] && isPaper[p] && neighbors4(p).some((q) => q >= 0 && removed[q])) grow.push(p);
-    }
-    for (const p of grow) removed[p] = 1;
-  }
-  // Paper enclosed by the drawing (between legs and grass…): big, very light.
-  const seen = new Uint8Array(N);
-  for (let p = 0; p < N; p++) {
-    if (!isPaper[p] || removed[p] || seen[p]) continue;
-    const n = flood(p, (q) => isPaper[q] && !removed[q], seen);
-    let sum = 0;
-    for (let i = 0; i < n; i++) sum += luma[queue[i]];
-    if (n >= cfg.enclosedMinPx && sum / n >= cfg.enclosedMinMeanLuma) {
-      for (let i = 0; i < n; i++) removed[queue[i]] = 1;
-    }
-  }
-  // Light anti-aliased fringe next to removed paper.
-  const fringe = [];
-  for (let p = 0; p < N; p++) {
-    if (removed[p] || luma[p] < cfg.fringeMinLuma) continue;
-    if (neighbors4(p).some((q) => q >= 0 && removed[q])) fringe.push(p);
-  }
-  for (const p of fringe) removed[p] = 1;
-  // Specks and paper stains.
-  const labelled = new Uint8Array(N);
-  for (let p = 0; p < N; p++) {
-    if (removed[p] || labelled[p]) continue;
-    const n = flood(p, (q) => !removed[q], labelled);
-    if (n < cfg.minComponentPx) for (let i = 0; i < n; i++) removed[queue[i]] = 1;
-  }
-}
+// === 1. Remove the paper background (scripts/pet-cutout-lib.mjs) ================
+const { removed, luma } = removePaper(data, ops, cfg);
 const keptShare = 1 - removed.reduce((a, b) => a + b, 0) / N;
 if (dryRun) {
   const verdict = keptShare > cfg.maxKeptShare ? "full scene — not usable as is" : "usable";
@@ -228,9 +134,7 @@ for (let p = 0; p < N; p++) {
   if (x < minX) minX = x; if (x > maxX) maxX = x;
   if (y < minY) minY = y; if (y > maxY) maxY = y;
 }
-// extractChannel keeps the mask single-channel (sharp would return 3 channels).
-const feathered = await sharp(alpha, { raw: { width: W, height: H, channels: 1 } })
-  .blur(0.8).extractChannel(0).raw().toBuffer();
+const feathered = await feather(alpha, W, H);
 const PAD = 16;
 const left = Math.max(0, minX - PAD), top = Math.max(0, minY - PAD);
 const cropW = Math.min(W, maxX + PAD) - left, cropH = Math.min(H, maxY + PAD) - top;

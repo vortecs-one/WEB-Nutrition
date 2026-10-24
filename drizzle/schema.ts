@@ -224,6 +224,7 @@ export const petCompanions = pgTable("pet_companions", {
   userKey: text("user_key").primaryKey(),
   characterId: varchar("character_id", { length: 40 }).notNull(),
   nickname: varchar("nickname", { length: 24 }),
+  // Unused: the mood is derived from the user's health data (lib/pets/mood.ts).
   mood: varchar("mood", { length: 16 }).notNull().default("neutral"),
   adoptedAt: timestamp("adopted_at", { withTimezone: true })
     .notNull()

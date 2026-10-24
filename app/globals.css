@@ -344,6 +344,41 @@
   20%  { opacity: 0.8; }
   100% { transform: translate(18px, -40px) scale(1.2); opacity: 0; }
 }
+
+/* "!" (alarmed: in the aura's color, red when urgent) or "?" (unsure) beside
+   the head, popping in again every few seconds. */
+.pet-anim .pet-emote {
+  position: absolute;
+  right: 17%;
+  top: 9%;
+  z-index: 3;
+  font-weight: 800;
+  font-size: 2.25rem;
+  line-height: 1;
+  color: var(--sidebar-foreground);
+  text-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  animation: pet-emote 2.6s ease-out infinite;
+  pointer-events: none;
+}
+.pet-anim .pet-emote-exclaim {
+  color: var(--pet-aura, var(--sidebar-foreground));
+}
+@keyframes pet-emote {
+  0%   { transform: translateY(6px) scale(0.5); opacity: 0; }
+  10%  { transform: translateY(0) scale(1.2); opacity: 1; }
+  18%  { transform: scale(1); }
+  55%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* A new pose fades in over the previous one (AnimatedPortrait). */
+.pet-anim .pet-pose-in {
+  animation: pet-pose-in 0.35s ease-out 1 both;
+}
+@keyframes pet-pose-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
 @keyframes pet-heart {
   0%   { transform: translateY(0) scale(0.5); opacity: 0; }
   20%  { opacity: 1; }
@@ -513,14 +548,17 @@
   .pet-anim .pet-graze,
   .pet-anim .pet-waddle,
   .pet-anim .pet-rustle,
-  .pet-anim .pet-aura {
+  .pet-anim .pet-aura,
+  .pet-anim .pet-emote,
+  .pet-anim .pet-pose-in {
     animation: none;
   }
   .pet-anim .pet-leaf,
   .pet-anim .pet-snow,
   .pet-anim .pet-zzz,
   .pet-anim .pet-heart,
-  .pet-anim .pet-ripple {
+  .pet-anim .pet-ripple,
+  .pet-anim .pet-pose-prev {
     display: none;
   }
 }

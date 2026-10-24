@@ -5,11 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { petCompanions } from "@/drizzle/schema";
 import { canUseExclusivePets } from "./access";
-import {
-  isCharacterMood,
-  isSelectableFor,
-  sanitizeNickname,
-} from "./manager";
+import { isSelectableFor, sanitizeNickname } from "./manager";
 import type { CharacterState } from "./types";
 
 export type CompanionResult =
@@ -34,7 +30,6 @@ function toState(row: CompanionRow, exclusiveAccess: boolean): CharacterState | 
   return {
     characterId: row.characterId,
     nickname: row.nickname,
-    mood: isCharacterMood(row.mood) ? row.mood : "neutral",
     adoptedAt: row.adoptedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -73,7 +68,6 @@ export async function adoptCompanion(
         userKey,
         characterId,
         nickname: null,
-        mood: "neutral",
         adoptedAt: now,
         updatedAt: now,
       })
@@ -82,7 +76,6 @@ export async function adoptCompanion(
         set: {
           characterId,
           nickname: null,
-          mood: "neutral",
           adoptedAt: now,
           updatedAt: now,
         },

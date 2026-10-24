@@ -21,14 +21,49 @@ export type CharacterTemperament =
   | "curious"
   | "adventurous";
 
+/**
+ * How the companion feels, derived from the user's health data (see
+ * lib/pets/mood.ts). The set follows Penguin Girl's emotions sheet; companions
+ * with face art show the matching close-up on the dashboard card.
+ */
 export type CharacterMood =
   | "happy"
-  | "calm"
-  | "neutral"
-  | "worried"
+  | "excited"
+  | "surprised"
   | "sad"
-  | "proud"
-  | "sleepy";
+  | "angry"
+  | "frustrated"
+  | "shy"
+  | "curious"
+  | "confused"
+  | "determined"
+  | "scared"
+  | "happy-tears"
+  | "tired"
+  | "annoyed"
+  | "playful"
+  | "hungry"
+  | "love"
+  | "embarrassed"
+  | "confident"
+  | "sleepy"
+  | "shocked"
+  | "teasing"
+  | "worried"
+  | "exhausted";
+
+/** Full-body pose shown in the popup by companions with pose art. */
+export type PetPose =
+  | "standing"
+  | "walking"
+  | "running"
+  | "jumping"
+  | "sitting"
+  | "looking-up"
+  | "hungry"
+  | "drinking"
+  | "stretching"
+  | "sleeping";
 
 export interface PublicDomainInfo {
   sourceWork: string;
@@ -57,6 +92,10 @@ export interface PetLayers {
   body: string;
   ground?: string;
   back?: string;
+  /** Full-body poses on the same canvas as `body` (sheet-drawn companions). */
+  poses?: Partial<Record<PetPose, string>>;
+  /** Close-up face per mood, for the dashboard card (not a popup layer). */
+  faces?: Partial<Record<CharacterMood, string>>;
 }
 
 export interface VirtualCharacter {
@@ -83,6 +122,8 @@ export interface VirtualCharacter {
    * grass or snow drawn in front of it) and `back` (ground filled in behind
    * the legs, revealed while it jumps) exist only for companions with a
    * ground split. Characters without layers show their static artwork.
+   * Companions drawn on character sheets (scripts/pet-sheet.mjs) also have
+   * `poses` and `faces`.
    */
   layers?: PetLayers;
   /** Animated-popup setting; "meadow" when absent. */
@@ -93,7 +134,6 @@ export interface VirtualCharacter {
 export interface CharacterState {
   characterId: string;
   nickname: string | null;
-  mood: CharacterMood;
   adoptedAt: string;
   updatedAt: string;
 }
@@ -101,5 +141,4 @@ export interface CharacterState {
 export type CharacterAction =
   | { type: "adopt"; characterId: string; at: string }
   | { type: "rename"; nickname: string | null; at: string }
-  | { type: "setMood"; mood: CharacterMood; at: string }
   | { type: "release" };

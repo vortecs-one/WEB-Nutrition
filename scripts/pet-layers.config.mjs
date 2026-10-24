@@ -20,6 +20,22 @@
 //     layers: the companion stands on a floor drawn in code (the ice floe,
 //     app/dashboard/pets/IceFloor.tsx). The split still decides what is body.
 //   null — no split: the whole cut-out moves together.
+// sheets: the companion is drawn on character sheets instead of one artwork
+//   (built by scripts/pet-sheet.mjs; coordinates are sheet pixels):
+//   upscaler — Hugging Face id of the 2× super-resolution model.
+//   poses — full-body drawings for the popup: `cells` maps each pose to its
+//     `box` [x0, y0, x1, y1] (inside the cell: no label, no neighbour; even
+//     sizes), `symbols: "keep"` to keep its separate marks (bubbles, zzz…;
+//     default: only the character), `baseline` for a pose in mid-air (the
+//     ground line), `cx` to override the centre. All poses share one
+//     `canvas` [w, h] with the feet `margin` above its bottom. In the bottom
+//     `shadowBand` px of each box the drawn ground shadow (cool, light
+//     pixels) counts as paper. The first pose is the default body and the
+//     gallery artwork.
+//   faces — close-ups for the dashboard card, by sheet `rows`: `top`/`cut`
+//     (the busts' flat bottom edge), `columns` (x boundaries between the
+//     busts), `scale` (to one head size across rows) and the `names` in
+//     order; framed as `tile`-px squares, saved at `size` px.
 // Any value in DEFAULTS can be overridden in a companion's entry.
 
 export const DEFAULTS = {
@@ -74,6 +90,63 @@ export const PETS = {
       holes: [[[473, 816], [498, 808], [501, 822], [503, 838], [488, 840], [474, 838]]],
       // The sketched rocks and snow aren't used: the popup draws an ice floe.
       bodyOnly: true,
+    },
+  },
+  // Two ChatGPT sheets in scripts/pet-sources/penguin-girl/ (1536×1024 each).
+  "penguin-girl": {
+    background: "paper",
+    // White belly and face inside clean outlines; small drawn marks stay.
+    outlineGapPx: 2,
+    enclosedMinMeanLuma: 256,
+    minComponentPx: 60,
+    sheets: {
+      upscaler: "Xenova/2x_APISR_RRDB_GAN_generator-onnx",
+      poses: {
+        src: "scripts/pet-sources/penguin-girl/poses.png",
+        canvas: [360, 440],
+        margin: 12,
+        shadowBand: 30,
+        cells: {
+          standing: { box: [4, 90, 302, 528] },
+          walking: { box: [308, 90, 596, 528] },
+          running: { box: [596, 90, 916, 528] },
+          jumping: { box: [914, 90, 1240, 528], baseline: 518 },
+          sitting: { box: [1236, 90, 1532, 528] },
+          "looking-up": { box: [4, 580, 302, 966] },
+          hungry: { box: [304, 580, 616, 966], symbols: "keep" },
+          drinking: { box: [614, 580, 916, 966], symbols: "keep" },
+          stretching: { box: [914, 580, 1210, 966] },
+          // Its dark zzz would vanish on the dark popup: the app animates its own.
+          sleeping: { box: [1208, 580, 1536, 966] },
+        },
+      },
+      faces: {
+        src: "scripts/pet-sources/penguin-girl/emotions.png",
+        tile: 272,
+        size: 320,
+        rows: [
+          {
+            top: 37, cut: 291, scale: 1,
+            columns: [0, 264, 524, 770, 1024, 1282, 1536],
+            names: ["happy", "excited", "surprised", "sad", "angry", "frustrated"],
+          },
+          {
+            top: 313, cut: 553, scale: 1.07,
+            columns: [0, 266, 534, 778, 1024, 1274, 1536],
+            names: ["shy", "curious", "confused", "determined", "scared", "happy-tears"],
+          },
+          {
+            top: 574, cut: 792, scale: 1.16,
+            columns: [0, 258, 516, 770, 1022, 1272, 1536],
+            names: ["tired", "annoyed", "playful", "hungry", "love", "embarrassed"],
+          },
+          {
+            top: 812, cut: 1000, scale: 1.21,
+            columns: [0, 250, 528, 766, 1010, 1258, 1536],
+            names: ["confident", "sleepy", "shocked", "teasing", "worried", "exhausted"],
+          },
+        ],
+      },
     },
   },
   pinocchio: { background: "paper", ground: null },

@@ -6,11 +6,13 @@ import { useGlucoseStatus } from "@/lib/glucose/status-provider";
 import type { GlucoseStatus } from "@/lib/glucose/types";
 import { useI18n } from "@/lib/i18n/provider";
 import { displayName, getCharacter } from "@/lib/pets/manager";
-import type { Locale } from "@/lib/pets/types";
+import { POSE_FOR_MOOD } from "@/lib/pets/mood";
+import type { CharacterMood, Locale, PetPose } from "@/lib/pets/types";
 import { CharacterPickerModal } from "./CharacterPickerModal";
 import { CharacterPortrait } from "./CharacterPortrait";
-import { CompanionDetailModal, moodLabel } from "./CompanionDetailModal";
+import { CompanionDetailModal } from "./CompanionDetailModal";
 import { useCompanion } from "./use-companion";
+import { useCompanionMood } from "./use-companion-mood";
 
 // The card takes the color of the glucose card's reading pill (statusCard in
 // app/dashboard/glucose/GlucoseTracker.tsx; keep the backgrounds in sync), with
@@ -30,6 +32,14 @@ export default function CompanionCard() {
   const glucoseStatus = useGlucoseStatus();
   const [detailOpen, setDetailOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The mood comes from the health data; exclusive accounts can override it
+  // by hand for testing (null = Auto) until they pick Auto or reload.
+  const derived = useCompanionMood();
+  const [manualMood, setManualMood] = useState<CharacterMood | null>(null);
+  const [manualPose, setManualPose] = useState<PetPose | null>(null);
+  const mood = manualMood ?? derived?.mood ?? null;
+  const pose = manualPose ?? (manualMood ? POSE_FOR_MOOD[manualMood] : derived?.pose) ?? null;
+  const manual = manualMood !== null || manualPose !== null;
 
   if (error) return null;
 
@@ -61,6 +71,7 @@ export default function CompanionCard() {
             character={character}
             locale={lang}
             sizes="96px"
+            mood={mood ?? undefined}
             className="h-20 w-20 shrink-0 rounded-2xl sm:h-24 sm:w-24"
           />
         ) : (
@@ -85,13 +96,20 @@ export default function CompanionCard() {
               <span className="truncate text-lg font-semibold">
                 {displayName(companion, lang)}
               </span>
-              <span
-                className={`self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  tinted ? "bg-current/15 text-current" : "bg-highlight/15 text-highlight"
-                }`}
-              >
-                {moodLabel(dict, companion.mood)}
-              </span>
+              {mood && (
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      tinted ? "bg-current/15 text-current" : "bg-highlight/15 text-highlight"
+                    }`}
+                  >
+                    {dict.pets.moods[mood]}
+                  </span>
+                  <span className={`truncate text-xs ${quiet}`}>
+                    {manual ? dict.pets.moodManualNote : derived && dict.pets.reasons[derived.reason]}
+                  </span>
+                </span>
+              )}
             </>
           ) : (
             <>
@@ -115,6 +133,13 @@ export default function CompanionCard() {
         isOpen={detailOpen}
         onClose={() => setDetailOpen(false)}
         onChangeCompanion={() => setPickerOpen(true)}
+        mood={mood}
+        pose={pose}
+        reason={manual ? null : (derived?.reason ?? null)}
+        manualMood={manualMood}
+        manualPose={manualPose}
+        onManualMoodChange={setManualMood}
+        onManualPoseChange={setManualPose}
       />
       {/* Rendered after the detail popup so it stacks on top of it. */}
       <CharacterPickerModal

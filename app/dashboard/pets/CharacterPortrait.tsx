@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Lock } from "lucide-react";
-import type { Locale, VirtualCharacter } from "@/lib/pets/types";
+import type { CharacterMood, Locale, VirtualCharacter } from "@/lib/pets/types";
 
 interface CharacterPortraitProps {
   character: VirtualCharacter;
@@ -8,6 +8,8 @@ interface CharacterPortraitProps {
   sizes: string;
   className?: string;
   priority?: boolean;
+  /** Shows this mood's close-up face instead, when the companion has face art. */
+  mood?: CharacterMood;
 }
 
 /**
@@ -20,8 +22,10 @@ export function CharacterPortrait({
   sizes,
   className = "",
   priority = false,
+  mood,
 }: CharacterPortraitProps) {
   const name = character.name[locale];
+  const face = mood ? character.layers?.faces?.[mood] : undefined;
 
   if (!character.artwork) {
     return (
@@ -38,7 +42,7 @@ export function CharacterPortrait({
   return (
     <div className={`relative overflow-hidden bg-sidebar-accent ${className}`}>
       <Image
-        src={character.artwork}
+        src={face ?? character.artwork}
         alt={name}
         fill
         sizes={sizes}

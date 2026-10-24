@@ -1,7 +1,6 @@
 import { VIRTUAL_CHARACTERS } from "./characters";
 import type {
   CharacterAction,
-  CharacterMood,
   CharacterSpecies,
   CharacterState,
   Locale,
@@ -50,23 +49,6 @@ export function isSelectableFor(id: string, exclusiveAccess: boolean): boolean {
   return isAvailableCharacter(id) && (charactersById.get(id)?.exclusive !== true || exclusiveAccess);
 }
 
-export const CHARACTER_MOODS = [
-  "happy",
-  "calm",
-  "neutral",
-  "worried",
-  "sad",
-  "proud",
-  "sleepy",
-] as const satisfies readonly CharacterMood[];
-
-export function isCharacterMood(value: unknown): value is CharacterMood {
-  return (
-    typeof value === "string" &&
-    (CHARACTER_MOODS as readonly string[]).includes(value)
-  );
-}
-
 export function sanitizeNickname(input: string | null): string | null {
   if (input === null) return null;
   const cleaned = input
@@ -91,7 +73,6 @@ export function createCharacterState(
   return {
     characterId,
     nickname: null,
-    mood: "neutral",
     adoptedAt: at,
     updatedAt: at,
   };
@@ -117,9 +98,6 @@ export function characterReducer(
         nickname: sanitizeNickname(action.nickname),
         updatedAt: action.at,
       };
-    case "setMood":
-      if (!state || state.mood === action.mood) return state;
-      return { ...state, mood: action.mood, updatedAt: action.at };
     case "release":
       return null;
   }

@@ -1,7 +1,9 @@
 import type { CharacterMood, PetScene, VirtualCharacter } from "./types";
 
 export type IdleStyle = "default" | "bouncy" | "sleepy" | "low";
-export type AmbientParticle = "leaf" | "snow" | "zzz";
+export type AmbientParticle = "leaf" | "snow";
+/** A mark beside the head: zzz while asleep, "!" when alarmed, "?" when unsure. */
+export type Emote = "zzz" | "exclaim" | "question";
 /** Character-specific idle motion layered on the shared breathing. */
 export type IdleMotion = "graze" | "waddle";
 /** A floor drawn in code (app/dashboard/pets/IceFloor.tsx). */
@@ -10,6 +12,7 @@ export type PetFloor = "ice";
 export interface PetAnimationProfile {
   idle: IdleStyle;
   particle: AmbientParticle | null;
+  emote: Emote | null;
   motion: IdleMotion;
   /**
    * The scene's drawn floor, used when the companion's art has no ground
@@ -26,16 +29,37 @@ export interface PetAnimationProfile {
   groundInFront: boolean;
 }
 
-// The mood sets the idle style and whether the scene's ambient particle
-// ("ambient") shows; sleepy shows its "zzz" instead.
-const MOOD_PROFILES: Record<CharacterMood, { idle: IdleStyle; particle: "ambient" | "zzz" | null }> = {
-  happy: { idle: "bouncy", particle: "ambient" },
-  proud: { idle: "bouncy", particle: "ambient" },
-  calm: { idle: "default", particle: "ambient" },
-  neutral: { idle: "default", particle: "ambient" },
-  worried: { idle: "low", particle: null },
-  sad: { idle: "low", particle: null },
-  sleepy: { idle: "sleepy", particle: "zzz" },
+// The mood sets the idle style, whether the scene's ambient particle shows
+// (not when low or sleepy) and the emote beside the head.
+const BOUNCY = { idle: "bouncy", ambient: true, emote: null } as const;
+const STEADY = { idle: "default", ambient: true, emote: null } as const;
+const LOW = { idle: "low", ambient: false, emote: null } as const;
+const SLEEPY = { idle: "sleepy", ambient: false, emote: null } as const;
+const MOOD_PROFILES: Record<CharacterMood, { idle: IdleStyle; ambient: boolean; emote: Emote | null }> = {
+  happy: BOUNCY,
+  excited: BOUNCY,
+  playful: BOUNCY,
+  love: BOUNCY,
+  confident: BOUNCY,
+  teasing: BOUNCY,
+  "happy-tears": BOUNCY,
+  hungry: BOUNCY,
+  surprised: { ...STEADY, emote: "exclaim" },
+  curious: STEADY,
+  confused: { ...STEADY, emote: "question" },
+  determined: STEADY,
+  shy: STEADY,
+  embarrassed: STEADY,
+  shocked: STEADY,
+  annoyed: STEADY,
+  sad: LOW,
+  worried: LOW,
+  scared: LOW,
+  frustrated: LOW,
+  angry: LOW,
+  tired: SLEEPY,
+  sleepy: { ...SLEEPY, emote: "zzz" },
+  exhausted: { ...SLEEPY, emote: "zzz" },
 };
 
 const SCENES: Record<
@@ -61,11 +85,12 @@ export function getAnimationProfile(
   mood: CharacterMood,
 ): PetAnimationProfile | null {
   if (!character.layers) return null;
-  const { idle, particle } = MOOD_PROFILES[mood];
+  const { idle, ambient, emote } = MOOD_PROFILES[mood];
   const scene = SCENES[character.scene ?? "meadow"];
   return {
     idle,
-    particle: particle === "ambient" ? scene.ambient : particle,
+    particle: ambient ? scene.ambient : null,
+    emote,
     motion: scene.motion,
     floor: scene.floor,
     groundRustle: scene.groundRustle,

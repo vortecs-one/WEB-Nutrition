@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Heart } from "lucide-react";
 import type { GlucoseStatus } from "@/lib/glucose/types";
-import type { CharacterMood, Locale, VirtualCharacter } from "@/lib/pets/types";
+import type { CharacterMood, Locale, PetPose, VirtualCharacter } from "@/lib/pets/types";
 import { getAnimationProfile } from "@/lib/pets/animations";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { IceFloor } from "./IceFloor";
@@ -12,6 +12,8 @@ import { IceFloor } from "./IceFloor";
 interface AnimatedPortraitProps {
   character: VirtualCharacter;
   mood: CharacterMood;
+  /** Full-body pose, for companions with pose art (the default body otherwise). */
+  pose?: PetPose;
   locale: Locale;
   petLabel: string;
   sizes: string;
@@ -34,17 +36,22 @@ const HEARTS = [
   { left: "64%", delay: "0.24s" },
 ];
 
+// How long a tap shows the jumping pose (when the companion has one).
+const TAP_JUMP_MS = 1200;
+
 /**
  * Animates the existing artwork with CSS transforms only (breathing, sway,
  * mood-specific idle, tap hop). Falls back to the static portrait for
  * characters without an animation profile. All motion is disabled under
  * prefers-reduced-motion in globals.css. With an `aura`, the pet gets a neon
  * rim and a breathing halo in that glucose status's color (also in
- * globals.css).
+ * globals.css). Companions with pose art show the given `pose`, cross-fading
+ * when it changes, and jump for joy when tapped.
  */
 export function AnimatedPortrait({
   character,
   mood,
+  pose,
   locale,
   petLabel,
   sizes,
@@ -52,8 +59,30 @@ export function AnimatedPortrait({
   aura = null,
 }: AnimatedPortraitProps) {
   const [tapCount, setTapCount] = useState(0);
+  const [jumping, setJumping] = useState(false);
+  const jumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (jumpTimer.current) clearTimeout(jumpTimer.current);
+  }, []);
   const profile = getAnimationProfile(character, mood);
   const layers = character.layers;
+  const poses = layers?.poses;
+  const shownPose = jumping && poses?.jumping ? "jumping" : pose;
+  const bodySrc = (shownPose && poses?.[shownPose]) || layers?.body || "";
+  // A new pose fades in over the previous one, which stays underneath until
+  // the new one has loaded and faded in (no gap while it downloads).
+  const [bodies, setBodies] = useState({ current: bodySrc, previous: null as string | null, loaded: false });
+  if (bodies.current !== bodySrc) {
+    setBodies({ current: bodySrc, previous: bodies.current, loaded: false });
+  }
+
+  function handleTap() {
+    setTapCount((n) => n + 1);
+    if (!poses?.jumping) return;
+    setJumping(true);
+    if (jumpTimer.current) clearTimeout(jumpTimer.current);
+    jumpTimer.current = setTimeout(() => setJumping(false), TAP_JUMP_MS);
+  }
 
   if (!profile || !layers) {
     return (
@@ -91,7 +120,7 @@ export function AnimatedPortrait({
   return (
     <button
       type="button"
-      onClick={() => setTapCount((n) => n + 1)}
+      onClick={handleTap}
       aria-label={petLabel}
       className={`pet-anim pet-stage group relative overflow-hidden rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-highlight ${className}`}
       data-idle={profile.idle}
@@ -121,7 +150,30 @@ export function AnimatedPortrait({
       <span key={tapCount} className={`${stageBox} ${bodyLayer} ${tapCount > 0 ? "pet-hop" : ""}`}>
         <span className="pet-body absolute inset-0 block">
           <span className={`pet-${profile.motion} absolute inset-0 block`}>
-            {layerImage(layers.body, character.name[locale])}
+            {bodies.previous && (
+              <span aria-hidden="true" className="pet-pose-prev absolute inset-0 block">
+                {layerImage(bodies.previous)}
+              </span>
+            )}
+            <span
+              key={bodies.current}
+              className={`absolute inset-0 block ${
+                bodies.previous ? (bodies.loaded ? "pet-pose-in" : "opacity-0") : ""
+              }`}
+              onAnimationEnd={(e) => {
+                if (e.animationName === "pet-pose-in") setBodies((b) => ({ ...b, previous: null }));
+              }}
+            >
+              <Image
+                src={bodies.current}
+                alt={character.name[locale]}
+                fill
+                sizes={sizes}
+                priority
+                className="object-contain object-bottom"
+                onLoad={() => setBodies((b) => (b.loaded ? b : { ...b, loaded: true }))}
+              />
+            </span>
           </span>
         </span>
       </span>
@@ -149,7 +201,7 @@ export function AnimatedPortrait({
           />
         ))}
 
-      {profile.particle === "zzz" &&
+      {profile.emote === "zzz" &&
         [0, 1, 2].map((i) => (
           <span
             key={i}
@@ -160,6 +212,12 @@ export function AnimatedPortrait({
             z
           </span>
         ))}
+
+      {(profile.emote === "exclaim" || profile.emote === "question") && (
+        <span key={profile.emote} aria-hidden="true" className={`pet-emote pet-emote-${profile.emote}`}>
+          {profile.emote === "exclaim" ? "!" : "?"}
+        </span>
+      )}
 
       {tapCount > 0 &&
         HEARTS.map((heart) => (

@@ -8,7 +8,7 @@ import { CharacterPortrait } from "./CharacterPortrait";
 
 // Shown first, in this order; then the other available characters, then the
 // locked ones.
-const FEATURED_ORDER = ["humboldt-penguin", "bambi"];
+const FEATURED_ORDER = ["penguin-girl", "humboldt-penguin", "bambi"];
 
 interface CharacterGalleryProps {
   currentId: string | null;

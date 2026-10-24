@@ -68,6 +68,29 @@ export const VIRTUAL_CHARACTERS: readonly VirtualCharacter[] = [
     enabled: true,
   },
   {
+    // Original character drawn on two sheets (scripts/pet-sources/): a
+    // full-body pose per state in the popup, a close-up face per mood on the
+    // dashboard card. Exclusive, like the Humboldt penguin.
+    id: "penguin-girl",
+    name: { es: "Pingüinita", en: "Penguin Girl" },
+    species: "penguin",
+    temperament: "cheerful",
+    description: {
+      es: "Una pingüina tierna, con su flor y su bufanda favorita, que siente contigo cada medición del día.",
+      en: "A sweet penguin with her flower and favorite scarf, who feels every reading of your day with you.",
+    },
+    origin: {
+      es: "Personaje original de V-Healthy",
+      en: "Original V-Healthy character",
+    },
+    rightsRisk: "low",
+    exclusive: true,
+    artwork: "/pets/penguin-girl.png",
+    layers: petLayers("penguin-girl"),
+    scene: "ice",
+    enabled: true,
+  },
+  {
     // The app's own original character (no public-domain source), exclusive
     // to the accounts in lib/pets/access.ts; everyone else sees it locked.
     id: "humboldt-penguin",

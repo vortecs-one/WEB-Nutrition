@@ -6,5 +6,46 @@
   },
   "humboldt-penguin": {
     "body": "/pets/humboldt-penguin-body.5d146d7f.png"
+  },
+  "penguin-girl": {
+    "body": "/pets/penguin-girl-pose-standing.5711375f.webp",
+    "poses": {
+      "standing": "/pets/penguin-girl-pose-standing.5711375f.webp",
+      "walking": "/pets/penguin-girl-pose-walking.b7001fd5.webp",
+      "running": "/pets/penguin-girl-pose-running.d4cf062d.webp",
+      "jumping": "/pets/penguin-girl-pose-jumping.4d01e791.webp",
+      "sitting": "/pets/penguin-girl-pose-sitting.73d77d9d.webp",
+      "looking-up": "/pets/penguin-girl-pose-looking-up.7ff92cdd.webp",
+      "hungry": "/pets/penguin-girl-pose-hungry.635dc39a.webp",
+      "drinking": "/pets/penguin-girl-pose-drinking.60f3a4b9.webp",
+      "stretching": "/pets/penguin-girl-pose-stretching.bd75cfbe.webp",
+      "sleeping": "/pets/penguin-girl-pose-sleeping.e894359f.webp"
+    },
+    "faces": {
+      "happy": "/pets/penguin-girl-face-happy.52bf5928.webp",
+      "excited": "/pets/penguin-girl-face-excited.d7e3fe20.webp",
+      "surprised": "/pets/penguin-girl-face-surprised.8aa5e078.webp",
+      "sad": "/pets/penguin-girl-face-sad.27d28f20.webp",
+      "angry": "/pets/penguin-girl-face-angry.eb9362c5.webp",
+      "frustrated": "/pets/penguin-girl-face-frustrated.13d47bb5.webp",
+      "shy": "/pets/penguin-girl-face-shy.67b5fb9b.webp",
+      "curious": "/pets/penguin-girl-face-curious.667d9fda.webp",
+      "confused": "/pets/penguin-girl-face-confused.8460d5f2.webp",
+      "determined": "/pets/penguin-girl-face-determined.5ff12e88.webp",
+      "scared": "/pets/penguin-girl-face-scared.55732725.webp",
+      "happy-tears": "/pets/penguin-girl-face-happy-tears.40a7af4c.webp",
+      "tired": "/pets/penguin-girl-face-tired.a4e0f8d9.webp",
+      "annoyed": "/pets/penguin-girl-face-annoyed.b6c7ef55.webp",
+      "playful": "/pets/penguin-girl-face-playful.132d877e.webp",
+      "hungry": "/pets/penguin-girl-face-hungry.917035ea.webp",
+      "love": "/pets/penguin-girl-face-love.8827c439.webp",
+      "embarrassed": "/pets/penguin-girl-face-embarrassed.ff4a83d0.webp",
+      "confident": "/pets/penguin-girl-face-confident.2981b203.webp",
+      "sleepy": "/pets/penguin-girl-face-sleepy.8e6be0c8.webp",
+      "shocked": "/pets/penguin-girl-face-shocked.b561a0d2.webp",
+      "teasing": "/pets/penguin-girl-face-teasing.599de0e0.webp",
+      "worried": "/pets/penguin-girl-face-worried.431a4f61.webp",
+      "exhausted": "/pets/penguin-girl-face-exhausted.527d1aac.webp"
+    }
   }
 }

@@ -1,7 +1,8 @@
 import "server-only";
 import { auth } from "@/auth";
 
-// Accounts that may choose exclusive companions (e.g. the Humboldt penguin).
+// Accounts that may choose exclusive companions (e.g. the Humboldt penguin
+// and Penguin Girl) and try their moods by hand.
 // Everyone else sees them locked.
 const EXCLUSIVE_PET_EMAILS = new Set([
   "vinka.jalilc@gmail.com",
