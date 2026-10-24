@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Droplet, Flame, Gauge, Moon, Scale, Utensils, Wheat } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { Droplet, Flame, Gauge, Moon, Scale, Utensils } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
   BURNED_GOAL,
@@ -12,11 +12,6 @@ import {
   useDayLog,
   type StressLevel,
 } from "@/lib/day-log/provider";
-
-// Same key convention as CaloriesTracker so both views read the same day.
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function formatSleep(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -90,35 +85,30 @@ function GoalStat({
   );
 }
 
-export function CompanionHealthStats() {
+// Health tiles for the day selected in the Calories view's navigator, shown
+// in the Daily composition popup. Macros aren't repeated here — the
+// composition details above them already list them.
+export function DailyHealthStats({
+  dateKey: key,
+  isToday,
+}: {
+  dateKey: string;
+  /** Picks today's wording ("today") over the past-day one ("that day"). */
+  isToday: boolean;
+}) {
   const { dict } = useI18n();
-  const t = dict.pets.stats;
-  const { dayData, consumedFor, burnedFor, waterFor, sleepFor, setSleep, stressFor, setStress } =
-    useDayLog();
+  const t = dict.healthStats;
+  const { consumedFor, burnedFor, waterFor, sleepFor, setSleep, stressFor, setStress } = useDayLog();
   const [editingSleep, setEditingSleep] = useState(false);
 
-  const key = todayKey();
   const consumed = consumedFor(key);
   const burned = burnedFor(key);
   const water = waterFor(key);
   const sleep = sleepFor(key);
   const stress = stressFor(key);
-  const meals = dayData(key).meals;
-
-  const macros = useMemo(
-    () =>
-      meals.reduce(
-        (acc, m) => ({
-          protein: acc.protein + (m.protein ?? 0),
-          carbs: acc.carbs + (m.carbs ?? 0),
-          fat: acc.fat + (m.fat ?? 0),
-        }),
-        { protein: 0, carbs: 0, fat: 0 },
-      ),
-    [meals],
-  );
 
   const net = consumed - burned;
+  const stressHint = isToday ? t.stressHint : t.stressHintDay;
 
   function handleSleepSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -132,9 +122,9 @@ export function CompanionHealthStats() {
   }
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="companion-stats-title">
-      <h3 id="companion-stats-title" className="text-sm font-semibold">
-        {t.title}
+    <section className="flex flex-col gap-3" aria-labelledby="health-stats-title">
+      <h3 id="health-stats-title" className="text-sm font-semibold">
+        {isToday ? t.title : t.titleDay}
       </h3>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -156,28 +146,12 @@ export function CompanionHealthStats() {
           </p>
         </Tile>
 
-        <Tile icon={<Wheat className="h-4 w-4" />} label={t.macros}>
-          <dl className="grid grid-cols-3 gap-1 text-center">
-            {(
-              [
-                [t.protein, macros.protein],
-                [t.carbs, macros.carbs],
-                [t.fat, macros.fat],
-              ] as const
-            ).map(([label, grams]) => (
-              <div key={label} className="flex flex-col">
-                <dd className="text-base font-semibold tabular-nums">{grams}g</dd>
-                <dt className="order-last text-xs text-sidebar-foreground/60">{label}</dt>
-              </div>
-            ))}
-          </dl>
-        </Tile>
-
         <Tile icon={<Droplet className="h-4 w-4" />} label={t.hydration}>
           <GoalStat value={water} goal={WATER_GOAL_ML} unit="ml" label={t.hydration} ofGoal={t.ofGoal} />
         </Tile>
 
-        <Tile icon={<Moon className="h-4 w-4" />} label={t.sleep}>
+        {/* Spans two columns so the five tiles fill both the 2- and 3-column grids. */}
+        <Tile icon={<Moon className="h-4 w-4" />} label={t.sleep} className="col-span-2">
           {editingSleep ? (
             <form onSubmit={handleSleepSubmit} className="flex flex-col gap-2">
               <div className="flex gap-2">
@@ -247,9 +221,9 @@ export function CompanionHealthStats() {
 
         <Tile icon={<Gauge className="h-4 w-4" />} label={t.stress} className="col-span-2 sm:col-span-3">
           <fieldset className="flex flex-col gap-2">
-            <legend className="sr-only">{t.stressHint}</legend>
+            <legend className="sr-only">{stressHint}</legend>
             <p className="text-xs text-sidebar-foreground/60" aria-hidden="true">
-              {t.stressHint}
+              {stressHint}
             </p>
             <div className="grid grid-cols-5 gap-1">
               {t.stressLevels.map((label, index) => {

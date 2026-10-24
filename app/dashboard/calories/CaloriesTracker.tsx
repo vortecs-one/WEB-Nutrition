@@ -18,7 +18,7 @@ import {
 } from "@/lib/day-log/provider";
 import { Modal } from "@/components/ui/modal";
 import CalorieGauge from "../nutrition/CalorieGauge";
-import NutritionChart from "../nutrition/NutritionChart";
+import DailyCompositionCard from "../nutrition/DailyComposition";
 import BarcodeLookup from "../nutrition/BarcodeLookup";
 import DietLog from "../nutrition/DietLog";
 import ActivityLog from "../nutrition/ActivityLog";
@@ -28,7 +28,7 @@ const GAUGE_RANGE = 3000;
 const GAUGE_STEP = 500;
 
 // Derive a stable YYYY-MM-DD key from a Date so both the gauge stats and the
-// composition chart always read the same day's data.
+// composition card always read the same day's data.
 function toDateKey(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -100,7 +100,8 @@ export default function CaloriesTracker() {
     <div className="mx-auto w-full max-w-4xl">
       <div className="flex flex-col md:flex-row items-stretch gap-3">
         {/* Hero: date navigator + calorie balance gauge.
-            flex-[1.3] : flex-1 gives a ~57/43 split (meter/composition). */}
+            flex-[1.3] : flex-1 gives a ~57/43 split (meter/composition card)
+            on desktop. */}
         <section className="min-w-0 flex-[1.3] flex flex-col bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-3 sm:p-5">
           {/* Header row: date navigator (left, scoped to the gauge's width)
               + expand-to-detail icon (right, above the button column below) —
@@ -249,18 +250,18 @@ export default function CaloriesTracker() {
           </div>
         </section>
 
-        {/* Nutrient composition chart — driven by the same date key as the gauge */}
-        {dateKey && (
-          <div className="min-w-0 flex-1">
-            <NutritionChart dateKey={dateKey} />
-          </div>
-        )}
+        {/* Nutrient composition card, driven by the same date key as the
+            gauge: below it on phones, beside it on desktop. Always rendered —
+            before mount dateKey is "" and the composition shows an empty day,
+            so the layout never jumps. */}
+        <div className="min-w-0 flex-1">
+          <DailyCompositionCard dateKey={dateKey} dateLabel={isToday ? undefined : dateLabel} />
+        </div>
       </div>
 
       {/* Quick-add food popup — meal-type quick-launch row above the barcode
-          scanner. The full logged-items history used to render below both of
-          these too; it's now a tab of the composition detail popup instead,
-          so only the icon row (showHistory=false) comes along here. */}
+          scanner. The full logged-items history lives on the My nutrition
+          page, so only the icon row (showHistory=false) comes along here. */}
       <Modal
         isOpen={showAddFood}
         onClose={() => setShowAddFood(false)}

@@ -8,7 +8,6 @@ import { displayName, getCharacter } from "@/lib/pets/manager";
 import type { CharacterMood, Locale } from "@/lib/pets/types";
 import type { Dictionary } from "@/lib/i18n/dictionaries/es";
 import { AnimatedPortrait } from "./AnimatedPortrait";
-import { CompanionHealthStats } from "./CompanionHealthStats";
 import { useCompanion } from "./use-companion";
 
 export function moodLabel(dict: Dictionary, mood: CharacterMood): string {
@@ -161,8 +160,6 @@ export function CompanionDetailModal({
             </div>
           </section>
         )}
-
-        {companion && <CompanionHealthStats />}
 
         {error && (
           <p role="alert" className="text-sm text-destructive">
