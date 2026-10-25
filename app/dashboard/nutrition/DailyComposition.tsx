@@ -17,8 +17,8 @@ import { DailyHealthStats } from "./DailyHealthStats";
 
 // Daily nutrient composition for one date key (the day selected in the
 // Calories view's navigator). Two views of the same data:
-// - CompositionList: compact rows on the dashboard card.
-// - CompositionDetails: donut + detailed rows in the card's popup.
+// - CompositionSummary: compact rows + a small donut on the dashboard card.
+// - CompositionDetails: larger donut + detailed rows in the card's popup.
 
 // Macro rows are always shown, even at 0 g, so the card keeps its layout.
 const MACRO_KEYS = new Set(["carbs", "protein", "fat"]);
@@ -178,35 +178,25 @@ function ExtraRow({ nutrient: n, detailed }: { nutrient: ExtraNutrient; detailed
   );
 }
 
-/** Compact rows: macros in grams, then sugars and sodium. */
-export function CompositionList({ dateKey }: { dateKey: string }) {
-  const { t, data, total, extraNutrients, gramsFor } = useDailyComposition(dateKey);
+type DailyComposition = ReturnType<typeof useDailyComposition>;
 
-  // The compact list omits saturated fat and fiber; they're shown in the details only.
-  const listNutrients = extraNutrients.filter(
-    (n) => n.key !== "saturatedFat" && n.key !== "fiber",
-  );
-
-  return (
-    <ul className="flex min-w-0 flex-col gap-1 sm:gap-1.5">
-      {data.map((d) => (
-        <MacroRow key={d.key} slice={d} grams={gramsFor(d.key)} total={total} unitG={t.unitG} detailed={false} />
-      ))}
-
-      {/* Divider before extra nutrients */}
-      <li role="separator" className="border-t border-sidebar-foreground/10" />
-
-      {listNutrients.map((n) => (
-        <ExtraRow key={n.key} nutrient={n} detailed={false} />
-      ))}
-    </ul>
-  );
-}
-
-/** Donut + every nutrient with grams and percentages. */
-export function CompositionDetails({ dateKey }: { dateKey: string }) {
-  const { t, data, total, extraNutrients, gramsFor } = useDailyComposition(dateKey);
-
+/** Ring of the day's composition; the centre shows the biggest share. */
+function CompositionDonut({
+  data,
+  total,
+  t,
+  className,
+  interactive = false,
+  compact = false,
+}: {
+  data: DailyComposition["data"];
+  total: number;
+  t: DailyComposition["t"];
+  className: string;
+  /** Slice tooltip on hover/tap; off where the whole card is the tap target. */
+  interactive?: boolean;
+  compact?: boolean;
+}) {
   const top = data.reduce(
     (best, d) => (d.value > best.value ? d : best),
     data[0] ?? { label: "", value: 0 },
@@ -231,68 +221,106 @@ export function CompositionDetails({ dateKey }: { dateKey: string }) {
       : [{ key: "empty", label: "", value: 1, fill: "var(--sidebar-foreground)" }];
 
   return (
+    <ChartContainer config={chartConfig} className={`aspect-square shrink-0 ${className}`}>
+      <PieChart>
+        {interactive && total > 0 && (
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                nameKey="key"
+                formatter={(value, name) => {
+                  const pct = Math.round((Number(value) / total) * 100);
+                  const label =
+                    chartConfig[name as keyof typeof chartConfig]?.label ??
+                    name;
+                  return `${label}: ${pct}%`;
+                }}
+              />
+            }
+          />
+        )}
+        <Pie
+          data={pieData}
+          dataKey="value"
+          nameKey="key"
+          innerRadius="56%"
+          outerRadius="82%"
+          paddingAngle={total > 0 ? 2 : 0}
+          strokeWidth={0}
+          isAnimationActive={false}
+        >
+          {pieData.map((d) => (
+            <Cell key={d.key} fill={d.fill} fillOpacity={total > 0 ? 1 : 0.15} />
+          ))}
+          <Label
+            content={({ viewBox }) => {
+              if (!viewBox || !("cx" in viewBox)) return null;
+              const { cx, cy } = viewBox as { cx: number; cy: number };
+              return (
+                <text x={cx} y={cy} textAnchor="middle">
+                  <tspan
+                    x={cx}
+                    y={cy - (compact ? 2 : 4)}
+                    className={`fill-foreground font-bold ${compact ? "text-base" : "text-xl sm:text-2xl"}`}
+                  >
+                    {topPct}%
+                  </tspan>
+                  <tspan
+                    x={cx}
+                    y={cy + (compact ? 10 : 13)}
+                    className={`fill-muted-foreground ${compact ? "text-[8px]" : "text-[9px] sm:text-[11px]"}`}
+                  >
+                    {topLabel}
+                  </tspan>
+                </text>
+              );
+            }}
+          />
+        </Pie>
+      </PieChart>
+    </ChartContainer>
+  );
+}
+
+/** Compact rows (macros in grams, then sugars and sodium) beside a small donut. */
+export function CompositionSummary({ dateKey }: { dateKey: string }) {
+  const { t, data, total, extraNutrients, gramsFor } = useDailyComposition(dateKey);
+
+  // The compact list omits saturated fat and fiber; they're shown in the details only.
+  const listNutrients = extraNutrients.filter(
+    (n) => n.key !== "saturatedFat" && n.key !== "fiber",
+  );
+
+  return (
+    <div className="flex items-center gap-3 sm:gap-4">
+      <ul className="flex min-w-0 flex-1 flex-col gap-1 sm:gap-1.5">
+        {data.map((d) => (
+          <MacroRow key={d.key} slice={d} grams={gramsFor(d.key)} total={total} unitG={t.unitG} detailed={false} />
+        ))}
+
+        {/* Divider before extra nutrients */}
+        <li role="separator" className="border-t border-sidebar-foreground/10" />
+
+        {listNutrients.map((n) => (
+          <ExtraRow key={n.key} nutrient={n} detailed={false} />
+        ))}
+      </ul>
+
+      <CompositionDonut data={data} total={total} t={t} compact className="h-24 w-24 sm:h-28 sm:w-28" />
+    </div>
+  );
+}
+
+/** Donut + every nutrient with grams and percentages. */
+export function CompositionDetails({ dateKey }: { dateKey: string }) {
+  const { t, data, total, extraNutrients, gramsFor } = useDailyComposition(dateKey);
+
+  return (
     // Reversed: the list reads first and the donut sits to its right, also on
     // phones (where the donut shrinks to leave the list its room).
     <div className="flex flex-row-reverse items-center gap-3 sm:gap-6">
-      <ChartContainer config={chartConfig} className="aspect-square h-32 w-32 shrink-0 sm:h-48 sm:w-48">
-        <PieChart>
-          {total > 0 && (
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent
-                  nameKey="key"
-                  formatter={(value, name) => {
-                    const pct = Math.round((Number(value) / total) * 100);
-                    const label =
-                      chartConfig[name as keyof typeof chartConfig]?.label ??
-                      name;
-                    return `${label}: ${pct}%`;
-                  }}
-                />
-              }
-            />
-          )}
-          <Pie
-            data={pieData}
-            dataKey="value"
-            nameKey="key"
-            innerRadius="56%"
-            outerRadius="82%"
-            paddingAngle={total > 0 ? 2 : 0}
-            strokeWidth={0}
-            isAnimationActive={false}
-          >
-            {pieData.map((d) => (
-              <Cell key={d.key} fill={d.fill} fillOpacity={total > 0 ? 1 : 0.15} />
-            ))}
-            <Label
-              content={({ viewBox }) => {
-                if (!viewBox || !("cx" in viewBox)) return null;
-                const { cx, cy } = viewBox as { cx: number; cy: number };
-                return (
-                  <text x={cx} y={cy} textAnchor="middle">
-                    <tspan
-                      x={cx}
-                      y={cy - 4}
-                      className="fill-foreground text-xl sm:text-2xl font-bold"
-                    >
-                      {topPct}%
-                    </tspan>
-                    <tspan
-                      x={cx}
-                      y={cy + 13}
-                      className="fill-muted-foreground text-[9px] sm:text-[11px]"
-                    >
-                      {topLabel}
-                    </tspan>
-                  </text>
-                );
-              }}
-            />
-          </Pie>
-        </PieChart>
-      </ChartContainer>
+      <CompositionDonut data={data} total={total} t={t} interactive className="h-32 w-32 sm:h-48 sm:w-48" />
 
       <ul className="flex w-full min-w-0 flex-col gap-1.5 sm:gap-2">
         {data.map((d) => (
@@ -309,9 +337,9 @@ export function CompositionDetails({ dateKey }: { dateKey: string }) {
   );
 }
 
-// Dashboard card beside the calorie gauge: compact nutrient rows; tapping
-// anywhere opens the popup with the donut, full details and the day's
-// health tiles.
+// Dashboard card beside the calorie gauge: compact nutrient rows with a small
+// donut; tapping anywhere opens the popup with the larger donut, full details
+// and the day's health tiles.
 export default function DailyCompositionCard({
   dateKey,
   dateLabel,
@@ -352,7 +380,7 @@ export default function DailyCompositionCard({
           </h2>
           <ChevronRight className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
         </div>
-        <CompositionList dateKey={dateKey} />
+        <CompositionSummary dateKey={dateKey} />
       </div>
 
       <Modal
