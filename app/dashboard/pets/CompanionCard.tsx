@@ -16,10 +16,9 @@ import { useCompanionMood } from "./use-companion-mood";
 
 // The card takes the color of the glucose card's reading pill (statusCard in
 // app/dashboard/glucose/GlucoseTracker.tsx; keep the backgrounds in sync), with
-// an ink picked for contrast on each: the pill's white on teal is too faint
-// for the small text here.
+// the dark ink that keeps the text legible on each.
 const GLUCOSE_CARD: Record<GlucoseStatus, string> = {
-  "in-range": "bg-chart-2 text-teal-950",
+  "in-range": "bg-lime-400 text-lime-950",
   high: "bg-amber-500 text-amber-950",
   low: "bg-amber-500 text-amber-950",
   urgent: "bg-destructive text-white",

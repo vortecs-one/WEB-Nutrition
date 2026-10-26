@@ -578,8 +578,10 @@
    hugs its silhouette (stacked drop-shadows on the cut-out, so it follows the
    idle motion for free; the filter itself never animates) and a halo behind
    it that slowly breathes. */
+/* In range is lemon green (lime-400, as the glucose pill). Not --chart-2: that
+   cyan is the Carbs color. */
 [data-aura="in-range"] {
-  --pet-aura: var(--color-chart-2);
+  --pet-aura: var(--color-lime-400);
 }
 [data-aura="high"],
 [data-aura="low"] {

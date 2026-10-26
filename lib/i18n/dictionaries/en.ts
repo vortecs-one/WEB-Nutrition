@@ -321,11 +321,6 @@ const en: Dictionary = {
     calculator: {
       open: "Insulin and carb calculator",
       title: "Dose calculator",
-      method: "Calculation method",
-      methodFormula: "Formula",
-      methodSheet: "Table",
-      methodFormulaHint: "Carbs ÷ ratio + (current glucose − target) ÷ sensitivity.",
-      methodSheetHint: "Your care team's dose table, in whole units.",
       currentGlucose: "Current glucose",
       noReading: "No current reading. Enter your glucose manually.",
       manualGlucose: "Glucose",
@@ -335,7 +330,6 @@ const en: Dictionary = {
       ratioHint: "Grams of carbs covered by 1 unit.",
       sensitivity: "Sensitivity factor",
       sensitivityHint: "How much 1 unit lowers glucose.",
-      target: "Target glucose",
       rangeLow: "Lower range",
       rangeHigh: "Upper range",
       tableTitle: "Dose table",
@@ -359,6 +353,8 @@ const en: Dictionary = {
       iobDeduction: "Insulin on board",
       totalDose: "Suggested dose",
       theoreticalDose: "Theoretical bolus",
+      formulaReference: "Formula estimate",
+      formulaReferenceHint: "Exact calculation, for comparison. The table sets your dose.",
       units: "U",
       grams: "g",
       perUnit: "/ U",
@@ -372,7 +368,6 @@ const en: Dictionary = {
       staleWarning: "The reading is over 15 minutes old. Confirm with a fresh check before dosing.",
       invalid:
         "Fill in ratio, sensitivity and ranges with values above 0 (upper range can't be below lower range).",
-      invalidFormula: "Fill in target, ratio and sensitivity with values above 0.",
       disclaimer:
         "Estimate only. It does not replace your care team's advice. Use the ratios prescribed by your doctor.",
       sessionNote: "Parameters are kept while this page stays open.",

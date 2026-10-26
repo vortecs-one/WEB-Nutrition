@@ -63,7 +63,7 @@ const REFRESH_MS = 60_000;
 // Status → card accent classes (background + text pairs kept together for
 // contrast, per design guidelines).
 const statusCard: Record<GlucoseStatus, string> = {
-  "in-range": "bg-chart-2 text-white",
+  "in-range": "bg-lime-400 text-lime-950",
   high: "bg-amber-500 text-amber-950",
   low: "bg-amber-500 text-amber-950",
   urgent: "bg-destructive text-destructive-foreground",
@@ -74,7 +74,7 @@ const statusCard: Record<GlucoseStatus, string> = {
 // `ink` is chosen against the fill's luminance rather than read from a theme
 // token: the app defines no --destructive-foreground or amber scale.
 const statusBadge: Record<GlucoseStatus, { fill: string; ink: string }> = {
-  "in-range": { fill: "var(--color-chart-2)", ink: "#ffffff" },
+  "in-range": { fill: "var(--color-lime-400)", ink: "#1a2e05" },
   high: { fill: "var(--color-amber-500)", ink: "#451a03" },
   low: { fill: "var(--color-amber-500)", ink: "#451a03" },
   urgent: { fill: "var(--color-destructive)", ink: "#ffffff" },

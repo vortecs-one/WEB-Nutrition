@@ -320,11 +320,6 @@ const es = {
     calculator: {
       open: "Calculadora de insulina y carbohidratos",
       title: "Calculadora de dosis",
-      method: "Método de cálculo",
-      methodFormula: "Fórmula",
-      methodSheet: "Tabla",
-      methodFormulaHint: "Carbohidratos ÷ ratio + (glucosa actual − objetivo) ÷ sensibilidad.",
-      methodSheetHint: "La tabla de dosis de tu equipo médico, en unidades enteras.",
       currentGlucose: "Glucosa actual",
       noReading: "Sin lectura actual. Ingresa tu glucosa manualmente.",
       manualGlucose: "Glucosa",
@@ -334,7 +329,6 @@ const es = {
       ratioHint: "Gramos de carbohidratos que cubre 1 unidad.",
       sensitivity: "Factor de sensibilidad",
       sensitivityHint: "Cuánto baja la glucosa 1 unidad.",
-      target: "Glucosa objetivo",
       rangeLow: "Rango menor",
       rangeHigh: "Rango mayor",
       tableTitle: "Tabla de dosis",
@@ -358,6 +352,8 @@ const es = {
       iobDeduction: "Insulina activa",
       totalDose: "Dosis sugerida",
       theoreticalDose: "Bolo teórico",
+      formulaReference: "Estimación por fórmula",
+      formulaReferenceHint: "Cálculo exacto, para comparar. La tabla define tu dosis.",
       units: "U",
       grams: "g",
       perUnit: "/ U",
@@ -371,7 +367,6 @@ const es = {
       staleWarning: "La lectura tiene más de 15 minutos. Confirma con una medición antes de dosificar.",
       invalid:
         "Completa ratio, sensibilidad y rangos con valores mayores a 0 (el rango mayor no puede ser menor que el rango menor).",
-      invalidFormula: "Completa objetivo, ratio y sensibilidad con valores mayores a 0.",
       disclaimer:
         "Estimación orientativa. No reemplaza las indicaciones de tu equipo médico. Usa los ratios que te haya indicado tu endocrinólogo.",
       sessionNote: "Los parámetros se mantienen mientras la página esté abierta.",
