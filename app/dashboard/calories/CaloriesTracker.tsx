@@ -259,9 +259,10 @@ export default function CaloriesTracker() {
         </div>
       </div>
 
-      {/* Quick-add food popup — meal-type quick-launch row above the barcode
-          scanner. The full logged-items history lives on the My nutrition
-          page, so only the icon row (showHistory=false) comes along here. */}
+      {/* Quick-add food popup — meal-type quick-launch row, shown in the
+          popup's Manual tab. The full logged-items history lives on the My
+          nutrition page, so only the icon row (showHistory=false) comes along
+          here. */}
       <Modal
         isOpen={showAddFood}
         onClose={() => setShowAddFood(false)}

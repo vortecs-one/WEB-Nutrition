@@ -17,7 +17,9 @@ import {
   UtensilsCrossed,
   ChevronLeft,
   Camera,
+  Pencil,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import useSWR from "swr";
 import { useI18n } from "@/lib/i18n/provider";
@@ -43,6 +45,8 @@ import FoodPhotoScanner from "./FoodPhotoScanner";
 import { photoItemToProduct, type FoodPhotoItem } from "@/lib/foods/photo-types";
 
 type Status = "idle" | "loading" | "not-found" | "error";
+
+type Tab = "barcode" | "photo" | "manual";
 
 // A single line in the meal-builder cart.
 type CartItem = {
@@ -77,8 +81,8 @@ export default function BarcodeLookup({
   quickAdd,
 }: {
   todayKey: string;
-  // Manual-entry launcher (e.g. the meal-type icon row) rendered under the
-  // camera frame in both tabs.
+  // Manual-entry launcher (e.g. the meal-type icon row), shown in its own
+  // "Manual" tab. The tab is hidden when this isn't passed.
   quickAdd?: ReactNode;
   // When embedded inside another card (e.g. the diet log), drop the outer
   // card chrome so it reads as a sub-section rather than a nested card.
@@ -112,7 +116,7 @@ export default function BarcodeLookup({
   // then true in one handler batches into a single render where the value
   // never changes, so the scanner's [active] effect would never re-run.
   const [scanNonce, setScanNonce] = useState(0);
-  const [tab, setTab] = useState<"barcode" | "photo">("barcode");
+  const [tab, setTab] = useState<Tab>("barcode");
 
   const anyModalOpen = savedOpen || detailFood !== null;
   useScrollLock(anyModalOpen);
@@ -321,9 +325,17 @@ export default function BarcodeLookup({
       { label: t.macroFat, value: `${fmt1(v.fat)}${t.unitG}` },
   ].filter((c) => !c.value.startsWith("—"));
 
+  // Tabs in display order. The manual tab only exists when there is a manual
+  // launcher to show.
+  const tabs: { id: Tab; label: string; Icon: LucideIcon }[] = [
+    { id: "barcode", label: t.tabBarcode, Icon: Barcode },
+    { id: "photo", label: t.tabPhoto, Icon: Camera },
+    ...(quickAdd ? [{ id: "manual" as const, label: t.tabManual, Icon: Pencil }] : []),
+  ];
+
   const quickAddSection = quickAdd ? (
-    <section aria-label={t.orAddManually} className="flex flex-col gap-3 rounded-2xl border border-highlight/20 bg-highlight/5 p-3 sm:p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-highlight">{t.orAddManually}</p>
+    <section aria-label={t.tabManual} className="flex flex-col gap-3 rounded-2xl border border-highlight/20 bg-highlight/5 p-3 sm:p-4">
+      <p className="text-xs text-muted-foreground">{t.manualHint}</p>
       {quickAdd}
     </section>
   ) : null;
@@ -345,14 +357,9 @@ export default function BarcodeLookup({
       <div
         role="tablist"
         aria-label={t.addMeal}
-        className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-muted p-1"
+        className={`grid ${tabs.length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-1 rounded-2xl border border-border bg-muted p-1`}
       >
-        {(
-          [
-            { id: "barcode", label: t.tabBarcode, Icon: Barcode },
-            { id: "photo", label: t.tabPhoto, Icon: Camera },
-          ] as const
-        ).map(({ id, label, Icon }) => {
+        {tabs.map(({ id, label, Icon }, index) => {
           const active = tab === id;
           return (
             <button
@@ -366,13 +373,14 @@ export default function BarcodeLookup({
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
                   e.preventDefault();
-                  const next = id === "barcode" ? "photo" : "barcode";
+                  const step = e.key === "ArrowRight" ? 1 : -1;
+                  const next = tabs[(index + step + tabs.length) % tabs.length].id;
                   setTab(next);
                   document.getElementById(`addfood-tab-${next}`)?.focus();
                 }
               }}
               tabIndex={active ? 0 : -1}
-              className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition ${
+              className={`flex min-h-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl text-sm font-semibold transition sm:gap-2 ${
                 active
                   ? id === "photo"
                     ? "bg-highlight text-highlight-foreground shadow-sm"
@@ -393,6 +401,9 @@ export default function BarcodeLookup({
       {tab === "photo" ? (
         <div role="tabpanel" id="addfood-panel-photo" aria-labelledby="addfood-tab-photo" className="space-y-4">
           <FoodPhotoScanner onAdd={addPhotoItemsToCart} />
+        </div>
+      ) : tab === "manual" ? (
+        <div role="tabpanel" id="addfood-panel-manual" aria-labelledby="addfood-tab-manual">
           {quickAddSection}
         </div>
       ) : (
@@ -446,8 +457,6 @@ export default function BarcodeLookup({
         onActivate={() => setScannerOpen(true)}
       />
       </div>
-
-      {quickAddSection}
 
       {/* Status region. The live region itself stays mounted and only its
           contents swap — several screen readers won't announce content that
