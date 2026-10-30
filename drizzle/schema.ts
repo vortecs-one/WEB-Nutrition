@@ -159,6 +159,9 @@ export const glucoseSettings = pgTable("glucose_settings", {
   id: serial("id").primaryKey(),
   // Stable per-user key: Thruxion human_id, falling back to email.
   userKey: text("user_key").notNull().unique(),
+  // Email of the sensor owner this row belongs to (lowercased). Health
+  // watchers can't derive the owner's user_key, so they find the row by this.
+  ownerEmail: text("owner_email"),
   // Data source for glucose readings: "nightscout" | "librelinkup".
   source: varchar("source", { length: 20 }).notNull().default("nightscout"),
   // Base URL of the user's Nightscout instance (normalized, no trailing slash).

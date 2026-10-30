@@ -470,6 +470,11 @@ const en: Dictionary = {
     setupTitleGeneric: "Connect your glucose source",
     setupBodyGeneric:
       "Choose how to get your readings: sign in with LibreLinkUp to read directly from your LibreLink app data, or connect your own Nightscout site.",
+    roleOwner: "Sensor owner",
+    roleWatcher: "Health watcher",
+    watcherNotConfiguredTitle: "No glucose data yet",
+    watcherNotConfigured:
+      "The sensor owner hasn't connected a glucose source yet. Readings will appear here once they do.",
   },
   auth: {
     loginTitle: "Login",

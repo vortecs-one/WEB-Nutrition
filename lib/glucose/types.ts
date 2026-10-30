@@ -75,10 +75,16 @@ export type LibreThresholds = {
   lowAlarm: LibreAlarm | null;
 };
 
+// Who is looking at the glucose data: the sensor owner, who manages the
+// source, or a health watcher with read-only remote access (see access.ts).
+export type GlucoseRole = "owner" | "watcher";
+
 // Client-safe settings (secrets intentionally excluded — Nightscout tokens
 // and LibreLinkUp passwords never leave the server; we only tell the client
-// whether they are stored).
+// whether they are stored). Watchers get the owner's settings with the
+// connection details blanked out.
 export type GlucoseSettings = {
+  role: GlucoseRole;
   source: GlucoseSource;
   nightscoutUrl: string | null;
   hasToken: boolean;

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { useGlucoseStatus } from "@/lib/glucose/status-provider";
-import type { GlucoseStatus } from "@/lib/glucose/types";
+import type { GlucoseRole, GlucoseStatus } from "@/lib/glucose/types";
+import GlucoseRoleBadge from "../glucose/GlucoseRoleBadge";
 import { useI18n } from "@/lib/i18n/provider";
 import { displayName, getCharacter } from "@/lib/pets/manager";
 import { POSE_FOR_MOOD } from "@/lib/pets/mood";
@@ -24,7 +25,12 @@ const GLUCOSE_CARD: Record<GlucoseStatus, string> = {
   urgent: "bg-destructive text-white",
 };
 
-export default function CompanionCard() {
+export default function CompanionCard({
+  glucoseRole = null,
+}: {
+  // Sensor owner or health watcher, shown as a chip; null without glucose access.
+  glucoseRole?: GlucoseRole | null;
+}) {
   const { dict, locale } = useI18n();
   const lang = locale as Locale;
   const { companion, isLoading, error } = useCompanion();
@@ -84,11 +90,14 @@ export default function CompanionCard() {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            id="companion-card-title"
-            className={`text-xs font-medium uppercase tracking-wide ${quiet}`}
-          >
-            {dict.pets.title}
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              id="companion-card-title"
+              className={`truncate text-xs font-medium uppercase tracking-wide ${quiet}`}
+            >
+              {dict.pets.title}
+            </span>
+            {glucoseRole && <GlucoseRoleBadge role={glucoseRole} tinted={tinted} />}
           </span>
           {companion && character ? (
             <>

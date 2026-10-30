@@ -12,14 +12,15 @@
 // only in Neon and in this file's fetches — the browser/WebView never talks
 // to Nightscout or LibreView directly (no CORS issues, secrets never exposed).
 
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { glucoseSettings } from "@/drizzle/schema";
 import { auth } from "@/auth";
-import { isGlucoseEmailAllowed } from "./access";
+import { getGlucoseOwnerEmail, glucoseRoleForEmail } from "./access";
 import type {
   GlucoseFetchResult,
   GlucoseReading,
+  GlucoseRole,
   GlucoseSettings,
   GlucoseUnit,
   LibrePatientInfo,
@@ -33,15 +34,27 @@ import {
   type LibreSession,
 } from "./librelinkup";
 
-// Resolve a stable per-user key from the session (same pattern as day-log):
-// prefer the Thruxion human_id, fall back to the email.
-async function getUserKey(): Promise<string | null> {
+// The signed-in glucose user: their role (owner / watcher, see access.ts),
+// their stable per-user key (same pattern as day-log: prefer the Thruxion
+// human_id, fall back to the email) and their lowercased email.
+type Viewer = { role: GlucoseRole; userKey: string; email: string };
+
+async function getViewer(): Promise<Viewer | null> {
   const session = await auth();
   const user = session?.user as
     | { humanId?: string | null; email?: string | null }
     | undefined;
-  if (!isGlucoseEmailAllowed(user?.email)) return null;
-  return user?.humanId ?? user?.email ?? null;
+  const role = glucoseRoleForEmail(user?.email);
+  const userKey = user?.humanId ?? user?.email ?? null;
+  if (!role || !userKey || !user?.email) return null;
+  return { role, userKey, email: user.email.trim().toLowerCase() };
+}
+
+// Settings and the source connection belong to the sensor owner: every
+// action that changes them resolves this key, which is null for watchers.
+async function getOwnerKey(): Promise<string | null> {
+  const viewer = await getViewer();
+  return viewer?.role === "owner" ? viewer.userKey : null;
 }
 
 // --- URL / auth helpers -----------------------------------------------------
@@ -100,13 +113,17 @@ async function nsFetch(
 
 type SettingsRow = typeof glucoseSettings.$inferSelect;
 
-function toClientSettings(row: SettingsRow): GlucoseSettings {
+// Watchers get the owner's settings without the connection details: the
+// owner's Nightscout address and LibreLinkUp login stay on the server.
+function toClientSettings(row: SettingsRow, role: GlucoseRole): GlucoseSettings {
+  const isOwner = role === "owner";
   return {
+    role,
     source: row.source === "librelinkup" ? "librelinkup" : "nightscout",
-    nightscoutUrl: row.nightscoutUrl,
-    hasToken: Boolean(row.nightscoutToken),
-    libreEmail: row.libreEmail,
-    hasLibreCredentials: Boolean(row.libreEmail && row.librePassword),
+    nightscoutUrl: isOwner ? row.nightscoutUrl : null,
+    hasToken: isOwner && Boolean(row.nightscoutToken),
+    libreEmail: isOwner ? row.libreEmail : null,
+    hasLibreCredentials: isOwner && Boolean(row.libreEmail && row.librePassword),
     librePatientId: row.librePatientId,
     unit: (row.unit === "mmol" ? "mmol" : "mgdl") as GlucoseUnit,
     lowThreshold: row.lowThreshold,
@@ -126,12 +143,41 @@ async function getSettingsRow(userKey: string): Promise<SettingsRow | null> {
   return row ?? null;
 }
 
-/** Returns the user's client-safe glucose settings, or null if unconfigured. */
+// The row whose readings the viewer sees. The owner reads their own row and
+// stamps their email on it; watchers read the row stamped with the configured
+// owner email (the most recently updated one, should there be several).
+async function resolveReadRow(): Promise<{ row: SettingsRow | null; role: GlucoseRole } | null> {
+  const viewer = await getViewer();
+  if (!viewer) return null;
+
+  if (viewer.role === "owner") {
+    const row = await getSettingsRow(viewer.userKey);
+    if (row && row.ownerEmail !== viewer.email) {
+      await db
+        .update(glucoseSettings)
+        .set({ ownerEmail: viewer.email })
+        .where(eq(glucoseSettings.id, row.id));
+      return { row: { ...row, ownerEmail: viewer.email }, role: "owner" };
+    }
+    return { row, role: "owner" };
+  }
+
+  const ownerEmail = getGlucoseOwnerEmail();
+  if (!ownerEmail) return { row: null, role: "watcher" };
+  const [row] = await db
+    .select()
+    .from(glucoseSettings)
+    .where(eq(glucoseSettings.ownerEmail, ownerEmail))
+    .orderBy(desc(glucoseSettings.updatedAt))
+    .limit(1);
+  return { row: row ?? null, role: "watcher" };
+}
+
+/** Returns the viewer's client-safe glucose settings, or null if unconfigured. */
 export async function fetchGlucoseSettings(): Promise<GlucoseSettings | null> {
-  const userKey = await getUserKey();
-  if (!userKey) return null;
-  const row = await getSettingsRow(userKey);
-  return row ? toClientSettings(row) : null;
+  const resolved = await resolveReadRow();
+  if (!resolved?.row) return null;
+  return toClientSettings(resolved.row, resolved.role);
 }
 
 type Thresholds = {
@@ -214,8 +260,9 @@ export type SaveGlucoseSettingsResult =
 export async function saveGlucoseSettings(
   input: SaveGlucoseSettingsInput,
 ): Promise<SaveGlucoseSettingsResult> {
-  const userKey = await getUserKey();
-  if (!userKey) return { ok: false, error: "unauthenticated" };
+  const viewer = await getViewer();
+  if (viewer?.role !== "owner") return { ok: false, error: "unauthenticated" };
+  const { userKey } = viewer;
 
   const existing = await getSettingsRow(userKey);
   // Omitted unit/thresholds keep whatever is already stored for this user —
@@ -230,6 +277,7 @@ export async function saveGlucoseSettings(
 
   const shared = {
     userKey,
+    ownerEmail: viewer.email,
     unit,
     ...thresholds,
     enabled: true,
@@ -259,7 +307,7 @@ export async function saveGlucoseSettings(
       .onConflictDoUpdate({ target: glucoseSettings.userKey, set: values })
       .returning();
 
-    return { ok: true, settings: toClientSettings(row) };
+    return { ok: true, settings: toClientSettings(row, "owner") };
   }
 
   // --- LibreLinkUp source ---
@@ -332,7 +380,7 @@ export async function saveGlucoseSettings(
     .onConflictDoUpdate({ target: glucoseSettings.userKey, set: values })
     .returning();
 
-  return { ok: true, settings: toClientSettings(row), patients };
+  return { ok: true, settings: toClientSettings(row, "owner"), patients };
 }
 
 // --- LibreLinkUp session management ------------------------------------------
@@ -393,7 +441,7 @@ export async function testLibreConnection(input: {
   librePassword?: string;
   useSavedPassword?: boolean;
 }): Promise<{ ok: true; patients: LibrePatientInfo[] } | { ok: false; error: string }> {
-  const userKey = await getUserKey();
+  const userKey = await getOwnerKey();
   if (!userKey) return { ok: false, error: "unauthenticated" };
 
   const email = input.libreEmail.trim().toLowerCase();
@@ -428,7 +476,7 @@ export async function testLibreConnection(input: {
 export async function setGlucoseUnit(
   unit: GlucoseUnit,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const userKey = await getUserKey();
+  const userKey = await getOwnerKey();
   if (!userKey) return { ok: false, error: "unauthenticated" };
 
   const row = await getSettingsRow(userKey);
@@ -445,7 +493,7 @@ export async function setGlucoseUnit(
 export async function setLibrePatient(
   patientId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const userKey = await getUserKey();
+  const userKey = await getOwnerKey();
   if (!userKey) return { ok: false, error: "unauthenticated" };
 
   const row = await getSettingsRow(userKey);
@@ -482,7 +530,7 @@ export async function testNightscoutConnection(input: {
   nightscoutToken?: string;
   useSavedToken?: boolean;
 }): Promise<{ ok: true; serverName: string } | { ok: false; error: string }> {
-  const userKey = await getUserKey();
+  const userKey = await getOwnerKey();
   if (!userKey) return { ok: false, error: "unauthenticated" };
 
   const url = normalizeUrl(input.nightscoutUrl);
@@ -562,22 +610,23 @@ async function fetchNightscoutThresholds(
  * mmol/L display). Secrets never leave the server.
  */
 export async function fetchGlucoseData(hours: number): Promise<GlucoseFetchResult> {
-  const userKey = await getUserKey();
-  if (!userKey) return { ok: false, error: "unknown" };
+  const resolved = await resolveReadRow();
+  if (!resolved) return { ok: false, error: "unknown" };
 
-  const row = await getSettingsRow(userKey);
+  const { row, role } = resolved;
   if (!row || !row.enabled) return { ok: false, error: "not-configured" };
 
   const windowHours = Math.min(48, Math.max(1, Math.round(hours) || 12));
 
   if (row.source === "librelinkup") {
-    return fetchFromLibre(row, windowHours);
+    return fetchFromLibre(row, role, windowHours);
   }
-  return fetchFromNightscout(row, windowHours);
+  return fetchFromNightscout(row, role, windowHours);
 }
 
 async function fetchFromNightscout(
   row: SettingsRow,
+  role: GlucoseRole,
   windowHours: number,
 ): Promise<GlucoseFetchResult> {
   if (!row.nightscoutUrl) return { ok: false, error: "not-configured" };
@@ -619,7 +668,7 @@ async function fetchFromNightscout(
       data: {
         current: readings.length > 0 ? readings[readings.length - 1] : null,
         readings,
-        settings: withSourceThresholds(toClientSettings(row), sourceThresholds),
+        settings: withSourceThresholds(toClientSettings(row, role), sourceThresholds),
         patientName: null,
         patients: [],
         // Nightscout entries carry no sensor or LibreLink threshold data.
@@ -634,6 +683,7 @@ async function fetchFromNightscout(
 
 async function fetchFromLibre(
   row: SettingsRow,
+  role: GlucoseRole,
   windowHours: number,
 ): Promise<GlucoseFetchResult> {
   if (!row.libreEmail || !row.librePassword) return { ok: false, error: "not-configured" };
@@ -723,7 +773,7 @@ async function fetchFromLibre(
         current: result.graph.current,
         readings,
         settings: withSourceThresholds(
-          toClientSettings({ ...row, librePatientId: result.targetId }),
+          toClientSettings({ ...row, librePatientId: result.targetId }, role),
           sourceThresholds,
         ),
         patientName: result.graph.patientName || null,

@@ -476,6 +476,11 @@ const es = {
     setupTitleGeneric: "Conecta tu fuente de glucosa",
     setupBodyGeneric:
       "Elige cómo obtener tus lecturas: inicia sesión con LibreLinkUp para leer directamente los datos de tu app LibreLink, o conecta tu propio sitio Nightscout.",
+    roleOwner: "Titular del sensor",
+    roleWatcher: "Seguimiento remoto",
+    watcherNotConfiguredTitle: "Aún no hay datos de glucosa",
+    watcherNotConfigured:
+      "La persona titular del sensor aún no conecta una fuente de glucosa. Las lecturas aparecerán aquí cuando lo haga.",
   },
   theme: {
     label: "Tema de color",

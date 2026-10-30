@@ -34,6 +34,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { fetchGlucoseData, setGlucoseUnit, setLibrePatient } from "@/lib/glucose/actions";
 import {
   type GlucoseData,
+  type GlucoseRole,
   type GlucoseSettings,
   type GlucoseStatus,
   type GlucoseUnit,
@@ -52,6 +53,7 @@ import { TREND_ICON } from "@/lib/glucose/trend-icons";
 import { mgdlToMmol } from "@/lib/health-formulas";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
+import GlucoseRoleBadge from "./GlucoseRoleBadge";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
 import InsulinCalculator from "./InsulinCalculator";
 
@@ -86,13 +88,19 @@ const ZONE_GREEN = "var(--color-lime-500)";
 
 export default function GlucoseTracker({
   initialSettings,
+  role,
 }: {
   initialSettings: GlucoseSettings | null;
+  // The viewer's role, needed before any settings exist. Watchers see the
+  // owner's readings read-only: no source settings, no patient switching.
+  role: GlucoseRole;
 }) {
   const { dict, locale } = useI18n();
   const t = dict.glucose;
 
   const [settings, setSettings] = useState<GlucoseSettings | null>(initialSettings);
+  const viewerRole = settings?.role ?? role;
+  const isOwner = viewerRole === "owner";
   const [showChart, setShowChart] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   // Connection form inside the settings panel — collapsed until the gear is used.
@@ -157,6 +165,9 @@ export default function GlucoseTracker({
         previous = s.unit;
         return { ...s, unit: next };
       });
+      // The unit is stored on the owner's settings, so a watcher's choice
+      // only applies to their own view.
+      if (!isOwner) return;
       setSavingUnit(true);
       const result = await setGlucoseUnit(next);
       if (!result.ok) {
@@ -165,7 +176,7 @@ export default function GlucoseTracker({
       }
       setSavingUnit(false);
     },
-    [savingUnit],
+    [savingUnit, isOwner],
   );
 
   // Initial load + polling (only while the tab is visible).
@@ -405,7 +416,8 @@ export default function GlucoseTracker({
     );
   };
 
-  // Not configured → onboarding card + settings form.
+  // Not configured → onboarding card + settings form for the owner; watchers
+  // can only wait for the owner to connect a source.
   if (!settings) {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-5">
@@ -413,12 +425,17 @@ export default function GlucoseTracker({
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sidebar-accent">
             <Activity className="h-6 w-6" aria-hidden="true" />
           </span>
-          <h1 className="mt-3 text-lg font-semibold text-balance">{t.setupTitleGeneric}</h1>
+          <div className="mt-3">
+            <GlucoseRoleBadge role={viewerRole} />
+          </div>
+          <h1 className="mt-2 text-lg font-semibold text-balance">
+            {isOwner ? t.setupTitleGeneric : t.watcherNotConfiguredTitle}
+          </h1>
           <p className="mt-1 text-sm text-sidebar-foreground/70 text-pretty">
-            {t.setupBodyGeneric}
+            {isOwner ? t.setupBodyGeneric : t.watcherNotConfigured}
           </p>
         </section>
-        <GlucoseSettingsForm settings={null} onSaved={(s) => setSettings(s)} />
+        {isOwner && <GlucoseSettingsForm settings={null} onSaved={(s) => setSettings(s)} />}
       </div>
     );
   }
@@ -784,8 +801,9 @@ export default function GlucoseTracker({
               )}
             </div>
           </div>
-          {/* Action: open the detail view (chart, sensor, settings) */}
-          <div className="flex shrink-0 gap-1">
+          {/* Role chip + action: open the detail view (chart, sensor, settings) */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <GlucoseRoleBadge role={viewerRole} />
             <button
               type="button"
               onClick={() => setShowChart(true)}
@@ -818,8 +836,9 @@ export default function GlucoseTracker({
         settings={settings}
       />
 
-      {/* Patient switcher (LibreLinkUp: main sensor + followed patients) */}
-      {settings.source === "librelinkup" && (data?.patients?.length ?? 0) > 1 && (
+      {/* Patient switcher (LibreLinkUp: main sensor + followed patients).
+          Owner only: switching changes the shared selection. */}
+      {isOwner && settings.source === "librelinkup" && (data?.patients?.length ?? 0) > 1 && (
         <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
@@ -926,6 +945,9 @@ export default function GlucoseTracker({
                   <span className="truncate">{data.patientName}</span>
                 </div>
               )}
+              <div className="mt-1.5">
+                <GlucoseRoleBadge role={viewerRole} />
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1047,15 +1069,18 @@ export default function GlucoseTracker({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
               {settings.source === "librelinkup" ? t.libreAppName : t.sourceNightscout}
             </h3>
-            <button
-              type="button"
-              onClick={() => setShowConnection((v) => !v)}
-              aria-label={t.settings}
-              aria-expanded={showConnection}
-              className="ml-auto -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-            >
-              <Settings2 className="h-4 w-4" aria-hidden="true" />
-            </button>
+            {/* The source login and settings belong to the sensor owner */}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setShowConnection((v) => !v)}
+                aria-label={t.settings}
+                aria-expanded={showConnection}
+                className="ml-auto -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+              >
+                <Settings2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
 
           {libreThresholds && (
@@ -1124,7 +1149,7 @@ export default function GlucoseTracker({
           )}
 
           {/* Source connection form — revealed by the gear above */}
-          {showConnection && (
+          {isOwner && showConnection && (
             <div className="mt-3 border-t border-sidebar-foreground/10 pt-3">
               <GlucoseSettingsForm
                 settings={settings}

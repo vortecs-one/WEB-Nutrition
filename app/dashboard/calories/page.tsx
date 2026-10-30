@@ -2,7 +2,7 @@
 import { getCurrentRole } from "@/lib/role/server";
 import { redirect } from "next/navigation";
 import { fetchGlucoseSettings } from "@/lib/glucose/actions";
-import { canAccessGlucose } from "@/lib/glucose/access";
+import { getGlucoseRole } from "@/lib/glucose/access";
 import { GlucoseStatusProvider } from "@/lib/glucose/status-provider";
 import GlucoseTracker from "../glucose/GlucoseTracker";
 import CaloriesTracker from "./CaloriesTracker";
@@ -18,15 +18,16 @@ export default async function CaloriesPage() {
     redirect("/dashboard");
   }
 
-  const showGlucose = await canAccessGlucose();
-  const glucoseSettings = showGlucose ? await fetchGlucoseSettings() : null;
+  // Sensor owner, health watcher, or null (no glucose access).
+  const glucoseRole = await getGlucoseRole();
+  const glucoseSettings = glucoseRole ? await fetchGlucoseSettings() : null;
 
   return (
     <div className="space-y-6">
       <CaloriesTracker />
       <GlucoseStatusProvider>
-        {showGlucose && <GlucoseTracker initialSettings={glucoseSettings} />}
-        <CompanionCard />
+        {glucoseRole && <GlucoseTracker initialSettings={glucoseSettings} role={glucoseRole} />}
+        <CompanionCard glucoseRole={glucoseRole} />
       </GlucoseStatusProvider>
     </div>
   );
