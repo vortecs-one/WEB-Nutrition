@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useDayLog, WATER_GOAL_ML } from "@/lib/day-log/provider";
+import { useDayLog } from "@/lib/day-log/provider";
+import { localDateKey } from "@/lib/day-log/date-key";
+import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { useGlucoseReading } from "@/lib/glucose/status-provider";
 import { minutesAgo } from "@/lib/glucose/types";
 import { deriveMood, type CompanionMood } from "@/lib/pets/mood";
-
-// Same day key as the calorie card (CaloriesTracker), so the companion reacts
-// to the day the gauge shows.
-function toDateKey(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * The companion's mood (lib/pets/mood.ts) from the latest glucose reading
@@ -28,10 +24,13 @@ export function useCompanionMood(): CompanionMood | null {
     const clock = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(clock);
   }, []);
+  // Same local day key as the calorie card, so the companion reacts to the
+  // day the gauge shows.
+  const day = now ? localDateKey(now) : "";
+  const { waterGoalMl } = useEnergyBudget(day);
 
   return useMemo(() => {
     if (!now) return null;
-    const day = toDateKey(now);
     return deriveMood({
       glucose: reading && {
         status: reading.status,
@@ -41,11 +40,11 @@ export function useCompanionMood(): CompanionMood | null {
         ageMinutes: minutesAgo(reading.date),
       },
       waterMl: waterFor(day),
-      waterGoalMl: WATER_GOAL_ML,
+      waterGoalMl,
       burnedKcal: burnedFor(day),
       sleepMinutes: sleepFor(day),
       stress: stressFor(day),
       hour: now.getHours() + now.getMinutes() / 60,
     });
-  }, [now, reading, waterFor, burnedFor, sleepFor, stressFor]);
+  }, [now, day, waterGoalMl, reading, waterFor, burnedFor, sleepFor, stressFor]);
 }

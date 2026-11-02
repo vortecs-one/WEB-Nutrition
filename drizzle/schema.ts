@@ -115,7 +115,7 @@ export const dayLogEntries = pgTable(
     userKey: text("user_key").notNull(),
     // Day this entry belongs to (YYYY-MM-DD).
     logDate: date("log_date").notNull(),
-    // "meal" | "activity" | "supplement" | "water".
+    // "meal" | "activity" | "supplement" | "water" | "sleep" | "stress" | "weight".
     kind: varchar("kind", { length: 20 }).notNull(),
     // Meal/activity/supplement subtype (e.g. "breakfast", "cardio", "protein").
     subtype: varchar("subtype", { length: 20 }).notNull(),
@@ -135,7 +135,8 @@ export const dayLogEntries = pgTable(
     sugars: integer("sugars"),
     fiber: integer("fiber"),
     sodium: integer("sodium"),
-    // Minutes slept for kind="sleep", level 1-5 for kind="stress".
+    // Minutes slept for kind="sleep", level 1-5 for kind="stress", grams
+    // for kind="weight".
     value: integer("value"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -267,3 +268,28 @@ export const savedFoods = pgTable(
     ),
   }),
 );
+
+// === Body profile (calorie formulas) ===
+// Body data for lib/health-formulas.ts, one row per user (same `userKey` as
+// day_log_entries). Weight lives in day_log_entries (kind "weight"), so it
+// keeps a history. Migration: drizzle/0011_add_body_profiles.sql.
+export const bodyProfiles = pgTable("body_profiles", {
+  id: serial("id").primaryKey(),
+  userKey: text("user_key").notNull().unique(),
+  // "male" | "female" (the formulas only distinguish these two).
+  sex: varchar("sex", { length: 10 }),
+  birthDate: date("birth_date"),
+  heightCm: integer("height_cm"),
+  // Daily life without workouts: "sedentary" … "veryActive".
+  activityLevel: varchar("activity_level", { length: 20 }).notNull().default("light"),
+  // "lose" | "maintain" | "gain".
+  goal: varchar("goal", { length: 10 }).notNull().default("maintain"),
+  // Weekly weight change aimed for, in grams (250, 500 or 750).
+  weeklyRateG: integer("weekly_rate_g").notNull().default(250),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

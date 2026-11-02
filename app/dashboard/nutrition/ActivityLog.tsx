@@ -1,14 +1,17 @@
 "use client";
 
-// Activity log: a form to record a burned-calorie activity plus the list of
-// the selected day's activities. Embeddable — the calorie dashboard opens it in
-// a popup and the Log view renders it inline — so it mirrors BarcodeLookup's
-// `embedded` prop convention.
+// Activity log: the day's energy summary, a form to record a burned-calorie
+// activity, and the list of the selected day's activities. Embeddable — the
+// calorie dashboard opens it in a popup and the Log view renders it inline —
+// so it mirrors BarcodeLookup's `embedded` prop convention. Workouts add to
+// the day's food budget (lib/energy/use-energy-budget.ts).
 
 import { useState, type FormEvent } from "react";
 import { Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog, type ActivityType } from "@/lib/day-log/provider";
+import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
+import { ProfilePrompt } from "../calories/EnergyParts";
 
 export default function ActivityLog({
   todayKey,
@@ -19,9 +22,11 @@ export default function ActivityLog({
   // chrome so it reads as a sub-section rather than a nested card.
   embedded?: boolean;
 }) {
-  const { dict } = useI18n();
+  const { dict, locale } = useI18n();
   const t = dict.nutritionUser;
   const ta = dict.caloriesUser;
+  const te = dict.energy;
+  const budget = useEnergyBudget(todayKey);
 
   const { dayData, addActivity, removeActivity } = useDayLog();
   const { activities } = todayKey
@@ -31,6 +36,8 @@ export default function ActivityLog({
   const [actName, setActName] = useState("");
   const [actCalories, setActCalories] = useState("");
   const [actType, setActType] = useState<ActivityType>("cardio");
+  // kcal of the activity just added, for the "added to your budget" line.
+  const [lastAdded, setLastAdded] = useState<number | null>(null);
 
   const activityTypeLabel = (at: ActivityType) =>
     ({ cardio: ta.cardio, strength: ta.strength, walking: ta.walking, sport: ta.sport, other: ta.other })[at];
@@ -40,9 +47,17 @@ export default function ActivityLog({
     const kcal = parseInt(actCalories, 10);
     if (!actName.trim() || Number.isNaN(kcal) || kcal <= 0 || !todayKey) return;
     addActivity(todayKey, { name: actName.trim(), calories: kcal, type: actType });
+    setLastAdded(kcal);
     setActName("");
     setActCalories("");
   };
+
+  const summary = [
+    { label: te.baseBurn, value: budget.baseBurn },
+    { label: te.workouts, value: budget.workouts },
+    { label: te.totalBurned, value: budget.totalBurned },
+    { label: budget.left < 0 ? te.over : te.left, value: Math.abs(budget.left), over: budget.left < 0 },
+  ];
 
   const inputClass =
     "w-full rounded-xl border border-border bg-background px-4 min-h-12 text-base outline-none focus:ring-2 focus:ring-ring";
@@ -56,6 +71,22 @@ export default function ActivityLog({
       }
     >
       {!embedded && <h2 className="text-lg font-semibold mb-4">{t.activityLog}</h2>}
+
+      {/* The day's burn and what's left to eat, updated as activities are added. */}
+      <div className="mb-4 flex flex-col gap-3">
+        <ProfilePrompt missing={budget.missing} />
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {summary.map((item) => (
+            <div key={item.label} className="rounded-xl bg-current/5 px-3 py-2">
+              <dt className="truncate text-xs opacity-70">{item.label}</dt>
+              <dd className={`text-base font-semibold tabular-nums ${item.over ? "text-destructive" : ""}`}>
+                {item.value.toLocaleString(locale)} <span className="text-xs font-normal opacity-70">{ta.kcal}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
       <form
         onSubmit={submitActivity}
         className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:items-end"
@@ -95,8 +126,11 @@ export default function ActivityLog({
           {ta.add}
         </button>
       </form>
+      <p role="status" className="mt-2 min-h-4 text-xs opacity-70">
+        {lastAdded !== null && te.addedToBudget.replace("{kcal}", lastAdded.toLocaleString(locale))}
+      </p>
 
-      <h3 className="text-sm font-medium mt-6 mb-1">{ta.activities}</h3>
+      <h3 className="text-sm font-medium mt-4 mb-1">{ta.activities}</h3>
       {activities.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{ta.noActivities}</p>
       ) : (

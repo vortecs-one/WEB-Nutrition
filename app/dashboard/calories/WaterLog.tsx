@@ -8,7 +8,8 @@
 import { useMemo } from "react";
 import { GlassWater, Milk, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
-import { useDayLog, WATER_GOAL_ML } from "@/lib/day-log/provider";
+import { useDayLog } from "@/lib/day-log/provider";
+import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 
 // Dial sweeps past the goal so overshooting stays visible (needle clamps here).
 const GAUGE_MAX_ML = 4000;
@@ -310,9 +311,11 @@ export default function WaterLog({ todayKey }: { todayKey: string }) {
     [dayData, todayKey],
   );
   const totalMl = todayKey ? waterFor(todayKey) : 0;
+  // 35 ml per kg of the latest weigh-in, or the 3 L default.
+  const { waterGoalMl } = useEnergyBudget(todayKey);
 
   const bottles = Math.floor(totalMl / 1000);
-  const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
+  const goalBottles = Math.ceil(waterGoalMl / 1000);
   // One slot per goal liter; grows past the goal, capped so the row can't blow up.
   const slots = Math.min(Math.max(bottles, goalBottles), 6);
 
@@ -335,7 +338,7 @@ export default function WaterLog({ todayKey }: { todayKey: string }) {
       {/* Nitro tachometer */}
       <WaterGauge
         ml={totalMl}
-        goalMl={WATER_GOAL_ML}
+        goalMl={waterGoalMl}
         label={t.gaugeLabel}
         goalLabel={t.goalLabel}
         litersUnit={t.liters}

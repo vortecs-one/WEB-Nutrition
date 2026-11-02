@@ -13,8 +13,9 @@ import type {
   DayLog,
   SleepEntry,
   StressEntry,
+  WeightEntry,
 } from "./types";
-import { DATE_KEY_RE, isSleepMinutes, isStressLevel } from "./types";
+import { DATE_KEY_RE, isSleepMinutes, isStressLevel, isWeightGrams } from "./types";
 
 // Resolve a stable per-user key from the session: prefer the Thruxion
 // human_id, fall back to the email. Returns null when unauthenticated so
@@ -92,6 +93,10 @@ export async function fetchUserDayLog(): Promise<DayLog> {
     } else if (row.kind === "stress") {
       if (!day.stress && isStressLevel(row.value)) {
         day.stress = { id: row.id, level: row.value };
+      }
+    } else if (row.kind === "weight") {
+      if (!day.weight && isWeightGrams(row.value)) {
+        day.weight = { id: row.id, grams: row.value };
       }
     }
   }
@@ -219,7 +224,7 @@ export async function addWaterEntry(
 // Replaces the user's single entry of `kind` for the day. Inputs are
 // re-validated here because server actions are callable from any client.
 async function setDailyValue(
-  kind: "sleep" | "stress",
+  kind: "sleep" | "stress" | "weight",
   dateKey: string,
   value: number,
 ): Promise<number | null> {
@@ -243,7 +248,7 @@ async function setDailyValue(
         userKey,
         logDate: dateKey,
         kind,
-        subtype: kind === "sleep" ? "night" : "self",
+        subtype: kind === "sleep" ? "night" : kind === "weight" ? "scale" : "self",
         name: kind,
         value,
       })
@@ -268,6 +273,15 @@ export async function setStressEntry(
   if (!isStressLevel(level)) return null;
   const id = await setDailyValue("stress", dateKey, level);
   return id === null ? null : { id, level };
+}
+
+export async function setWeightEntry(
+  dateKey: string,
+  grams: number,
+): Promise<WeightEntry | null> {
+  if (!isWeightGrams(grams)) return null;
+  const id = await setDailyValue("weight", dateKey, grams);
+  return id === null ? null : { id, grams };
 }
 
 // Deletes one entry, always scoped to the signed-in user so a user can never

@@ -9,15 +9,15 @@
 import { Flame, Salad } from "lucide-react";
 
 type Props = {
-  /** Signed balance the needle points at and the center shows: consumed - burned.
-   *  Negative = deficit (left), positive = surplus (right). */
+  /** Signed balance the needle points at and the center shows: eaten − (base
+   *  burn + workouts). Negative = deficit (left), positive = surplus (right). */
   value: number;
   /** Symmetric range of the dial, e.g. 800 means -800..+800. */
   range: number;
   /** Spacing between numbered divisions, e.g. 200 for -1000..1000 by 200s.
    *  Must evenly divide 2*range. */
   step: number;
-  /** Optional goal marker value (e.g. target deficit). */
+  /** Optional goal marker value: the day's target deficit (−) or surplus (+). */
   goal?: number;
   /** Big centered label above the number. */
   label: string;
@@ -26,8 +26,8 @@ type Props = {
   /** Optional total calories consumed today — draws a green salad badge on the
    *  surplus (right) side at +consumed. Hidden when 0. */
   consumed?: number;
-  /** Optional total calories burned today — draws a red flame badge on the
-   *  deficit (left) side at -burned. Hidden when 0. */
+  /** Optional total calories burned today (base burn + workouts) — draws a
+   *  red flame badge on the deficit (left) side at -burned. Hidden when 0. */
   burned?: number;
   /** Hide the visible label in the dial's bottom gap (still used for aria). */
   hideLabel?: boolean;
@@ -130,10 +130,9 @@ export default function CalorieGauge({
   const needleInner = polar(needleAngle, 50);
   const needleTip = polar(needleAngle, 90);
 
-  // Goal/Meta badge is pinned to the purple↔yellow boundary (RED_START) — it
-  // marks where the dial enters the yellow "redline" zone, not the raw `goal`
-  // value. Still gated on `goal` so a caller can omit the marker entirely.
-  const goalAngle = goal != null ? fractionToAngle(RED_START) : null;
+  // Goal/Meta badge sits at the day's goal balance (e.g. −275 to lose 0.25 kg
+  // a week), so the needle reaching it means the day is on target.
+  const goalAngle = goal != null ? valueToAngle(goal, range) : null;
   // Badge centered on the glowing ring — its center rides the meter line (R),
   // so the r=12 circle straddles the arc evenly.
   const goalBadge = goalAngle != null ? polar(goalAngle, R) : null;

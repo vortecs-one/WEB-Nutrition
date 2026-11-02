@@ -18,6 +18,7 @@ import {
   removeEntry,
   setSleepEntry,
   setStressEntry,
+  setWeightEntry,
 } from "./actions";
 import type {
   Meal,
@@ -65,6 +66,11 @@ type DayLogValue = {
   setSleep: (dateKey: string, minutes: number) => void;
   stressFor: (dateKey: string) => StressLevel | null;
   setStress: (dateKey: string, level: StressLevel) => void;
+  /** Every weigh-in, oldest first (kg). */
+  weighIns: { dateKey: string; kg: number }[];
+  /** The latest weigh-in on or before a day, or null. */
+  weightOn: (dateKey: string) => { dateKey: string; kg: number } | null;
+  setWeight: (dateKey: string, kg: number) => void;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
@@ -279,6 +285,41 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [log],
   );
 
+  const weighIns = useMemo(
+    () =>
+      Object.entries(log)
+        .filter(([, d]) => d.weight)
+        .map(([dateKey, d]) => ({ dateKey, kg: d.weight!.grams / 1000 }))
+        .sort((a, b) => a.dateKey.localeCompare(b.dateKey)),
+    [log],
+  );
+
+  const weightOn = useCallback(
+    (dateKey: string) => {
+      // Keys are YYYY-MM-DD, so string order is date order.
+      for (let i = weighIns.length - 1; i >= 0; i--) {
+        if (weighIns[i].dateKey <= dateKey) return weighIns[i];
+      }
+      return null;
+    },
+    [weighIns],
+  );
+
+  const setWeight = useCallback(
+    (dateKey: string, kg: number) => {
+      const grams = Math.round(kg * 1000);
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            weight: { id: d.weight?.id ?? -Date.now(), grams },
+          })),
+        () => setWeightEntry(dateKey, grams),
+      );
+    },
+    [runMutation],
+  );
+
   const setSleep = useCallback(
     (dateKey: string, minutes: number) => {
       runMutation(
@@ -326,8 +367,14 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       setSleep,
       stressFor,
       setStress,
+      weighIns,
+      weightOn,
+      setWeight,
     }),
     [
+      weighIns,
+      weightOn,
+      setWeight,
       sleepFor,
       setSleep,
       stressFor,

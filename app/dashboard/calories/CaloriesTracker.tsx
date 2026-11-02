@@ -10,12 +10,9 @@ import {
   Maximize2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
-import {
-  useDayLog,
-  CONSUMED_GOAL,
-  BURNED_GOAL,
-  WATER_GOAL_ML,
-} from "@/lib/day-log/provider";
+import { useDayLog } from "@/lib/day-log/provider";
+import { localDateKey } from "@/lib/day-log/date-key";
+import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { Modal } from "@/components/ui/modal";
 import CalorieGauge from "../nutrition/CalorieGauge";
 import DailyCompositionCard from "../nutrition/DailyComposition";
@@ -23,21 +20,16 @@ import BarcodeLookup from "../nutrition/BarcodeLookup";
 import DietLog from "../nutrition/DietLog";
 import ActivityLog from "../nutrition/ActivityLog";
 import WaterLog, { NitroBottle } from "./WaterLog";
+import { BalanceDetails } from "./BalanceDetails";
 
 const GAUGE_RANGE = 3000;
 const GAUGE_STEP = 500;
-
-// Derive a stable YYYY-MM-DD key from a Date so both the gauge stats and the
-// composition card always read the same day's data.
-function toDateKey(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 export default function CaloriesTracker() {
   const { dict, locale } = useI18n();
   const t = dict.caloriesUser;
 
-  const { consumedFor, burnedFor, waterFor } = useDayLog();
+  const { waterFor } = useDayLog();
 
   // Quick-add food popup (barcode / saved foods, same flow as the Log view).
   const [showAddFood, setShowAddFood] = useState(false);
@@ -54,31 +46,28 @@ export default function CaloriesTracker() {
   useEffect(() => setDate(new Date()), []);
 
   const dateKey = useMemo(
-    () => (date ? toDateKey(date) : ""),
+    () => (date ? localDateKey(date) : ""),
     [date],
   );
 
-  const consumed = useMemo(
-    () => (dateKey ? consumedFor(dateKey) : 0),
-    [consumedFor, dateKey],
-  );
-  const burned = useMemo(
-    () => (dateKey ? burnedFor(dateKey) : 0),
-    [burnedFor, dateKey],
-  );
+  // Personal targets from the body profile (lib/energy/use-energy-budget.ts).
+  const budget = useEnergyBudget(dateKey);
+  const consumed = budget.eaten;
+  // Workouts only: the activity button's figure. The gauge uses the total.
+  const burned = budget.workouts;
   const waterMl = useMemo(
     () => (dateKey ? waterFor(dateKey) : 0),
     [waterFor, dateKey],
   );
 
-  // Signed calorie balance from the food perspective: eaten minus burned.
-  // Negative = deficit (burned more than eaten), positive = surplus. Drives
-  // both the needle and the center readout so they always point to the same value.
-  const balance = consumed - burned;
-  const goalBalance = CONSUMED_GOAL - BURNED_GOAL;
+  // Signed full-day balance: eaten − (base burn + workouts). Negative =
+  // deficit, positive = surplus. Drives both the needle and the center
+  // readout so they always point to the same value; the goal badge marks the
+  // deficit or surplus the profile's goal asks for.
+  const balance = budget.net;
 
   // Today's date key — used to cap forward navigation.
-  const [todayKey] = useState(() => toDateKey(new Date()));
+  const [todayKey] = useState(() => localDateKey(new Date()));
   const isToday = dateKey === todayKey;
 
   const shiftDay = (delta: number) =>
@@ -162,9 +151,9 @@ export default function CaloriesTracker() {
                 value={balance}
                 range={GAUGE_RANGE}
                 step={GAUGE_STEP}
-                goal={goalBalance}
+                goal={budget.adjustment}
                 consumed={consumed}
-                burned={burned}
+                burned={budget.totalBurned}
                 label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
                 goalLabel={t.goalLabel}
                 hideLabel
@@ -175,7 +164,7 @@ export default function CaloriesTracker() {
                   the center readout, but stay legible on wide screens. */}
               {(() => {
                 const bottles = Math.floor(waterMl / 1000);
-                const goalBottles = Math.ceil(WATER_GOAL_ML / 1000);
+                const goalBottles = Math.ceil(budget.waterGoalMl / 1000);
                 const slots = Math.min(Math.max(bottles, goalBottles), 6);
                 return (
                   <div className="absolute inset-x-0 bottom-[3%] flex flex-col items-center gap-[1cqi]">
@@ -305,18 +294,18 @@ export default function CaloriesTracker() {
         title={t.balance}
         size="md"
       >
-        <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">
-          {t.netHint}
-        </p>
+        {!isToday && (
+          <p className="text-sm text-sidebar-foreground/60 -mt-2 mb-4">{dateLabel}</p>
+        )}
         <div className="flex flex-col items-center gap-4">
           <div className="aspect-square h-56 w-56 sm:h-64 sm:w-64 shrink-0">
             <CalorieGauge
               value={balance}
               range={GAUGE_RANGE}
               step={GAUGE_STEP}
-              goal={goalBalance}
+              goal={budget.adjustment}
               consumed={consumed}
-              burned={burned}
+              burned={budget.totalBurned}
               label={balance <= 0 ? t.calorieDeficit : t.calorieSurplus}
               goalLabel={t.goalLabel}
               hideLabel
@@ -327,43 +316,7 @@ export default function CaloriesTracker() {
             {balance <= 0 ? t.deficit : t.surplus}
           </p>
 
-          <ul className="flex w-full flex-col gap-1.5 sm:gap-2">
-            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-              <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-                {t.consumed}
-              </span>
-              <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
-                +{consumed} {t.kcal}
-              </span>
-            </li>
-            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-              <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-                {t.burned}
-              </span>
-              <span className="shrink-0 tabular-nums font-bold" style={{ color: "var(--chart-3)" }}>
-                -{burned} {t.kcal}
-              </span>
-            </li>
-
-            <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
-
-            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-              <span className="min-w-0 flex-1 truncate font-semibold text-sidebar-foreground">
-                {t.net}
-              </span>
-              <span className="shrink-0 tabular-nums font-bold text-sidebar-foreground">
-                {balance > 0 ? "+" : ""}{balance} {t.kcal}
-              </span>
-            </li>
-            <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-              <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
-                {t.goal}
-              </span>
-              <span className="shrink-0 tabular-nums text-sidebar-foreground/70">
-                {goalBalance > 0 ? "+" : ""}{goalBalance} {t.kcal}
-              </span>
-            </li>
-          </ul>
+          {dateKey && <BalanceDetails dateKey={dateKey} isToday={isToday} />}
         </div>
       </Modal>
     </div>

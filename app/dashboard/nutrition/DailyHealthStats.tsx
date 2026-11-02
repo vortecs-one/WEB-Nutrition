@@ -4,14 +4,12 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Droplet, Flame, Gauge, Moon, Scale, Utensils } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
-  BURNED_GOAL,
-  CONSUMED_GOAL,
   MAX_SLEEP_MIN,
   SLEEP_GOAL_MIN,
-  WATER_GOAL_ML,
   useDayLog,
   type StressLevel,
 } from "@/lib/day-log/provider";
+import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 
 function formatSleep(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -98,16 +96,17 @@ export function DailyHealthStats({
 }) {
   const { dict } = useI18n();
   const t = dict.healthStats;
-  const { consumedFor, burnedFor, waterFor, sleepFor, setSleep, stressFor, setStress } = useDayLog();
+  const { waterFor, sleepFor, setSleep, stressFor, setStress } = useDayLog();
+  // Targets from the body profile: food budget = target + workouts.
+  const budget = useEnergyBudget(key);
   const [editingSleep, setEditingSleep] = useState(false);
 
-  const consumed = consumedFor(key);
-  const burned = burnedFor(key);
+  const consumed = budget.eaten;
   const water = waterFor(key);
   const sleep = sleepFor(key);
   const stress = stressFor(key);
 
-  const net = consumed - burned;
+  const net = budget.net;
   const stressHint = isToday ? t.stressHint : t.stressHintDay;
 
   function handleSleepSubmit(event: FormEvent<HTMLFormElement>) {
@@ -129,11 +128,19 @@ export function DailyHealthStats({
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Tile icon={<Utensils className="h-4 w-4" />} label={t.consumed}>
-          <GoalStat value={consumed} goal={CONSUMED_GOAL} unit="kcal" label={t.consumed} ofGoal={t.ofGoal} />
+          <GoalStat value={consumed} goal={budget.target + budget.workouts} unit="kcal" label={t.consumed} ofGoal={t.ofGoal} />
         </Tile>
 
         <Tile icon={<Flame className="h-4 w-4" />} label={t.burned}>
-          <GoalStat value={burned} goal={BURNED_GOAL} unit="kcal" label={t.burned} ofGoal={t.ofGoal} />
+          <p className="flex items-baseline gap-1">
+            <span className="text-xl font-semibold tabular-nums">{budget.totalBurned.toLocaleString()}</span>
+            <span className="text-xs text-sidebar-foreground/60">kcal</span>
+          </p>
+          <p className="text-xs text-sidebar-foreground/60">
+            {t.burnedDetail
+              .replace("{base}", budget.baseBurn.toLocaleString())
+              .replace("{workouts}", budget.workouts.toLocaleString())}
+          </p>
         </Tile>
 
         <Tile icon={<Scale className="h-4 w-4" />} label={t.net}>
@@ -147,7 +154,7 @@ export function DailyHealthStats({
         </Tile>
 
         <Tile icon={<Droplet className="h-4 w-4" />} label={t.hydration}>
-          <GoalStat value={water} goal={WATER_GOAL_ML} unit="ml" label={t.hydration} ofGoal={t.ofGoal} />
+          <GoalStat value={water} goal={budget.waterGoalMl} unit="ml" label={t.hydration} ofGoal={t.ofGoal} />
         </Tile>
 
         {/* Spans two columns so the five tiles fill both the 2- and 3-column grids. */}

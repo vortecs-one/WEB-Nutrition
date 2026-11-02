@@ -139,3 +139,167 @@ export function percentOfDailyValue(value: number, dailyValue: number): number {
 export function sodiumToMg(gramsValue: number | null): number | null {
   return gramsValue == null ? null : gramsValue * 1000;
 }
+
+// --- Energy balance and body measures ----------------------------------------------
+// Standard estimates for adults, not medical advice:
+//
+//   BMR (Mifflin-St Jeor)  10 × kg + 6.25 × cm − 5 × age, +5 men / −161 women
+//   base burn              BMR × activity factor (daily life, workouts excluded)
+//   goal adjustment        kg per week × 7700 ÷ 7 (1 kg of body fat ≈ 7700 kcal)
+//   food target            base burn ± goal adjustment
+//   calories left          food target + logged workouts − food eaten
+//
+// e.g. a woman of 30, 165 cm, 60 kg: BMR 1320; light activity → 1815; losing
+// 0.25 kg a week (−275) → eats 1540 kcal, plus whatever her workouts burn.
+
+export type Sex = "male" | "female";
+export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "veryActive";
+export type WeightGoal = "lose" | "maintain" | "gain";
+
+/** Daily life without workouts: desk job … physical job with lots of walking. */
+export const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
+  veryActive: 1.9,
+};
+
+/** kcal stored in 1 kg of body fat. */
+export const KCAL_PER_KG = 7700;
+
+/** Weekly weight-change rates offered to the user (kg). */
+export const WEEKLY_RATES_KG = [0.25, 0.5, 0.75] as const;
+
+/** The daily deficit or surplus never exceeds this share of the base burn. */
+export const MAX_ADJUSTMENT_SHARE = 0.25;
+
+/** Lowest food target suggested without medical supervision (kcal). */
+export const MIN_INTAKE_KCAL: Record<Sex, number> = { female: 1200, male: 1500 };
+
+/** Whole years between a YYYY-MM-DD birth date and a YYYY-MM-DD day. */
+export function ageOn(birthDate: string, dateKey: string): number {
+  const [by, bm, bd] = birthDate.slice(0, 10).split("-").map(Number);
+  const [y, m, d] = dateKey.slice(0, 10).split("-").map(Number);
+  return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0);
+}
+
+export type BodyInput = { sex: Sex; weightKg: number; heightCm: number; age: number };
+
+/** Basal metabolic rate, Mifflin-St Jeor (kcal/day). */
+export function bmrMifflin({ sex, weightKg, heightCm, age }: BodyInput): number {
+  return 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === "male" ? 5 : -161);
+}
+
+/** Calories burned by daily life (BMR × activity factor), workouts excluded. */
+export function baseBurn(bmr: number, level: ActivityLevel): number {
+  return bmr * ACTIVITY_FACTORS[level];
+}
+
+/** Daily kcal change that gains or loses `weeklyRateKg` a week (signed). */
+export function goalAdjustment(goal: WeightGoal, weeklyRateKg: number): number {
+  if (goal === "maintain") return 0;
+  const kcal = (weeklyRateKg * KCAL_PER_KG) / 7;
+  return goal === "lose" ? -kcal : kcal;
+}
+
+export type FoodTarget = {
+  /** kcal to eat in the day, workouts not included. */
+  kcal: number;
+  /** Signed daily deficit (−) or surplus (+) actually applied. */
+  adjustment: number;
+  /** Which safety limit changed the requested target, if any. */
+  limitedBy: "adjustmentCap" | "minIntake" | null;
+};
+
+/**
+ * Food target for the day: base burn ± the goal adjustment, keeping the
+ * deficit or surplus within 25% of the base burn and the target above the
+ * minimum intake.
+ */
+export function foodTarget({
+  baseBurnKcal,
+  goal,
+  weeklyRateKg,
+  sex,
+}: {
+  baseBurnKcal: number;
+  goal: WeightGoal;
+  weeklyRateKg: number;
+  sex: Sex;
+}): FoodTarget {
+  const requested = goalAdjustment(goal, weeklyRateKg);
+  const cap = baseBurnKcal * MAX_ADJUSTMENT_SHARE;
+  let adjustment = Math.max(-cap, Math.min(cap, requested));
+  let limitedBy: FoodTarget["limitedBy"] = adjustment !== requested ? "adjustmentCap" : null;
+  if (baseBurnKcal + adjustment < MIN_INTAKE_KCAL[sex]) {
+    // Never raise the target above the base burn just to reach the minimum.
+    adjustment = Math.min(0, MIN_INTAKE_KCAL[sex] - baseBurnKcal);
+    limitedBy = "minIntake";
+  }
+  return { kcal: Math.round(baseBurnKcal + adjustment), adjustment: Math.round(adjustment), limitedBy };
+}
+
+/** kcal still available today: target + workouts − food (negative = over). */
+export function caloriesLeft(targetKcal: number, workoutsKcal: number, eatenKcal: number): number {
+  return targetKcal + workoutsKcal - eatenKcal;
+}
+
+/** Body-fat change a net energy balance amounts to (kg, signed). */
+export function weightChangeKg(netKcal: number): number {
+  return netKcal / KCAL_PER_KG;
+}
+
+/** Body mass index (kg/m²). */
+export function bmi(weightKg: number, heightCm: number): number {
+  const m = heightCm / 100;
+  return weightKg / (m * m);
+}
+
+export type BmiCategory = "underweight" | "healthy" | "overweight" | "obese";
+
+/** WHO adult categories. */
+export function bmiCategory(value: number): BmiCategory {
+  if (value < 18.5) return "underweight";
+  if (value < 25) return "healthy";
+  if (value < 30) return "overweight";
+  return "obese";
+}
+
+/** Weights with a healthy BMI (18.5–24.9) for a height, in kg (1 decimal). */
+export function healthyWeightRange(heightCm: number): { minKg: number; maxKg: number } {
+  const m2 = (heightCm / 100) ** 2;
+  return { minKg: Math.round(18.5 * m2 * 10) / 10, maxKg: Math.round(24.9 * m2 * 10) / 10 };
+}
+
+/** Protein per kg of body weight: higher while losing or gaining. */
+export const PROTEIN_G_PER_KG: Record<WeightGoal, number> = { lose: 1.6, maintain: 1.2, gain: 1.6 };
+/** Share of the food target eaten as fat. */
+export const FAT_SHARE = 0.3;
+/** Recommended minimum of carbohydrate per day (g). */
+export const MIN_CARBS_G = 130;
+
+/**
+ * Macro targets in grams: protein by body weight, 30% of the kcal as fat,
+ * the rest as carbs (never under 130 g).
+ */
+export function macroTargets({
+  targetKcal,
+  weightKg,
+  goal,
+}: {
+  targetKcal: number;
+  weightKg: number;
+  goal: WeightGoal;
+}): { protein: number; fat: number; carbs: number } {
+  const protein = Math.round(weightKg * PROTEIN_G_PER_KG[goal]);
+  const fat = Math.round((targetKcal * FAT_SHARE) / KCAL_PER_GRAM.fat);
+  const carbsKcal = targetKcal - protein * KCAL_PER_GRAM.protein - fat * KCAL_PER_GRAM.fat;
+  const carbs = Math.max(MIN_CARBS_G, Math.round(carbsKcal / KCAL_PER_GRAM.carbs));
+  return { protein, fat, carbs };
+}
+
+/** Daily water from body weight (35 ml/kg), rounded to 100 ml. */
+export function waterGoalMl(weightKg: number): number {
+  return Math.round((weightKg * 35) / 100) * 100;
+}

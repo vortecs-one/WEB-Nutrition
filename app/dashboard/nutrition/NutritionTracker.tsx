@@ -5,10 +5,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import BarcodeLookup from "./BarcodeLookup";
 import ActivityLog from "./ActivityLog";
 import DietLog from "./DietLog";
-
-function toDateKey(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
+import { localDateKey } from "@/lib/day-log/date-key";
 
 export default function NutritionTracker() {
   const { dict } = useI18n();
@@ -16,7 +13,7 @@ export default function NutritionTracker() {
 
   const [todayKey, setTodayKey] = useState<string>("");
   // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only init to avoid SSR/hydration mismatch
-  useEffect(() => setTodayKey(toDateKey(new Date())), []);
+  useEffect(() => setTodayKey(localDateKey(new Date())), []);
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">

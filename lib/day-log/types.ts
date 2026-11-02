@@ -57,6 +57,12 @@ export type SleepEntry = {
   minutes: number;
 };
 
+// One weigh-in per day (grams, so it fits the integer `value` column).
+export type WeightEntry = {
+  id: number;
+  grams: number;
+};
+
 // Self-reported stress, one per day.
 export type StressLevel = 1 | 2 | 3 | 4 | 5;
 export type StressEntry = {
@@ -72,14 +78,15 @@ export type DayData = {
   water: WaterEntry[];
   sleep?: SleepEntry;
   stress?: StressEntry;
+  weight?: WeightEntry;
 };
 
 // Map from ISO date string (YYYY-MM-DD) -> that day's data.
 export type DayLog = Record<string, DayData>;
 
-// Daily targets (could later come from the user's profile / Thruxion API).
+// Fallback targets while the body profile is incomplete; with it, the
+// targets come from lib/energy/use-energy-budget.ts.
 export const CONSUMED_GOAL = 1940;
-export const BURNED_GOAL = 2383;
 export const WATER_GOAL_ML = 3000;
 export const SLEEP_GOAL_MIN = 480;
 export const MAX_SLEEP_MIN = 1440;
@@ -88,6 +95,14 @@ export const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isStressLevel(value: unknown): value is StressLevel {
   return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 5;
+}
+
+// Weigh-ins between 20 and 400 kg (same range as the database CHECK).
+export const MIN_WEIGHT_G = 20_000;
+export const MAX_WEIGHT_G = 400_000;
+
+export function isWeightGrams(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= MIN_WEIGHT_G && (value as number) <= MAX_WEIGHT_G;
 }
 
 export function isSleepMinutes(value: unknown): value is number {

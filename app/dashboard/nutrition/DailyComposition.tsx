@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
 import { DAILY_VALUE, percentOfDailyValue } from "@/lib/health-formulas";
+import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { DailyHealthStats } from "./DailyHealthStats";
 
 // Daily nutrient composition for one date key (the day selected in the
@@ -38,6 +39,8 @@ function useDailyComposition(dateKey: string) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { dayData } = useDayLog();
+  // Personal macro targets (grams), once the body profile is complete.
+  const { macros } = useEnergyBudget(dateKey);
 
   const { meals, supplements } = useMemo(
     () => dayData(dateKey),
@@ -117,42 +120,81 @@ function useDailyComposition(dateKey: string) {
     key === "fat"     ? nutrientTotals.fat ?? 0 :
     null;
 
-  return { t, data, total, extraNutrients, gramsFor };
+  const targetFor = (key: string) =>
+    macros && (key === "protein" || key === "carbs" || key === "fat") ? macros[key] : null;
+
+  return { t, data, total, extraNutrients, gramsFor, targetFor };
 }
 
 type CompositionSlice = { key: string; label: string; value: number; fill: string };
 type ExtraNutrient = { key: string; label: string; value: number; unit: string; pct: number | null };
 
-// Macro row — compact list shows the gram quantity; details show grams
-// alongside the percentage. The donut itself (slices, center label, tooltip)
-// stays percentage-based regardless — only this text row changes.
+// Macro row — compact list shows the gram quantity (over its daily target
+// when the profile gives one); details show grams alongside the percentage,
+// plus progress toward the target. The donut itself (slices, center label,
+// tooltip) stays percentage-based regardless — only this text row changes.
 function MacroRow({
   slice,
   grams,
+  target,
   total,
   unitG,
+  ofTarget,
   detailed,
 }: {
   slice: CompositionSlice;
   grams: number | null;
+  /** Daily target in grams, null without a complete profile. */
+  target: number | null;
   total: number;
   unitG: string;
+  /** "of {goal} g" caption for the progress bar. */
+  ofTarget: string;
   detailed: boolean;
 }) {
   const pct = total > 0 ? Math.round((slice.value / total) * 100) : 0;
+  const color = COLOR_MAP[slice.key] ?? "inherit";
   return (
-    <li className="flex items-center gap-2 text-[11px] sm:text-sm">
-      <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
-        {slice.label}
-      </span>
-      {detailed && grams != null && (
-        <span className="shrink-0 tabular-nums text-sidebar-foreground/50 text-[11px]">
-          {grams}{unitG}
+    <li className="flex flex-col gap-1">
+      <div className="flex items-center gap-2 text-[11px] sm:text-sm">
+        <span className="min-w-0 flex-1 truncate text-sidebar-foreground/70">
+          {slice.label}
         </span>
+        {detailed && grams != null && (
+          <span className="shrink-0 tabular-nums text-sidebar-foreground/50 text-[11px]">
+            {grams}{unitG}
+            {target != null && ` ${ofTarget.replace("{goal}", String(target))}`}
+          </span>
+        )}
+        <span className="shrink-0 font-bold tabular-nums min-w-10 text-right" style={{ color }}>
+          {detailed ? (
+            `${pct}%`
+          ) : grams != null ? (
+            <>
+              {grams}
+              {target != null && <span className="font-normal text-sidebar-foreground/50">/{target}</span>}
+              {unitG}
+            </>
+          ) : (
+            `${pct}%`
+          )}
+        </span>
+      </div>
+      {detailed && grams != null && target != null && (
+        <div
+          role="progressbar"
+          aria-label={slice.label}
+          aria-valuemin={0}
+          aria-valuemax={target}
+          aria-valuenow={Math.min(grams, target)}
+          className="h-1.5 w-full overflow-hidden rounded-full bg-sidebar-foreground/10"
+        >
+          <div
+            className="h-full rounded-full transition-[width]"
+            style={{ width: `${Math.min(100, Math.round((grams / target) * 100))}%`, background: color }}
+          />
+        </div>
       )}
-      <span className="shrink-0 font-bold tabular-nums min-w-10 text-right" style={{ color: COLOR_MAP[slice.key] ?? "inherit" }}>
-        {detailed ? `${pct}%` : grams != null ? `${grams}${unitG}` : `${pct}%`}
-      </span>
     </li>
   );
 }
@@ -285,7 +327,8 @@ function CompositionDonut({
 
 /** Compact rows (macros in grams, then sugars and sodium) beside a small donut. */
 export function CompositionSummary({ dateKey }: { dateKey: string }) {
-  const { t, data, total, extraNutrients, gramsFor } = useDailyComposition(dateKey);
+  const { dict } = useI18n();
+  const { t, data, total, extraNutrients, gramsFor, targetFor } = useDailyComposition(dateKey);
 
   // The compact list omits saturated fat and fiber; they're shown in the details only.
   const listNutrients = extraNutrients.filter(
@@ -296,7 +339,7 @@ export function CompositionSummary({ dateKey }: { dateKey: string }) {
     <div className="flex items-center gap-3 sm:gap-4">
       <ul className="flex min-w-0 flex-1 flex-col gap-1 sm:gap-1.5">
         {data.map((d) => (
-          <MacroRow key={d.key} slice={d} grams={gramsFor(d.key)} total={total} unitG={t.unitG} detailed={false} />
+          <MacroRow key={d.key} slice={d} grams={gramsFor(d.key)} target={targetFor(d.key)} total={total} unitG={t.unitG} ofTarget={dict.energy.macroOf} detailed={false} />
         ))}
 
         {/* Divider before extra nutrients */}
@@ -314,7 +357,8 @@ export function CompositionSummary({ dateKey }: { dateKey: string }) {
 
 /** Donut + every nutrient with grams and percentages. */
 export function CompositionDetails({ dateKey }: { dateKey: string }) {
-  const { t, data, total, extraNutrients, gramsFor } = useDailyComposition(dateKey);
+  const { dict } = useI18n();
+  const { t, data, total, extraNutrients, gramsFor, targetFor } = useDailyComposition(dateKey);
 
   return (
     // Reversed: the list reads first and the donut sits to its right, also on
@@ -324,7 +368,7 @@ export function CompositionDetails({ dateKey }: { dateKey: string }) {
 
       <ul className="flex w-full min-w-0 flex-col gap-1.5 sm:gap-2">
         {data.map((d) => (
-          <MacroRow key={d.key} slice={d} grams={gramsFor(d.key)} total={total} unitG={t.unitG} detailed />
+          <MacroRow key={d.key} slice={d} grams={gramsFor(d.key)} target={targetFor(d.key)} total={total} unitG={t.unitG} ofTarget={dict.energy.macroOf} detailed />
         ))}
 
         <li role="separator" className="my-1 border-t border-sidebar-foreground/10" />
