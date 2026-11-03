@@ -10,8 +10,10 @@ import type { GlucoseRole } from "@/lib/glucose/types";
 export default function GlucoseRoleBadge({
   role,
   tinted = false,
+  showIcon = true,
 }: {
   role: GlucoseRole;
+  showIcon?: boolean;
   // On a surface colored by the glucose status (the companion card), take the
   // surface's ink instead of the sidebar palette.
   tinted?: boolean;
@@ -29,7 +31,7 @@ export default function GlucoseRoleBadge({
     <span
       className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-xs ${palette}`}
     >
-      <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+      {showIcon && <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />}
       {isOwner ? dict.glucose.roleOwner : dict.glucose.roleWatcher}
     </span>
   );

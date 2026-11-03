@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Activity,
   Users,
+  UserRound,
   Cpu,
   BellRing,
   Settings2,
@@ -925,28 +926,28 @@ export default function GlucoseTracker({
                 {current ? `: ${statusLabel[currentStatus]}` : ""}
               </div>
               {current && (
-                <div className="mt-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] sm:text-xs text-sidebar-foreground/60">
                   <div className="truncate">
                     {currentMins === 0
                       ? t.justNow
                       : t.lastUpdated.replace("{min}", String(currentMins))}
                   </div>
                   {isStale && (
-                    <div className="mt-0.5 flex items-start gap-1 text-destructive">
+                    <div className="flex items-start gap-1 text-destructive">
                       <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
                       <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
                     </div>
                   )}
                 </div>
               )}
-              {settings.source === "librelinkup" && data?.patientName && (
-                <div className="mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
-                  <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{data.patientName}</span>
-                </div>
-              )}
-              <div className="mt-1.5">
-                <GlucoseRoleBadge role={viewerRole} />
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                {settings.source === "librelinkup" && data?.patientName && (
+                  <div className="flex min-w-0 items-center gap-1.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                    <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{data.patientName}</span>
+                  </div>
+                )}
+                <GlucoseRoleBadge role={viewerRole} showIcon={false} />
               </div>
             </div>
           </div>
