@@ -2,19 +2,22 @@
 
 // Server-side proxy for glucose data sources.
 //
-// Two sources are supported (selected per user in glucose_settings.source):
+// Three sources are supported (selected per user in glucose_settings.source):
 //   - Nightscout: the user's own Nightscout instance (URL + token)
 //   - LibreLinkUp: Abbott's follower API — real-time readings from the
 //     LibreLink app on the same account ("patient" / main reading) or from
 //     followed patients ("friend" / remote reading).
+//   - CareLink (Medtronic): no API — readings come from the CareLink
+//     Personal CSV export, parsed in the browser (see carelink-csv.ts) and
+//     stored in carelink_readings.
 //
 // All secrets (Nightscout token, LibreLinkUp password, session tokens) live
 // only in Neon and in this file's fetches — the browser/WebView never talks
 // to Nightscout or LibreView directly (no CORS issues, secrets never exposed).
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { glucoseSettings } from "@/drizzle/schema";
+import { carelinkReadings, glucoseSettings } from "@/drizzle/schema";
 import { auth } from "@/auth";
 import { getGlucoseOwnerEmail, glucoseRoleForEmail } from "./access";
 import type {
@@ -33,6 +36,7 @@ import {
   libreLogin,
   type LibreSession,
 } from "./librelinkup";
+import { CARELINK_IMPORT_CHUNK, isPlausibleReading, type CareLinkCsvReading } from "./carelink-csv";
 
 // The signed-in glucose user: their role (owner / watcher, see access.ts),
 // their stable per-user key (same pattern as day-log: prefer the Thruxion
@@ -119,12 +123,19 @@ function toClientSettings(row: SettingsRow, role: GlucoseRole): GlucoseSettings 
   const isOwner = role === "owner";
   return {
     role,
-    source: row.source === "librelinkup" ? "librelinkup" : "nightscout",
+    source:
+      row.source === "librelinkup"
+        ? "librelinkup"
+        : row.source === "carelink"
+          ? "carelink"
+          : "nightscout",
     nightscoutUrl: isOwner ? row.nightscoutUrl : null,
     hasToken: isOwner && Boolean(row.nightscoutToken),
     libreEmail: isOwner ? row.libreEmail : null,
     hasLibreCredentials: isOwner && Boolean(row.libreEmail && row.librePassword),
     librePatientId: row.librePatientId,
+    careLinkLastImportAt: row.carelinkLastImportAt ? row.carelinkLastImportAt.getTime() : null,
+    careLinkReadingCount: row.carelinkReadingCount ?? 0,
     unit: (row.unit === "mmol" ? "mmol" : "mgdl") as GlucoseUnit,
     lowThreshold: row.lowThreshold,
     highThreshold: row.highThreshold,
@@ -233,7 +244,7 @@ function withSourceThresholds(
 }
 
 export type SaveGlucoseSettingsInput = {
-  source: "nightscout" | "librelinkup";
+  source: "nightscout" | "librelinkup" | "carelink";
   // Nightscout fields (required when source === "nightscout")
   nightscoutUrl?: string;
   /** New token; empty string clears it; undefined keeps the stored one. */
@@ -299,6 +310,26 @@ export async function saveGlucoseSettings(
       source: "nightscout" as const,
       nightscoutUrl: url,
       nightscoutToken: token,
+    };
+
+    const [row] = await db
+      .insert(glucoseSettings)
+      .values(values)
+      .onConflictDoUpdate({ target: glucoseSettings.userKey, set: values })
+      .returning();
+
+    return { ok: true, settings: toClientSettings(row, "owner") };
+  }
+
+  // --- CareLink source ---
+  // No credentials to validate here (CSV import only, for now — see
+  // importCareLinkCsv, which also upserts this same row and is the usual
+  // way CareLink actually gets activated). This branch just lets the owner
+  // pick CareLink as their active source before ever importing a file.
+  if (input.source === "carelink") {
+    const values = {
+      ...shared,
+      source: "carelink" as const,
     };
 
     const [row] = await db
@@ -621,7 +652,170 @@ export async function fetchGlucoseData(hours: number): Promise<GlucoseFetchResul
   if (row.source === "librelinkup") {
     return fetchFromLibre(row, role, windowHours);
   }
+  if (row.source === "carelink") {
+    return fetchFromCareLinkImport(row, role, windowHours);
+  }
   return fetchFromNightscout(row, role, windowHours);
+}
+
+/**
+ * CareLink has no live endpoint to call — "fetching" here means reading
+ * back whatever importCareLinkReadings has previously written to
+ * carelinkReadings. The window ends at the newest stored reading rather
+ * than at now: imports are periodic snapshots, so a window ending now would
+ * come back empty whenever the last import is older than the selected
+ * range. Always ok:true once the source is configured (even with zero
+ * rows): that's a legitimate "picked CareLink, haven't imported a file yet"
+ * state, not a configuration error.
+ */
+async function fetchFromCareLinkImport(
+  row: SettingsRow,
+  role: GlucoseRole,
+  windowHours: number,
+): Promise<GlucoseFetchResult> {
+  const [latest] = await db
+    .select({ date: carelinkReadings.date })
+    .from(carelinkReadings)
+    .where(eq(carelinkReadings.userKey, row.userKey))
+    .orderBy(desc(carelinkReadings.date))
+    .limit(1);
+
+  const rows = latest
+    ? await db
+        .select({ date: carelinkReadings.date, sgv: carelinkReadings.sgv })
+        .from(carelinkReadings)
+        .where(
+          and(
+            eq(carelinkReadings.userKey, row.userKey),
+            gte(carelinkReadings.date, new Date(latest.date.getTime() - windowHours * 3600_000)),
+          ),
+        )
+        .orderBy(carelinkReadings.date)
+    : [];
+
+  // CareLink's export carries no trend-direction equivalent to Nightscout's
+  // `direction` field, so every reading is reported as NONE.
+  const readings: GlucoseReading[] = rows.map((r) => ({
+    sgv: r.sgv,
+    date: r.date.getTime(),
+    direction: "NONE" as TrendDirection,
+  }));
+
+  return {
+    ok: true,
+    data: {
+      current: readings.length > 0 ? readings[readings.length - 1] : null,
+      readings,
+      settings: toClientSettings(row, role),
+      patientName: null,
+      patients: [],
+      // CSV imports carry no sensor or LibreLink threshold data.
+      sensor: null,
+      libreThresholds: null,
+    },
+  };
+}
+
+// --- CareLink CSV import -----------------------------------------------------
+
+export type ImportCareLinkReadingsResult =
+  | { ok: true; added: number; totalStored: number; settings: GlucoseSettings }
+  | { ok: false; error: string };
+
+/**
+ * Stores one chunk of the readings parseCareLinkCsv pulled out of a CareLink
+ * export in the browser (see carelink-csv.ts for why parsing happens there).
+ * The import form sends a file's readings in chunks of at most
+ * CARELINK_IMPORT_CHUNK, one call each, and every reading is re-checked here
+ * since anything can arrive from the client. Also activates "carelink" as
+ * the owner's source — uploading a CareLink file is unambiguous intent, so
+ * this doesn't require a separate Save click first. Re-importing a file with
+ * overlapping dates is a safe no-op (the (userKey, date) unique constraint on
+ * carelinkReadings skips duplicates).
+ */
+export async function importCareLinkReadings(
+  readings: CareLinkCsvReading[],
+): Promise<ImportCareLinkReadingsResult> {
+  const viewer = await getViewer();
+  if (viewer?.role !== "owner") return { ok: false, error: "unauthenticated" };
+  if (!Array.isArray(readings) || readings.length > CARELINK_IMPORT_CHUNK) {
+    return { ok: false, error: "invalid" };
+  }
+  const { userKey, email } = viewer;
+
+  const now = new Date();
+  const values = readings
+    .filter((r) => isPlausibleReading(r, now.getTime()))
+    .map((r) => ({ userKey, date: new Date(r.date), sgv: r.sgv }));
+  if (values.length === 0) return { ok: false, error: "no-readings" };
+
+  const inserted = await db
+    .insert(carelinkReadings)
+    .values(values)
+    .onConflictDoNothing({ target: [carelinkReadings.userKey, carelinkReadings.date] })
+    .returning({ id: carelinkReadings.id });
+
+  // Counted rather than added up, so the cached total can't drift.
+  const totalStored = await db.$count(carelinkReadings, eq(carelinkReadings.userKey, userKey));
+
+  const existing = await getSettingsRow(userKey);
+  const unit: GlucoseUnit = existing?.unit === "mmol" ? "mmol" : "mgdl";
+
+  const settingsValues = {
+    ...(existing
+      ? {
+          lowThreshold: existing.lowThreshold,
+          highThreshold: existing.highThreshold,
+          targetLow: existing.targetLow,
+          targetHigh: existing.targetHigh,
+        }
+      : DEFAULT_THRESHOLDS),
+    userKey,
+    ownerEmail: email,
+    source: "carelink" as const,
+    unit,
+    enabled: true,
+    carelinkLastImportAt: now,
+    carelinkReadingCount: totalStored,
+    updatedAt: now,
+  };
+
+  const [row] = await db
+    .insert(glucoseSettings)
+    .values(settingsValues)
+    .onConflictDoUpdate({ target: glucoseSettings.userKey, set: settingsValues })
+    .returning();
+
+  return {
+    ok: true,
+    added: inserted.length,
+    totalStored,
+    settings: toClientSettings(row, "owner"),
+  };
+}
+
+export type ClearCareLinkReadingsResult =
+  | { ok: true; settings: GlucoseSettings | null }
+  | { ok: false; error: string };
+
+/**
+ * Deletes every CareLink reading imported for the owner — the undo for an
+ * import that came out wrong. The CSV export stays the source of truth, so
+ * importing it again restores everything. The active source stays
+ * "carelink"; switching sources is the settings form's job.
+ */
+export async function clearCareLinkReadings(): Promise<ClearCareLinkReadingsResult> {
+  const userKey = await getOwnerKey();
+  if (!userKey) return { ok: false, error: "unauthenticated" };
+
+  await db.delete(carelinkReadings).where(eq(carelinkReadings.userKey, userKey));
+  const [row] = await db
+    .update(glucoseSettings)
+    .set({ carelinkReadingCount: 0, carelinkLastImportAt: null, updatedAt: new Date() })
+    .where(eq(glucoseSettings.userKey, userKey))
+    .returning();
+
+  return { ok: true, settings: row ? toClientSettings(row, "owner") : null };
 }
 
 async function fetchFromNightscout(

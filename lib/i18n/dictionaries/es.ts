@@ -494,6 +494,9 @@ const es = {
     sourceLibre: "LibreLinkUp",
     sourceLibreHint:
       "Lee la glucosa directamente de los servidores de Abbott: los mismos datos que las apps LibreLink y LibreLinkUp. Funciona con tu propio sensor (lectura principal) y con pacientes que sigues (lectura remota).",
+    sourceCareLink: "CareLink (Medtronic)",
+    sourceCareLinkHint:
+      "Importa lecturas desde tu exportación CSV de CareLink Personal (Medtronic). No hay conexión en vivo: descarga una exportación nueva periódicamente desde tu cuenta de CareLink Personal y súbela aquí para actualizar tus datos.",
     // --- Configuración de LibreLinkUp ---
     libreSettingsTitle: "Conectar LibreLinkUp",
     libreSettingsSubtitle:
@@ -516,6 +519,43 @@ const es = {
       "Ingresa tu correo y contraseña de LibreLinkUp.",
     libreTestUnreachable:
       "No se pudo conectar con LibreLinkUp. Verifica tu conexión e inténtalo de nuevo.",
+    // --- Configuración de CareLink (importación de CSV) ---
+    // Nombre de marca de la fuente conectada — igual en todos los idiomas.
+    careLinkAppName: "CareLink",
+    careLinkSettingsTitle: "Importar desde CareLink (Medtronic)",
+    careLinkSettingsSubtitle:
+      'Medtronic no tiene una conexión en vivo para leer, así que esto funciona con el archivo CSV que tú mismo exportas: en CareLink Personal, ve a Informes y usa "Exportación de datos (CSV)".',
+    careLinkFileLabel: "Archivo CSV de CareLink",
+    careLinkFileHint:
+      'El archivo que descargas desde la página de Informes de CareLink Personal ("Exportación de datos (CSV)").',
+    // Vista previa: el archivo se lee en el navegador y se muestra antes de
+    // guardar nada, porque el formato real del CSV aún no está confirmado.
+    careLinkPreviewTitle: "Revisa antes de importar",
+    careLinkPreviewSummary: "{count} lecturas, del {from} al {to}",
+    careLinkPreviewRange: "Valores de {min} a {max} {unit}",
+    careLinkPreviewColumns: "Leído de: {columns} · unidad del archivo: {unit}",
+    careLinkPreviewDateGuess:
+      "Las fechas de este archivo no indican si va primero el día o el mes; se leyeron como {order}. Revisa las fechas de arriba.",
+    careLinkPreviewSkipped: "Se omitirán {count} fila(s) con fecha o valor ilegible.",
+    careLinkImportButton: "Importar {count} lecturas",
+    careLinkImportProgress: "Importando... {done} / {total}",
+    careLinkImportSuccess:
+      "{added} lectura(s) nueva(s) importada(s) ({skipped} ya estaban guardadas).",
+    careLinkImportFailed:
+      "La importación se detuvo tras {done} de {total} lecturas. Inténtalo de nuevo: las lecturas ya guardadas se omiten.",
+    careLinkImportEmpty: "Este archivo está vacío.",
+    careLinkImportNoReadings: "No se pudieron leer lecturas de glucosa en este archivo.",
+    careLinkImportUnrecognized:
+      "No se pudo leer este archivo. Verifica que sea la exportación CSV de CareLink Personal.",
+    careLinkLastImport: "Última importación: {time} ({count} lecturas guardadas)",
+    careLinkNoImportYet: "Aún no se ha importado ningún dato.",
+    careLinkDeleteButton: "Borrar datos importados",
+    careLinkDeleteConfirm:
+      "¿Borrar las {count} lecturas importadas de CareLink? Puedes volver a importar el archivo CSV después.",
+    careLinkDeleteError: "No se pudieron borrar los datos importados. Inténtalo de nuevo.",
+    // Línea de frescura de la tarjeta: los datos de CareLink son históricos,
+    // así que se muestra la hora de la lectura en vez de "hace N min".
+    careLinkReadingFrom: "Lectura importada · {time}",
     // --- Selector de paciente ---
     patientLabel: "Paciente",
     patientOwn: "Lectura principal",

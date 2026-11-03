@@ -206,6 +206,16 @@ export default function GlucoseTracker({
 
   const unit = settings?.unit ?? "mgdl";
   const current = data?.current ?? null;
+  const currentMins = current ? minutesAgo(current.date) : null;
+  const readingIsOld = currentMins !== null && currentMins > STALE_MINUTES;
+  // CareLink has no live feed: its readings come from periodic CSV imports,
+  // so an old reading is the normal state between imports, not a sensor or
+  // upload problem — no red stale warning (the card shows when the reading
+  // was taken instead). An old reading is still old, though: it must not
+  // pass for the current glucose in the insulin calculator or the companion.
+  const isCareLink = settings?.source === "carelink";
+  const isStale = !isCareLink && readingIsOld;
+  const historicalOnly = isCareLink && readingIsOld;
   // null while there's no reading to classify. The reading is also published
   // for the companion, which takes its colors, its corner readout and its mood
   // from it.
@@ -213,7 +223,7 @@ export default function GlucoseTracker({
     current && settings ? glucoseStatus(current.sgv, settings) : null;
   const currentStatus: GlucoseStatus = liveStatus ?? "in-range";
   usePublishGlucose(
-    current && liveStatus && settings
+    current && liveStatus && settings && !historicalOnly
       ? {
           status: liveStatus,
           sgv: current.sgv,
@@ -225,8 +235,6 @@ export default function GlucoseTracker({
         }
       : null,
   );
-  const currentMins = current ? minutesAgo(current.date) : null;
-  const isStale = currentMins !== null && currentMins > STALE_MINUTES;
   const TrendIcon = current ? TREND_ICON[current.direction] : null;
 
   const statusLabel: Record<GlucoseStatus, string> = {
@@ -774,9 +782,11 @@ export default function GlucoseTracker({
               {current && (
                 <div className="mt-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
                   <div className="truncate">
-                    {currentMins === 0
-                      ? t.justNow
-                      : t.lastUpdated.replace("{min}", String(currentMins))}
+                    {isCareLink
+                      ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
+                      : currentMins === 0
+                        ? t.justNow
+                        : t.lastUpdated.replace("{min}", String(currentMins))}
                   </div>
                   {isStale && (
                     <div className="mt-0.5 flex items-start gap-1 text-destructive">
@@ -829,10 +839,12 @@ export default function GlucoseTracker({
         </button>
       </section>
 
+      {/* An imported CareLink reading that's no longer fresh is history, not
+          the current glucose: leave it out so the calculator asks for one. */}
       <InsulinCalculator
         isOpen={showCalculator}
         onClose={() => setShowCalculator(false)}
-        currentMgdl={current?.sgv ?? null}
+        currentMgdl={historicalOnly ? null : (current?.sgv ?? null)}
         isStale={isStale}
         settings={settings}
       />
@@ -928,9 +940,11 @@ export default function GlucoseTracker({
               {current && (
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] sm:text-xs text-sidebar-foreground/60">
                   <div className="truncate">
-                    {currentMins === 0
-                      ? t.justNow
-                      : t.lastUpdated.replace("{min}", String(currentMins))}
+                    {isCareLink
+                      ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
+                      : currentMins === 0
+                        ? t.justNow
+                        : t.lastUpdated.replace("{min}", String(currentMins))}
                   </div>
                   {isStale && (
                     <div className="flex items-start gap-1 text-destructive">
@@ -1068,7 +1082,11 @@ export default function GlucoseTracker({
               <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
             )}
             <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
-              {settings.source === "librelinkup" ? t.libreAppName : t.sourceNightscout}
+              {settings.source === "librelinkup"
+                ? t.libreAppName
+                : settings.source === "carelink"
+                  ? t.careLinkAppName
+                  : t.sourceNightscout}
             </h3>
             {/* The source login and settings belong to the sensor owner */}
             {isOwner && (

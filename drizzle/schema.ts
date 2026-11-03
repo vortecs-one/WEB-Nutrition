@@ -11,6 +11,7 @@ import {
   boolean,
   index,
   primaryKey,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // === Usuarios ===
@@ -152,10 +153,13 @@ export const dayLogEntries = pgTable(
 );
 
 // === Configuración de glucosa (Nightscout) ===
-// Per-user Nightscout connection settings for the glucose monitoring
-// feature. One row per user (same `userKey` pattern as day_log_entries:
-// Thruxion human_id, falling back to email). Readings are NOT stored here —
-// Nightscout is the source of truth; we only persist the connection config.
+// Per-user connection settings for the glucose monitoring feature. One row
+// per user (same `userKey` pattern as day_log_entries: Thruxion human_id,
+// falling back to email). For Nightscout/LibreLinkUp, readings are NOT
+// stored here — the source itself is the source of truth; we only persist
+// the connection config. CareLink is the one exception: Medtronic has no
+// API, only a manual CSV export, so its readings ARE persisted — see
+// carelinkReadings below.
 export const glucoseSettings = pgTable("glucose_settings", {
   id: serial("id").primaryKey(),
   // Stable per-user key: Thruxion human_id, falling back to email.
@@ -163,7 +167,7 @@ export const glucoseSettings = pgTable("glucose_settings", {
   // Email of the sensor owner this row belongs to (lowercased). Health
   // watchers can't derive the owner's user_key, so they find the row by this.
   ownerEmail: text("owner_email"),
-  // Data source for glucose readings: "nightscout" | "librelinkup".
+  // Data source for glucose readings: "nightscout" | "librelinkup" | "carelink".
   source: varchar("source", { length: 20 }).notNull().default("nightscout"),
   // Base URL of the user's Nightscout instance (normalized, no trailing slash).
   // Nullable: users on the LibreLinkUp source don't need Nightscout.
@@ -190,6 +194,17 @@ export const glucoseSettings = pgTable("glucose_settings", {
   libreAccountType: varchar("libre_account_type", { length: 10 }),
   // First + last name from the LibreView user object, used as display label.
   libreDisplayName: text("libre_display_name"),
+  // --- CareLink (Medtronic) ---
+  // Reserved for a possible future automated-polling source (not built yet —
+  // see the project plan). CSV import needs no credentials, so these are
+  // unused placeholders today; no password/token column exists until then.
+  carelinkUsername: text("carelink_username"),
+  carelinkPatientId: text("carelink_patient_id"),
+  // Cached from carelinkReadings so settings reads stay a synchronous row
+  // mapper (see toClientSettings) instead of a second query on every poll.
+  // Updated by importCareLinkCsv after each import.
+  carelinkLastImportAt: timestamp("carelink_last_import_at", { withTimezone: true }),
+  carelinkReadingCount: integer("carelink_reading_count").notNull().default(0),
   // Display unit: "mgdl" | "mmol". Values are always stored/fetched in mg/dL.
   unit: varchar("unit", { length: 10 }).notNull().default("mgdl"),
   // Alert thresholds in mg/dL (dashed lines on the chart).
@@ -206,6 +221,36 @@ export const glucoseSettings = pgTable("glucose_settings", {
     .notNull()
     .defaultNow(),
 });
+
+// === Lecturas importadas de CareLink (Medtronic) ===
+// Unlike Nightscout/LibreLinkUp, CareLink has no API — only the manual CSV
+// export from CareLink Personal's reports page. These rows are the
+// persisted result of parsing that export; "fetching" CareLink data means
+// querying this table instead of calling an external API.
+export const carelinkReadings = pgTable(
+  "carelink_readings",
+  {
+    id: serial("id").primaryKey(),
+    userKey: text("user_key").notNull(),
+    // Epoch timestamp of the reading, parsed from the CSV's (timezone-less,
+    // local-time) date/time columns.
+    date: timestamp("date", { withTimezone: true }).notNull(),
+    // Sensor glucose value in mg/dL (converted at import time if the export
+    // was in mmol/L).
+    sgv: integer("sgv").notNull(),
+    importedAt: timestamp("imported_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    // Makes re-uploading an export with overlapping dates a safe no-op
+    // (ON CONFLICT DO NOTHING), and serves the per-user window queries.
+    userDateUnique: unique("carelink_readings_user_date_unique").on(
+      table.userKey,
+      table.date,
+    ),
+  }),
+);
 
 // === AI photo scans: daily counter that caps AI Gateway spend ===
 // One row per user per day, plus a "__global__" row for the app-wide cap.

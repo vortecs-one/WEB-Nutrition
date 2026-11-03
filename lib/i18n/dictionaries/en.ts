@@ -491,6 +491,9 @@ const en: Dictionary = {
     sourceLibre: "LibreLinkUp",
     sourceLibreHint:
       "Reads glucose directly from Abbott's servers — the same data as the LibreLink and LibreLinkUp apps. Works for your own sensor (main reading) and for patients you follow (remote reading).",
+    sourceCareLink: "CareLink (Medtronic)",
+    sourceCareLinkHint:
+      "Imports readings from your Medtronic CareLink Personal CSV export. There's no live connection — download a new export periodically from your CareLink Personal account and upload it here to refresh your data.",
     // --- LibreLinkUp settings ---
     libreSettingsTitle: "Connect LibreLinkUp",
     libreSettingsSubtitle:
@@ -510,6 +513,42 @@ const en: Dictionary = {
     libreMissingCredentials: "Enter your LibreLinkUp email and password.",
     libreTestUnreachable:
       "Could not reach LibreLinkUp. Check your connection and try again.",
+    // --- CareLink settings (CSV import) ---
+    // Brand name of the connected source — same in every locale.
+    careLinkAppName: "CareLink",
+    careLinkSettingsTitle: "Import from CareLink (Medtronic)",
+    careLinkSettingsSubtitle:
+      'Medtronic has no live connection to read from, so this works from the CSV file you export yourself: in CareLink Personal, go to Informes (Reports) and use "Exportación de datos (CSV)".',
+    careLinkFileLabel: "CareLink CSV file",
+    careLinkFileHint:
+      'The file you download from CareLink Personal\'s Informes page ("Exportación de datos (CSV)").',
+    // Preview: the file is read in the browser and shown before anything is
+    // saved, since the real CSV layout isn't confirmed yet.
+    careLinkPreviewTitle: "Check before importing",
+    careLinkPreviewSummary: "{count} readings, {from} to {to}",
+    careLinkPreviewRange: "Values from {min} to {max} {unit}",
+    careLinkPreviewColumns: "Read from: {columns} · unit in the file: {unit}",
+    careLinkPreviewDateGuess:
+      "This file's dates don't show whether the day or the month comes first; they were read as {order}. Check the dates above.",
+    careLinkPreviewSkipped: "{count} row(s) with an unreadable date or value will be skipped.",
+    careLinkImportButton: "Import {count} readings",
+    careLinkImportProgress: "Importing... {done} / {total}",
+    careLinkImportSuccess: "{added} new reading(s) imported ({skipped} already stored).",
+    careLinkImportFailed:
+      "The import stopped after {done} of {total} readings. Try again — readings already stored are skipped.",
+    careLinkImportEmpty: "This file is empty.",
+    careLinkImportNoReadings: "No glucose readings could be read from this file.",
+    careLinkImportUnrecognized:
+      "Could not read this file. Make sure it's the CSV export from CareLink Personal.",
+    careLinkLastImport: "Last import: {time} ({count} readings stored)",
+    careLinkNoImportYet: "No data imported yet.",
+    careLinkDeleteButton: "Delete imported data",
+    careLinkDeleteConfirm:
+      "Delete all {count} imported CareLink readings? You can import the CSV file again afterwards.",
+    careLinkDeleteError: "Could not delete the imported data. Try again.",
+    // Card freshness line: CareLink data is historical, so it shows when the
+    // reading was taken instead of "N min ago".
+    careLinkReadingFrom: "Imported reading · {time}",
     // --- Patient switcher ---
     patientLabel: "Patient",
     patientOwn: "Main reading",

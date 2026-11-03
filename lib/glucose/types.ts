@@ -34,7 +34,12 @@ export type GlucoseUnit = "mgdl" | "mmol";
 // - "nightscout": the user's own Nightscout instance
 // - "librelinkup": Abbott's LibreLinkUp follower API (same data the
 //   LibreLink / LibreLinkUp apps show, main sensor + followed patients)
-export type GlucoseSource = "nightscout" | "librelinkup";
+// - "carelink": Medtronic CareLink Personal (MiniMed pump + Guardian
+//   sensor). No API exists, so this is CSV-import based — see
+//   lib/glucose/carelink-csv.ts — and, unlike the other two sources,
+//   readings are persisted (carelinkReadings in drizzle/schema.ts) rather
+//   than fetched live on every poll.
+export type GlucoseSource = "nightscout" | "librelinkup" | "carelink";
 
 // A patient connection visible to the LibreLinkUp account (client-safe).
 export type LibrePatientInfo = {
@@ -93,6 +98,10 @@ export type GlucoseSettings = {
   hasLibreCredentials: boolean;
   /** Currently selected LibreLinkUp patient connection. */
   librePatientId: string | null;
+  /** Epoch ms of the most recent CareLink CSV import, or null if none yet. */
+  careLinkLastImportAt: number | null;
+  /** Total readings currently stored from CareLink imports. */
+  careLinkReadingCount: number;
   unit: GlucoseUnit;
   lowThreshold: number;
   highThreshold: number;
