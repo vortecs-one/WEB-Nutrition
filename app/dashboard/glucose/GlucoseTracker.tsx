@@ -49,11 +49,14 @@ import {
   sensorWarmUpEndsAt,
   splitDuration,
 } from "@/lib/glucose/types";
+import { chartTimeTicks } from "@/lib/glucose/chart-time";
 import { usePublishGlucose } from "@/lib/glucose/status-provider";
 import { TREND_ICON } from "@/lib/glucose/trend-icons";
 import { mgdlToMmol } from "@/lib/health-formulas";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
+import GlucoseRangeSelector from "./GlucoseRangeSelector";
+import GlucoseReadingPill from "./GlucoseReadingPill";
 import GlucoseRoleBadge from "./GlucoseRoleBadge";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
 import InsulinCalculator from "./InsulinCalculator";
@@ -63,17 +66,9 @@ type RangeHours = (typeof RANGES)[number];
 
 const REFRESH_MS = 60_000;
 
-// Status → card accent classes (background + text pairs kept together for
-// contrast, per design guidelines).
-const statusCard: Record<GlucoseStatus, string> = {
-  "in-range": "bg-lime-400 text-lime-950",
-  high: "bg-amber-500 text-amber-950",
-  low: "bg-amber-500 text-amber-950",
-  urgent: "bg-destructive text-destructive-foreground",
-};
-
-// SVG counterpart of statusCard, for the chart's endpoint badge — Tailwind
-// classes can't paint SVG fills, so keep the two in sync by hand.
+// SVG counterpart of the reading pill's status colors (statusCard in
+// GlucoseReadingPill.tsx), for the chart's endpoint badge — Tailwind classes
+// can't paint SVG fills, so keep the two in sync by hand.
 // `ink` is chosen against the fill's luminance rather than read from a theme
 // token: the app defines no --destructive-foreground or amber scale.
 const statusBadge: Record<GlucoseStatus, { fill: string; ink: string }> = {
@@ -349,6 +344,43 @@ export default function GlucoseTracker({
   const timeFormatter = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+  // Time axis: a fixed window ending at the current time (the 30s clock tick
+  // keeps it moving), not at the first/last reading — so the last label is the
+  // current hour, and the line simply stops where the readings do. An imported
+  // CareLink history that's no longer fresh has no "now" to end at, so its
+  // window ends at its last reading. Never earlier than the last reading, so a
+  // device clock slightly behind the source can't cut the line off.
+  const axisEnd =
+    historicalOnly && lastReadingAt !== null
+      ? lastReadingAt
+      : Math.max(Date.now(), lastReadingAt ?? 0);
+  const axisStart = axisEnd - rangeHours * 3600_000;
+
+  // Round times plus the end time as the last label, brighter and bolder so it
+  // reads as "now". It's centered on the plot's right edge, so the charts keep
+  // a right margin of half its width.
+  const timeTick = (fontSize: number, opacity: number) => {
+    const TimeTick = (props: unknown) => {
+      const { x, y, payload } = props as { x: number; y: number; payload: { value: number } };
+      const isEnd = payload.value === axisEnd;
+      return (
+        <text
+          x={x}
+          y={y}
+          dy="0.71em"
+          textAnchor="middle"
+          fill="currentColor"
+          fillOpacity={isEnd ? 1 : opacity}
+          fontSize={fontSize}
+          fontWeight={isEnd ? 600 : 400}
+        >
+          {timeFormatter(payload.value)}
+        </text>
+      );
+    };
+    return TimeTick;
+  };
+
   // Vertical zone gradient: green where the curve is inside the target range,
   // red outside it. Shared by both charts, which have different y-domains — so
   // the stops are computed per-domain and each chart gets its own gradient ids
@@ -449,83 +481,32 @@ export default function GlucoseTracker({
     );
   }
 
-  // Range selector (3h/6h/12h/24h) — reused in the compact card and the
-  // expanded detail popup; both drive the same `rangeHours` state.
+  // Range selector (3h/6h/12h/24h) above the detail chart; drives the same
+  // `rangeHours` state the polling reads.
   const rangeSelector = (
-    <div
-      role="group"
-      aria-label={t.chartTitle}
-      className="flex rounded-full bg-sidebar-accent p-1"
-    >
-      {/* LibreLinkUp's graph endpoint only returns ~12h of history. */}
-      {RANGES.filter(
-        (h) => settings.source !== "librelinkup" || h <= 12,
-      ).map((h) => (
-        <button
-          key={h}
-          type="button"
-          onClick={() => setRangeHours(h)}
-          aria-pressed={rangeHours === h}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-            rangeHours === h
-              ? "bg-sidebar text-sidebar-foreground shadow-sm"
-              : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
-          }`}
-        >
-          {h === 3 ? t.range3h : h === 6 ? t.range6h : h === 12 ? t.range12h : t.range24h}
-        </button>
-      ))}
-    </div>
+    <GlucoseRangeSelector
+      // LibreLinkUp's graph endpoint only returns ~12h of history.
+      ranges={RANGES.filter((h) => settings.source !== "librelinkup" || h <= 12)}
+      value={rangeHours}
+      onChange={(h) => setRangeHours(h as RangeHours)}
+      labels={{ 3: t.range3h, 6: t.range6h, 12: t.range12h, 24: t.range24h }}
+      ariaLabel={t.chartTitle}
+    />
   );
 
-  // Current-reading pill — big value + unit + trend arrow, tinted by status.
-  // Shared by the compact card header and the detail view header.
-  const readingPill = (
-    <div
-      className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 transition-colors ${statusCard[currentStatus]}`}
-    >
-      <div className="flex flex-col items-center leading-none">
-        <span className="text-2xl sm:text-3xl font-bold tabular-nums leading-none">
-          {current ? formatGlucose(current.sgv, unit) : "--"}
-        </span>
-        <span className="mt-0.5 text-xs sm:text-sm font-bold opacity-90">{unitLabel(unit)}</span>
-      </div>
-      {TrendIcon && (
-        <TrendIcon
-          className="h-8 w-8 sm:h-10 sm:w-10 shrink-0"
-          strokeWidth={2.75}
-          role="img"
-          aria-label={current?.direction}
-        />
-      )}
-    </div>
-  );
-
-  // Display-unit toggle — sits beside the range selector above the detail
-  // chart, styled to match it.
-  const unitSelector = (
-    <div
-      role="group"
-      aria-label={t.unit}
-      className="flex rounded-full bg-sidebar-accent p-1"
-    >
-      {(["mgdl", "mmol"] as const).map((u) => (
-        <button
-          key={u}
-          type="button"
-          onClick={() => handleUnitChange(u)}
-          aria-pressed={unit === u}
-          disabled={savingUnit}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition disabled:opacity-60 ${
-            unit === u
-              ? "bg-sidebar text-sidebar-foreground shadow-sm"
-              : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
-          }`}
-        >
-          {u === "mgdl" ? t.unitMgdl : t.unitMmol}
-        </button>
-      ))}
-    </div>
+  // Current-reading pill — big value + trend arrow, tinted by status. The
+  // compact card header shows it plain; the detail view header merges the
+  // display-unit switch into it (withUnitSwitch).
+  const readingPill = (withUnitSwitch: boolean) => (
+    <GlucoseReadingPill
+      value={current ? formatGlucose(current.sgv, unit) : "--"}
+      unit={unit}
+      status={currentStatus}
+      TrendIcon={TrendIcon}
+      direction={current?.direction}
+      onUnitChange={withUnitSwitch ? handleUnitChange : undefined}
+      savingUnit={savingUnit}
+    />
   );
 
   // Chart body — fills whatever height its wrapper provides, so the same JSX
@@ -561,14 +542,18 @@ export default function GlucoseTracker({
           <XAxis
             dataKey="date"
             type="number"
-            domain={["dataMin", "dataMax"]}
-            tickFormatter={timeFormatter}
-            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.6 }}
+            domain={[axisStart, axisEnd]}
+            ticks={chartTimeTicks(axisStart, axisEnd, 5)}
+            interval={0}
+            tick={timeTick(12, 0.6)}
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            minTickGap={64}
           />
+          {/* "Now": a hairline at the window's end while the readings are live. */}
+          {!historicalOnly && (
+            <ReferenceLine x={axisEnd} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1} />
+          )}
           <YAxis
             domain={yScale.domain}
             ticks={yScale.ticks}
@@ -728,7 +713,7 @@ export default function GlucoseTracker({
       </div>
     ) : (
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 128 }}>
-        <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 28, bottom: 0, left: 8 }}>
           <defs>
             <linearGradient id="glucose-compact-stroke" x1="0" y1="0" x2="0" y2="1">
               {zoneStopsFor(vMin, vMax, 1)}
@@ -740,12 +725,12 @@ export default function GlucoseTracker({
           <XAxis
             dataKey="date"
             type="number"
-            domain={["dataMin", "dataMax"]}
-            tickFormatter={timeFormatter}
-            tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+            domain={[axisStart, axisEnd]}
+            ticks={chartTimeTicks(axisStart, axisEnd, 3)}
+            interval={0}
+            tick={timeTick(10, 0.5)}
             tickLine={false}
             axisLine={false}
-            minTickGap={60}
           />
           <YAxis domain={[vMin, vMax]} hide />
           <Tooltip content={renderTooltip} wrapperStyle={{ outline: "none" }} />
@@ -771,17 +756,21 @@ export default function GlucoseTracker({
         {/* Header: reading pill + meta on the left, actions on the right */}
         <div className="flex items-start justify-between gap-2" aria-live="polite">
           <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-            {readingPill}
-            {/* Meta: label + status on one line, then freshness (patient name
-                lives in the detail view) */}
-            <div className="min-w-0">
+            {readingPill(false)}
+            {/* Meta: label + status, the role chip, then freshness with the
+                stale warning to its right (patient name lives in the detail
+                view) */}
+            <div className="flex min-w-0 flex-col gap-1">
               <div className="truncate text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80">
                 {t.currentReading}
                 {current ? `: ${statusLabel[currentStatus]}` : ""}
               </div>
+              <div className="self-start">
+                <GlucoseRoleBadge role={viewerRole} />
+              </div>
               {current && (
-                <div className="mt-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
-                  <div className="truncate">
+                <div className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                  <div className={isStale ? "shrink-0" : "min-w-0 truncate"}>
                     {isCareLink
                       ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
                       : currentMins === 0
@@ -789,7 +778,7 @@ export default function GlucoseTracker({
                         : t.lastUpdated.replace("{min}", String(currentMins))}
                   </div>
                   {isStale && (
-                    <div className="mt-0.5 flex items-start gap-1 text-destructive">
+                    <div className="flex min-w-[6.5rem] flex-1 items-start gap-1 text-destructive">
                       <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
                       <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
                     </div>
@@ -812,18 +801,15 @@ export default function GlucoseTracker({
               )}
             </div>
           </div>
-          {/* Role chip + action: open the detail view (chart, sensor, settings) */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            <GlucoseRoleBadge role={viewerRole} />
-            <button
-              type="button"
-              onClick={() => setShowChart(true)}
-              aria-label={t.title}
-              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
-            >
-              <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            </button>
-          </div>
+          {/* Action: open the detail view (chart, sensor, settings) */}
+          <button
+            type="button"
+            onClick={() => setShowChart(true)}
+            aria-label={t.title}
+            className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full hover:bg-sidebar-accent active:scale-95 transition"
+          >
+            <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+          </button>
         </div>
 
         {/* Panoramic simplified chart — full detail + range selector in the expand popup */}
@@ -930,15 +916,18 @@ export default function GlucoseTracker({
             here: the card header already announces this value, and a second
             live region would double-announce while the modal is open. */}
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          {/* Text sized for the (two-row) reading pill beside it: three stacked
+              lines come out about as tall as the pill. Not stretched to it —
+              a wrapping stale warning would otherwise blow the pill up. */}
           <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-            {readingPill}
-            <div className="min-w-0">
-              <div className="truncate text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80">
+            {readingPill(true)}
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <div className="truncate text-sm sm:text-base font-semibold uppercase tracking-wide text-sidebar-foreground/80">
                 {t.currentReading}
                 {current ? `: ${statusLabel[currentStatus]}` : ""}
               </div>
               {current && (
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] sm:text-xs text-sidebar-foreground/60">
+                <div className="flex flex-wrap items-center gap-x-2 text-xs sm:text-sm text-sidebar-foreground/60">
                   <div className="truncate">
                     {isCareLink
                       ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
@@ -948,27 +937,30 @@ export default function GlucoseTracker({
                   </div>
                   {isStale && (
                     <div className="flex items-start gap-1 text-destructive">
-                      <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
-                      <span className="text-[9px] sm:text-[10px]">{t.staleWarning}</span>
+                      <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span className="text-xs">{t.staleWarning}</span>
                     </div>
                   )}
                 </div>
               )}
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 {settings.source === "librelinkup" && data?.patientName && (
-                  <div className="flex min-w-0 items-center gap-1.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
-                    <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs sm:text-sm text-sidebar-foreground/60">
+                    <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">{data.patientName}</span>
                   </div>
                 )}
-                <GlucoseRoleBadge role={viewerRole} showIcon={false} />
+                <GlucoseRoleBadge role={viewerRole} showIcon={false} size="lg" />
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {unitSelector}
-            {rangeSelector}
-          </div>
+        </div>
+        {/* Chart caption + time window, in a row of their own above the plot. */}
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
+            {t.chartTitle}
+          </h3>
+          {rangeSelector}
         </div>
         {/* Wide/rectangular plot box — the aspect ratio includes the x-axis
             band, so the axis labels never spill into a nested scroll. */}

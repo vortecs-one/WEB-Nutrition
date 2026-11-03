@@ -11,9 +11,12 @@ export default function GlucoseRoleBadge({
   role,
   tinted = false,
   showIcon = true,
+  size = "sm",
 }: {
   role: GlucoseRole;
   showIcon?: boolean;
+  // "lg" for the detail header, where the chip sits beside the large reading pill.
+  size?: "sm" | "lg";
   // On a surface colored by the glucose status (the companion card), take the
   // surface's ink instead of the sidebar palette.
   tinted?: boolean;
@@ -29,7 +32,9 @@ export default function GlucoseRoleBadge({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-xs ${palette}`}
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full font-semibold ${
+        size === "lg" ? "px-2.5 py-1 text-xs sm:text-sm" : "px-2 py-0.5 text-[10px] sm:text-xs"
+      } ${palette}`}
     >
       {showIcon && <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />}
       {isOwner ? dict.glucose.roleOwner : dict.glucose.roleWatcher}
