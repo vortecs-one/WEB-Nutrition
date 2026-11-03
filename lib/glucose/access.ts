@@ -14,8 +14,16 @@ export type { GlucoseRole };
 
 const normalize = (email: string) => email.trim().toLowerCase();
 
+let warnedMissingOwner = false;
+
 export function getGlucoseOwnerEmail(): string | null {
   const owner = normalize(process.env.GLUCOSE_OWNER_EMAIL ?? "");
+  // A deployment without the variable silently locks glucose and the
+  // exclusive companions for everyone; leave a trace in the runtime logs.
+  if (!owner && !warnedMissingOwner && process.env.NODE_ENV === "production") {
+    warnedMissingOwner = true;
+    console.warn("[glucose] GLUCOSE_OWNER_EMAIL is not set: glucose and exclusive companions are disabled");
+  }
   return owner || null;
 }
 
