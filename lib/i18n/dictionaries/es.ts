@@ -38,6 +38,7 @@ const es = {
     myNutrition: "Registro",
     myCalories: "Panel",
     myGlucose: "Glucosa",
+    insulinPump: "Bomba de insulina",
   },
   topbar: {
     plan: "Estandar",
@@ -488,15 +489,16 @@ const es = {
     loading: "Cargando lecturas...",
     disclaimer:
       "Esta información es solo de referencia. No la uses para decisiones de tratamiento; consulta siempre a tu equipo médico.",
-    // --- Selector de fuente de datos ---
-    sourceLabel: "Fuente de datos",
+    // --- Selector de sensor ---
+    sourceLabel: "Sensor de glucosa",
     sourceNightscout: "Nightscout",
     sourceLibre: "LibreLinkUp",
     sourceLibreHint:
       "Lee la glucosa directamente de los servidores de Abbott: los mismos datos que las apps LibreLink y LibreLinkUp. Funciona con tu propio sensor (lectura principal) y con pacientes que sigues (lectura remota).",
-    sourceCareLink: "CareLink (Medtronic)",
+    // Sensor de Medtronic; sus lecturas llegan a CareLink a través de la app MiniMed.
+    sourceCareLink: "Guardian 3",
     sourceCareLinkHint:
-      "Importa lecturas desde tu exportación CSV de CareLink Personal (Medtronic). No hay conexión en vivo: descarga una exportación nueva periódicamente desde tu cuenta de CareLink Personal y súbela aquí para actualizar tus datos.",
+      "Las lecturas del Guardian 3 llegan a CareLink a través de la app MiniMed. No hay conexión en vivo: importa la exportación de CareLink desde la página Bomba de insulina.",
     // --- Configuración de LibreLinkUp ---
     libreSettingsTitle: "Conectar LibreLinkUp",
     libreSettingsSubtitle:
@@ -519,11 +521,13 @@ const es = {
       "Ingresa tu correo y contraseña de LibreLinkUp.",
     libreTestUnreachable:
       "No se pudo conectar con LibreLinkUp. Verifica tu conexión e inténtalo de nuevo.",
-    // --- Configuración de CareLink (importación de CSV) ---
-    // Nombre de marca de la fuente conectada — igual en todos los idiomas.
-    careLinkAppName: "CareLink",
-    careLinkSettingsTitle: "Importar desde CareLink (Medtronic)",
-    careLinkSettingsSubtitle:
+    // --- Guardian 3 / CareLink (importación de CSV, en la página Bomba de insulina) ---
+    // Nombre de marca de la app detrás de la fuente — igual en todos los idiomas.
+    careLinkAppName: "MiniMed",
+    careLinkSettingsTitle: "Sensor Guardian 3",
+    careLinkSettingsSubtitle: "Medtronic · a través de la app MiniMed y CareLink",
+    careLinkImportTitle: "Importar desde CareLink",
+    careLinkImportSubtitle:
       'Medtronic no tiene una conexión en vivo para leer, así que esto funciona con el archivo CSV que tú mismo exportas: en CareLink Personal, ve a Informes y usa "Exportación de datos (CSV)".',
     careLinkFileLabel: "Archivo CSV de CareLink",
     careLinkFileHint:
@@ -556,6 +560,21 @@ const es = {
     // Línea de frescura de la tarjeta: los datos de CareLink son históricos,
     // así que se muestra la hora de la lectura en vez de "hace N min".
     careLinkReadingFrom: "Lectura importada · {time}",
+    // --- Página Bomba de insulina (MiniMed 780G + CareLink) ---
+    pump: {
+      title: "Bomba de insulina",
+      devices: "MiniMed 780G · sensor Guardian 3 · CareLink",
+      back: "Volver al panel",
+      open: "Bomba",
+      openPage: "Abrir la página Bomba de insulina",
+      useAsSensorPrompt:
+        "La tarjeta de glucosa está leyendo de {sensor}. ¿Mostrar ahí las lecturas importadas del Guardian 3?",
+      useAsSensorButton: "Usar Guardian 3 como sensor",
+      useAsSensorError: "No se pudo cambiar el sensor. Inténtalo de nuevo.",
+      dataTitle: "Datos de la bomba",
+      dataSoon:
+        "Los bolos, la basal, los carbohidratos y los cambios de reservorio o de set aparecerán aquí cuando el formato de la exportación de CareLink se confirme con un archivo real.",
+    },
     // --- Selector de paciente ---
     patientLabel: "Paciente",
     patientOwn: "Lectura principal",

@@ -3,10 +3,12 @@
 // Glucose monitor: big current-reading card with trend arrow + status color,
 // a patient switcher (LibreLinkUp main/remote readings), and a history chart
 // with target band and high/low threshold lines (modeled on the classic
-// Nightscout dark chart). Data comes from the configured source: LibreLinkUp
-// (same data as the LibreLink app) or Nightscout.
+// Nightscout dark chart). Data comes from the configured sensor: LibreLinkUp
+// (same data as the LibreLink app), Nightscout, or Guardian 3 (imported from
+// CareLink on the Insulin pump page).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   Activity,
@@ -18,6 +20,7 @@ import {
   Info,
   Maximize2,
   Syringe,
+  Droplet,
 } from "lucide-react";
 import {
   AreaChart,
@@ -757,16 +760,16 @@ export default function GlucoseTracker({
         <div className="flex items-start justify-between gap-2" aria-live="polite">
           <div className="flex min-w-0 items-start gap-2 sm:gap-3">
             {readingPill(false)}
-            {/* Meta: label + status, the role chip, then freshness with the
+            {/* Meta: the role chip, label + status, then freshness with the
                 stale warning to its right (patient name lives in the detail
                 view) */}
             <div className="flex min-w-0 flex-col gap-1">
+              <div className="self-start">
+                <GlucoseRoleBadge role={viewerRole} />
+              </div>
               <div className="truncate text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/80">
                 {t.currentReading}
                 {current ? `: ${statusLabel[currentStatus]}` : ""}
-              </div>
-              <div className="self-start">
-                <GlucoseRoleBadge role={viewerRole} />
               </div>
               {current && (
                 <div className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-[10px] sm:text-xs text-sidebar-foreground/60">
@@ -815,14 +818,28 @@ export default function GlucoseTracker({
         {/* Panoramic simplified chart — full detail + range selector in the expand popup */}
         <div className="mt-3 h-32 sm:h-40 w-full">{compactChart}</div>
 
-        <button
-          type="button"
-          onClick={() => setShowCalculator(true)}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-purple-500 active:scale-[0.99]"
-        >
-          <Syringe className="h-4 w-4" aria-hidden="true" />
-          {t.calculator.open}
-        </button>
+        {/* Calculator, plus the way to the Insulin pump page — users have no
+            menu on small screens, so this is its only entry point there. */}
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowCalculator(true)}
+            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-purple-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-purple-500 active:scale-[0.99]"
+          >
+            <Syringe className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {/* Wraps rather than truncates: the Spanish label doesn't fit
+                beside the pump link on a phone. */}
+            <span className="text-balance text-center leading-tight">{t.calculator.open}</span>
+          </button>
+          <Link
+            href="/dashboard/pump"
+            aria-label={t.pump.title}
+            className="flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-sidebar-accent px-4 py-3 text-sm font-medium transition hover:text-sidebar-foreground active:scale-[0.99]"
+          >
+            <Droplet className="h-4 w-4" aria-hidden="true" />
+            {t.pump.open}
+          </Link>
+        </div>
       </section>
 
       {/* An imported CareLink reading that's no longer fresh is history, not
@@ -922,6 +939,15 @@ export default function GlucoseTracker({
           <div className="flex min-w-0 items-start gap-2 sm:gap-3">
             {readingPill(true)}
             <div className="flex min-w-0 flex-col gap-1.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {settings.source === "librelinkup" && data?.patientName && (
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs sm:text-sm text-sidebar-foreground/60">
+                    <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{data.patientName}</span>
+                  </div>
+                )}
+                <GlucoseRoleBadge role={viewerRole} showIcon={false} size="lg" />
+              </div>
               <div className="truncate text-sm sm:text-base font-semibold uppercase tracking-wide text-sidebar-foreground/80">
                 {t.currentReading}
                 {current ? `: ${statusLabel[currentStatus]}` : ""}
@@ -943,15 +969,6 @@ export default function GlucoseTracker({
                   )}
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                {settings.source === "librelinkup" && data?.patientName && (
-                  <div className="flex min-w-0 items-center gap-1.5 text-xs sm:text-sm text-sidebar-foreground/60">
-                    <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{data.patientName}</span>
-                  </div>
-                )}
-                <GlucoseRoleBadge role={viewerRole} showIcon={false} size="lg" />
-              </div>
             </div>
           </div>
         </div>

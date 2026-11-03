@@ -10,12 +10,19 @@ import ThemeSelector from "@/components/ThemeSelector";
 // - lg and up: fixed sidebar alongside the content (classic dashboard).
 // - below lg: native-style top tab bar (under the header) for primary
 //   navigation, keeping the experience app-like inside the mobile webview.
-export default function DashboardShell({ children }: { children: ReactNode }) {
+export default function DashboardShell({
+  children,
+  hasGlucose,
+}: {
+  children: ReactNode;
+  /** Whether the user has glucose access (adds the Insulin pump page). */
+  hasGlucose: boolean;
+}) {
   return (
     <div className="min-h-screen flex bg-background text-foreground">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:shrink-0">
-        <Sidebar />
+        <Sidebar hasGlucose={hasGlucose} />
       </div>
 
       {/* Right side: top bar + mobile tabs + page content */}

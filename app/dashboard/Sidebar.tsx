@@ -11,14 +11,17 @@ import { getNavItems } from "./nav";
 
 export default function Sidebar({
   onNavigate,
+  hasGlucose = false,
 }: {
   /** Called when a link is clicked — used to close any mobile drawer. */
   onNavigate?: () => void;
+  /** Whether the user has glucose access (adds the Insulin pump page). */
+  hasGlucose?: boolean;
 }) {
   const pathname = usePathname();
   const { dict } = useI18n();
   const role = useRole();
-  const navItems = getNavItems(role, dict);
+  const navItems = getNavItems(role, dict, { glucose: hasGlucose });
 
   const [open, setOpen] = useState<Record<string, boolean>>({
     anthropometry: true,

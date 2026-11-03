@@ -2,8 +2,9 @@
 import type { ReactNode } from "react";
 import DashboardShell from "./DashboardShell";
 import { DayLogProvider } from "@/lib/day-log/provider";
+import { canAccessGlucose } from "@/lib/glucose/access";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
   modal,
 }: {
@@ -11,9 +12,12 @@ export default function DashboardLayout({
   // Popups opened over the current page (intercepted routes, see @modal).
   modal: ReactNode;
 }) {
+  // Glucose access adds the Insulin pump page to a user's menu.
+  const hasGlucose = await canAccessGlucose();
+
   return (
     <DayLogProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell hasGlucose={hasGlucose}>{children}</DashboardShell>
       {modal}
     </DayLogProvider>
   );

@@ -8,9 +8,9 @@
 // actions.ts's importCareLinkReadings, which stores what this parser
 // returns, and fetchFromCareLinkImport, which reads it back).
 //
-// Runs in the browser (GlucoseSettingsForm), not on the server: CareLink
-// timestamps are local time with no timezone marker, and the browser's
-// timezone is the household's while the server's is UTC. A full export can
+// Runs in the browser (app/dashboard/pump/CareLinkImport.tsx), not on the
+// server: CareLink timestamps are local time with no timezone marker, and
+// the browser's timezone is the household's while the server's is UTC. A full export can
 // also be several MB — over the server-action body limit — while the
 // readings pulled out of it are a fraction of that. The server re-checks
 // every reading with isPlausibleReading before storing it.

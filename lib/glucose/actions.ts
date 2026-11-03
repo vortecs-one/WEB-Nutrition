@@ -7,9 +7,10 @@
 //   - LibreLinkUp: Abbott's follower API — real-time readings from the
 //     LibreLink app on the same account ("patient" / main reading) or from
 //     followed patients ("friend" / remote reading).
-//   - CareLink (Medtronic): no API — readings come from the CareLink
-//     Personal CSV export, parsed in the browser (see carelink-csv.ts) and
-//     stored in carelink_readings.
+//   - CareLink (Medtronic, shown as the Guardian 3 sensor): no API — readings
+//     come from the CareLink Personal CSV export, imported on the Insulin
+//     pump page, parsed in the browser (see carelink-csv.ts) and stored in
+//     carelink_readings.
 //
 // All secrets (Nightscout token, LibreLinkUp password, session tokens) live
 // only in Neon and in this file's fetches — the browser/WebView never talks
@@ -146,12 +147,19 @@ function toClientSettings(row: SettingsRow, role: GlucoseRole): GlucoseSettings 
 }
 
 async function getSettingsRow(userKey: string): Promise<SettingsRow | null> {
-  const [row] = await db
-    .select()
-    .from(glucoseSettings)
-    .where(eq(glucoseSettings.userKey, userKey))
-    .limit(1);
-  return row ?? null;
+  try {
+    const [row] = await db
+      .select()
+      .from(glucoseSettings)
+      .where(eq(glucoseSettings.userKey, userKey))
+      .limit(1);
+    return row ?? null;
+  } catch (err) {
+    // Drizzle's "Failed query" message hides the pg/network error; log it.
+    const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+    console.error("[glucose] settings read failed:", cause?.code, cause?.message);
+    throw err;
+  }
 }
 
 // The row whose readings the viewer sees. The owner reads their own row and
@@ -321,11 +329,11 @@ export async function saveGlucoseSettings(
     return { ok: true, settings: toClientSettings(row, "owner") };
   }
 
-  // --- CareLink source ---
+  // --- CareLink source (Guardian 3 sensor) ---
   // No credentials to validate here (CSV import only, for now — see
-  // importCareLinkCsv, which also upserts this same row and is the usual
-  // way CareLink actually gets activated). This branch just lets the owner
-  // pick CareLink as their active source before ever importing a file.
+  // importCareLinkReadings, which stores the readings but leaves the active
+  // source alone). This branch is how the owner makes Guardian 3 the active
+  // sensor, before or after importing a file.
   if (input.source === "carelink") {
     const values = {
       ...shared,
@@ -727,11 +735,13 @@ export type ImportCareLinkReadingsResult =
  * export in the browser (see carelink-csv.ts for why parsing happens there).
  * The import form sends a file's readings in chunks of at most
  * CARELINK_IMPORT_CHUNK, one call each, and every reading is re-checked here
- * since anything can arrive from the client. Also activates "carelink" as
- * the owner's source — uploading a CareLink file is unambiguous intent, so
- * this doesn't require a separate Save click first. Re-importing a file with
- * overlapping dates is a safe no-op (the (userKey, date) unique constraint on
- * carelinkReadings skips duplicates).
+ * since anything can arrive from the client. Doesn't change the owner's
+ * active sensor: while Guardian 3 and LibreLinkUp are both in use, importing
+ * must not turn the live feed off — the sensor is picked in the glucose
+ * settings (or the pump page's "Use Guardian 3" button). Only an owner with
+ * no settings row yet gets "carelink", since there's nothing else to use.
+ * Re-importing a file with overlapping dates is a safe no-op (the (userKey,
+ * date) unique constraint on carelinkReadings skips duplicates).
  */
 export async function importCareLinkReadings(
   readings: CareLinkCsvReading[],
@@ -772,7 +782,7 @@ export async function importCareLinkReadings(
       : DEFAULT_THRESHOLDS),
     userKey,
     ownerEmail: email,
-    source: "carelink" as const,
+    source: existing?.source ?? "carelink",
     unit,
     enabled: true,
     carelinkLastImportAt: now,
@@ -801,8 +811,8 @@ export type ClearCareLinkReadingsResult =
 /**
  * Deletes every CareLink reading imported for the owner — the undo for an
  * import that came out wrong. The CSV export stays the source of truth, so
- * importing it again restores everything. The active source stays
- * "carelink"; switching sources is the settings form's job.
+ * importing it again restores everything. The active source is left as it
+ * is; switching sensors is the settings form's job.
  */
 export async function clearCareLinkReadings(): Promise<ClearCareLinkReadingsResult> {
   const userKey = await getOwnerKey();

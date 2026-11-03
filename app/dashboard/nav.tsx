@@ -13,6 +13,7 @@ import {
   Boxes,
   UserCircle,
   Flame,
+  Droplet,
   type LucideProps,
 } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -79,9 +80,9 @@ function nutritionistNav(dict: Dictionary): NavItem[] {
   ];
 }
 
-function userNav(dict: Dictionary): NavItem[] {
+function userNav(dict: Dictionary, glucose: boolean): NavItem[] {
   const t = dict.nav;
-  return [
+  const items: NavItem[] = [
     {
       key: "myProfile",
       label: t.myProfile,
@@ -101,10 +102,19 @@ function userNav(dict: Dictionary): NavItem[] {
       icon: Salad,
     },
   ];
+  // MiniMed 780G + CareLink, only for people with glucose access.
+  if (glucose) {
+    items.push({ key: "pump", label: t.insulinPump, href: "/dashboard/pump", icon: Droplet });
+  }
+  return items;
 }
 
-export function getNavItems(role: Role, dict: Dictionary): NavItem[] {
-  return role === "user" ? userNav(dict) : nutritionistNav(dict);
+export function getNavItems(
+  role: Role,
+  dict: Dictionary,
+  { glucose = false }: { glucose?: boolean } = {},
+): NavItem[] {
+  return role === "user" ? userNav(dict, glucose) : nutritionistNav(dict);
 }
 
 // Icons kept around so tree-shaking doesn't drop ones used by future items.
