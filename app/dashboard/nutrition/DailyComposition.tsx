@@ -350,7 +350,7 @@ export function CompositionSummary({ dateKey }: { dateKey: string }) {
         ))}
       </ul>
 
-      <CompositionDonut data={data} total={total} t={t} compact className="h-24 w-24 sm:h-28 sm:w-28" />
+      <CompositionDonut data={data} total={total} t={t} compact className="h-28 w-28 sm:h-32 sm:w-32" />
     </div>
   );
 }
@@ -364,7 +364,7 @@ export function CompositionDetails({ dateKey }: { dateKey: string }) {
     // Reversed: the list reads first and the donut sits to its right, also on
     // phones (where the donut shrinks to leave the list its room).
     <div className="flex flex-row-reverse items-center gap-3 sm:gap-6">
-      <CompositionDonut data={data} total={total} t={t} interactive className="h-32 w-32 sm:h-48 sm:w-48" />
+      <CompositionDonut data={data} total={total} t={t} interactive className="h-40 w-40 sm:h-56 sm:w-56" />
 
       <ul className="flex w-full min-w-0 flex-col gap-1.5 sm:gap-2">
         {data.map((d) => (

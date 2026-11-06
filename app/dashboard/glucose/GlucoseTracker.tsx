@@ -512,6 +512,56 @@ export default function GlucoseTracker({
     />
   );
 
+  // Endpoint badge shared by the detail chart and the card's compact chart.
+  // Only the latest point is labelled — the axis and tooltip carry the rest,
+  // and a value on every point would be unreadable. The badge is tinted by the
+  // same status as the reading pill above, and shows the same trend arrow
+  // rather than repeating the numeric value already shown big in that pill.
+  const renderTrendMarker = (props: unknown) => {
+    const { x, y, value, index } = props as {
+      x?: number; y?: number; value?: number; index?: number;
+    };
+    if (index !== chartData.length - 1) return null;
+    if (typeof x !== "number" || typeof y !== "number") return null;
+    const r = 10;
+    const badge = statusBadge[currentStatus];
+    return (
+      <g>
+        <circle cx={x} cy={y} r={r + 6} fill={badge.fill} fillOpacity={0.22} />
+        <circle
+          cx={x}
+          cy={y}
+          r={r}
+          fill={badge.fill}
+          stroke="var(--color-sidebar)"
+          strokeWidth={2}
+        />
+        {TrendIcon ? (
+          <TrendIcon
+            x={x - 8}
+            y={y - 8}
+            width={16}
+            height={16}
+            color={badge.ink}
+            strokeWidth={2.75}
+          />
+        ) : (
+          <text
+            x={x}
+            y={y}
+            fill={badge.ink}
+            fontSize={11}
+            fontWeight={700}
+            textAnchor="middle"
+            dominantBaseline="central"
+          >
+            {String(value)}
+          </text>
+        )}
+      </g>
+    );
+  };
+
   // Chart body — fills whatever height its wrapper provides, so the same JSX
   // renders in the compact card (h-64/72) and the expanded popup (h-[60vh]).
   const chartContent =
@@ -639,58 +689,7 @@ export default function GlucoseTracker({
             activeDot={{ r: 5, strokeWidth: 2.5, stroke: "var(--color-sidebar)" }}
             isAnimationActive={false}
           >
-            {/* Only the latest point is labelled — the axis and tooltip carry
-                the rest, and a value on every point would be unreadable. The
-                badge is tinted by the same status as the reading pill above,
-                and shows the same trend arrow rather than repeating the
-                numeric value already shown big in that pill. */}
-            <LabelList
-              dataKey="value"
-              content={(props) => {
-                const { x, y, value, index } = props as {
-                  x?: number; y?: number; value?: number; index?: number;
-                };
-                if (index !== chartData.length - 1) return null;
-                if (typeof x !== "number" || typeof y !== "number") return null;
-                const r = 10;
-                const badge = statusBadge[currentStatus];
-                return (
-                  <g>
-                    <circle cx={x} cy={y} r={r + 6} fill={badge.fill} fillOpacity={0.22} />
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={r}
-                      fill={badge.fill}
-                      stroke="var(--color-sidebar)"
-                      strokeWidth={2}
-                    />
-                    {TrendIcon ? (
-                      <TrendIcon
-                        x={x - 8}
-                        y={y - 8}
-                        width={16}
-                        height={16}
-                        color={badge.ink}
-                        strokeWidth={2.75}
-                      />
-                    ) : (
-                      <text
-                        x={x}
-                        y={y}
-                        fill={badge.ink}
-                        fontSize={11}
-                        fontWeight={700}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                      >
-                        {String(value)}
-                      </text>
-                    )}
-                  </g>
-                );
-              }}
-            />
+            <LabelList dataKey="value" content={renderTrendMarker} />
           </Area>
         </AreaChart>
       </ResponsiveContainer>
@@ -716,7 +715,7 @@ export default function GlucoseTracker({
       </div>
     ) : (
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 128 }}>
-        <AreaChart data={chartData} margin={{ top: 4, right: 28, bottom: 0, left: 8 }}>
+        <AreaChart data={chartData} margin={{ top: 14, right: 28, bottom: 0, left: 8 }}>
           <defs>
             <linearGradient id="glucose-compact-stroke" x1="0" y1="0" x2="0" y2="1">
               {zoneStopsFor(vMin, vMax, 1)}
@@ -746,7 +745,9 @@ export default function GlucoseTracker({
             dot={false}
             activeDot={{ r: 4 }}
             isAnimationActive={false}
-          />
+          >
+            <LabelList dataKey="value" content={renderTrendMarker} />
+          </Area>
         </AreaChart>
       </ResponsiveContainer>
     );
