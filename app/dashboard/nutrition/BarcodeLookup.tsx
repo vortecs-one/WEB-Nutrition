@@ -42,6 +42,7 @@ import { sodiumToMg } from "@/lib/health-formulas";
 import NutritionFacts from "./NutritionFacts";
 import BarcodeScanner from "./BarcodeScanner";
 import FoodPhotoScanner from "./FoodPhotoScanner";
+import ContributeProduct from "./ContributeProduct";
 import { photoItemToProduct, type FoodPhotoItem } from "@/lib/foods/photo-types";
 
 type Status = "idle" | "loading" | "not-found" | "error";
@@ -117,6 +118,12 @@ export default function BarcodeLookup({
   // never changes, so the scanner's [active] effect would never re-run.
   const [scanNonce, setScanNonce] = useState(0);
   const [tab, setTab] = useState<Tab>("barcode");
+  // Open Food Facts contribution panel: register a missing barcode, or add
+  // photos to a found product that has none.
+  const [contribute, setContribute] = useState<{
+    barcode: string;
+    startAt: "details" | "photos";
+  } | null>(null);
 
   const anyModalOpen = savedOpen || detailFood !== null;
   useScrollLock(anyModalOpen);
@@ -480,14 +487,29 @@ export default function BarcodeLookup({
             <p className="text-xs text-muted-foreground text-pretty">
               {t.barcodeNotFoundHint}
             </p>
-            <button
-              type="button"
-              onClick={rescan}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent active:scale-95"
-            >
-              <Barcode className="h-4 w-4" aria-hidden="true" />
-              {t.scanAgain}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={rescan}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent active:scale-95"
+              >
+                <Barcode className="h-4 w-4" aria-hidden="true" />
+                {t.scanAgain}
+              </button>
+              {lastQuery && /^\d{8,14}$/.test(lastQuery) && !contribute && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScannerOpen(false);
+                    setContribute({ barcode: lastQuery, startAt: "details" });
+                  }}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 active:scale-95"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {t.contributeCta}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -507,6 +529,21 @@ export default function BarcodeLookup({
           </div>
         )}
       </div>
+
+      {contribute && (
+        <ContributeProduct
+          key={`${contribute.barcode}-${contribute.startAt}`}
+          barcode={contribute.barcode}
+          startAt={contribute.startAt}
+          onCancel={() => setContribute(null)}
+          onDone={() => {
+            const code = contribute.barcode;
+            setContribute(null);
+            setBarcode(code);
+            void runLookup(code);
+          }}
+        />
+      )}
 
       {/* Current product preview */}
       {product && (
@@ -559,6 +596,18 @@ export default function BarcodeLookup({
                 <div className="mt-1 text-xs text-muted-foreground whitespace-nowrap">
                   {t.barcodeLabel}: {product.barcode}
                 </div>
+                {!product.image && !contribute && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContribute({ barcode: product.barcode, startAt: "photos" })
+                    }
+                    className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-muted px-3 text-xs font-semibold text-foreground transition hover:bg-accent active:scale-95"
+                  >
+                    <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t.addPhotosCta}
+                  </button>
+                )}
               </div>
             </div>
           </div>

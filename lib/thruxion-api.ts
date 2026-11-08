@@ -84,7 +84,8 @@ export async function thruxionFetch(
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("Content-Type")) {
+  // FormData must keep fetch's generated multipart boundary header.
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -299,6 +300,93 @@ export async function getFoodByBarcode(
       ingredients: asString(data.ingredients),
     },
   };
+}
+
+// Raw outcome of a Food API write call: the HTTP status plus the parsed JSON
+// body (the API answers every error as `{ message, details?, available? }`).
+export type FoodApiResponse = {
+  status: number;
+  body: {
+    message?: string;
+    details?: string;
+    available?: string[];
+    [key: string]: unknown;
+  };
+};
+
+async function foodApiCall(
+  path: string,
+  init: RequestInit,
+): Promise<FoodApiResponse> {
+  let res = await thruxionFetch(path, init);
+  // The Food API answers a rejected token with 403 (not 401), so give the
+  // shared token one refresh here too.
+  if (res.status === 403) {
+    invalidateSystemToken();
+    res = await thruxionFetch(path, init, true);
+  }
+  const body = (await res.json().catch(() => ({}))) as FoodApiResponse["body"];
+  return { status: res.status, body: body ?? {} };
+}
+
+const barcodePath = (barcode: string) =>
+  `/api/foods/barcode/${encodeURIComponent(barcode)}`;
+
+/** POST /api/foods/barcode/<barcode> — 201 created, 409 already exists. */
+export function createFoodProduct(
+  barcode: string,
+  fields: Record<string, unknown>,
+): Promise<FoodApiResponse> {
+  return foodApiCall(barcodePath(barcode), {
+    method: "POST",
+    body: JSON.stringify(fields),
+  });
+}
+
+/** PATCH /api/foods/barcode/<barcode> — 200 updated, 404 not in Open Food Facts. */
+export function updateFoodProduct(
+  barcode: string,
+  fields: Record<string, unknown>,
+): Promise<FoodApiResponse> {
+  return foodApiCall(barcodePath(barcode), {
+    method: "PATCH",
+    body: JSON.stringify(fields),
+  });
+}
+
+export type FoodImageType =
+  | "front"
+  | "ingredients"
+  | "nutrition"
+  | "packaging"
+  | "other";
+
+/** POST /api/foods/barcode/<barcode>/images (multipart) — 201 uploaded. */
+export function uploadFoodImage(
+  barcode: string,
+  image: Blob,
+  type: FoodImageType,
+  lang: string,
+): Promise<FoodApiResponse> {
+  const form = new FormData();
+  form.append("type", type);
+  form.append("lang", lang);
+  form.append("image", image, `${type}.jpg`);
+  return foodApiCall(`${barcodePath(barcode)}/images`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+/** GET /api/foods/barcode/<barcode>/ingredients-from-photo — OCR, saves nothing. */
+export function readFoodIngredientsFromPhoto(
+  barcode: string,
+  lang?: string,
+): Promise<FoodApiResponse> {
+  const query = lang ? `?lang=${encodeURIComponent(lang)}` : "";
+  return foodApiCall(`${barcodePath(barcode)}/ingredients-from-photo${query}`, {
+    method: "GET",
+  });
 }
 
 // Re-export the token accessor for callers that need the raw bearer token.

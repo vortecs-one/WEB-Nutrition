@@ -4,13 +4,26 @@ import { and, eq, desc } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { savedFoods } from "@/drizzle/schema";
-import { getFoodByBarcode } from "@/lib/thruxion-api";
-import type {
-  FoodLookupResult,
-  FoodMeta,
-  FoodNutrition,
-  FoodProduct,
-  SavedFoodProduct,
+import { z } from "zod";
+import {
+  createFoodProduct,
+  getFoodByBarcode,
+  readFoodIngredientsFromPhoto,
+  updateFoodProduct,
+  uploadFoodImage,
+  type FoodApiResponse,
+} from "@/lib/thruxion-api";
+import {
+  NUTRIMENT_KEYS,
+  type FoodLookupResult,
+  type FoodMeta,
+  type FoodNutrition,
+  type FoodPhotoKind,
+  type FoodProduct,
+  type FoodWriteResult,
+  type IngredientsOcrResult,
+  type NewFoodProductInput,
+  type SavedFoodProduct,
 } from "./types";
 
 // Default metadata for older saved rows that predate the meta field.
@@ -82,6 +95,192 @@ export async function lookupFoodByBarcode(
       "[v0] lookupFoodByBarcode failed:",
       (error as Error).message,
     );
+    return { ok: false, reason: "error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Contributing to Open Food Facts (register missing barcodes, send photos).
+// Everything goes through the Thruxion Food API with the server-side system
+// token; the browser only ever talks to these actions.
+// ---------------------------------------------------------------------------
+
+const BARCODE_RE = /^\d{8,14}$/;
+const LANG_RE = /^[a-z]{2}$/;
+const PHOTO_KINDS: readonly FoodPhotoKind[] = ["front", "ingredients", "nutrition"];
+const PHOTO_MIME = new Set(["image/jpeg", "image/png", "image/gif"]);
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v ? v : undefined));
+
+const newProductSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  brand: optionalText(200),
+  quantity: optionalText(50),
+  servingSize: optionalText(50),
+  ingredients: optionalText(5000),
+  nutriments: z
+    .partialRecord(z.enum(NUTRIMENT_KEYS), z.number().finite().min(0).max(5000))
+    .optional(),
+});
+
+const cleanLang = (lang: string | undefined) =>
+  lang && LANG_RE.test(lang) ? lang : "es";
+
+// Map a Food API response to the UI-safe result union.
+function toWriteResult(
+  { status, body }: FoodApiResponse,
+  okStatus: number,
+): FoodWriteResult {
+  if (status === okStatus) return { ok: true };
+  const message = body.details ?? body.message;
+  // A 404 without the API's JSON error means the route itself is missing
+  // (Express "Cannot POST"), i.e. the new endpoints aren't deployed yet.
+  if (status === 404) {
+    return { ok: false, reason: body.message ? "not-found" : "unavailable" };
+  }
+  if (status === 409) return { ok: false, reason: "exists" };
+  if (status === 400) return { ok: false, reason: "invalid", message };
+  if (status === 502 || status === 503) {
+    return { ok: false, reason: "rejected", message };
+  }
+  console.error("[v0] Food API write failed:", status, message);
+  return { ok: false, reason: "error" };
+}
+
+// Register a barcode that Open Food Facts doesn't know yet.
+export async function registerFoodProduct(
+  barcode: string,
+  input: NewFoodProductInput,
+  lang?: string,
+): Promise<FoodWriteResult> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, reason: "unauthenticated" };
+
+  const clean = (barcode ?? "").replace(/\D+/g, "");
+  const parsed = newProductSchema.safeParse(input);
+  if (!BARCODE_RE.test(clean) || !parsed.success) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const { name, brand, quantity, servingSize, ingredients, nutriments } =
+    parsed.data;
+  const hasNutriments = nutriments && Object.keys(nutriments).length > 0;
+
+  try {
+    const res = await createFoodProduct(clean, {
+      name,
+      lang: cleanLang(lang),
+      ...(brand && { brands: brand }),
+      ...(quantity && { quantity }),
+      ...(servingSize && { serving_size: servingSize }),
+      ...(ingredients && { ingredients }),
+      ...(hasNutriments && { nutrition_data_per: "100g", nutriments }),
+      comment: "Added from the V-Healthy app",
+    });
+    return toWriteResult(res, 201);
+  } catch (error) {
+    console.error("[v0] registerFoodProduct failed:", (error as Error).message);
+    return { ok: false, reason: "error" };
+  }
+}
+
+// Save (user-verified) ingredients text on an existing product.
+export async function saveFoodIngredients(
+  barcode: string,
+  ingredients: string,
+  lang?: string,
+): Promise<FoodWriteResult> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, reason: "unauthenticated" };
+
+  const clean = (barcode ?? "").replace(/\D+/g, "");
+  const text = (ingredients ?? "").trim();
+  if (!BARCODE_RE.test(clean) || !text || text.length > 5000) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  try {
+    const res = await updateFoodProduct(clean, {
+      ingredients: text,
+      lang: cleanLang(lang),
+      comment: "Ingredients verified in the V-Healthy app",
+    });
+    return toWriteResult(res, 200);
+  } catch (error) {
+    console.error("[v0] saveFoodIngredients failed:", (error as Error).message);
+    return { ok: false, reason: "error" };
+  }
+}
+
+// Upload one product photo. Expects FormData with `barcode`, `kind`, `lang`
+// and `image` (a JPEG/PNG/GIF file up to 10 MB).
+export async function uploadFoodPhoto(form: FormData): Promise<FoodWriteResult> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, reason: "unauthenticated" };
+
+  const barcode = String(form.get("barcode") ?? "").replace(/\D+/g, "");
+  const kind = String(form.get("kind") ?? "") as FoodPhotoKind;
+  const lang = cleanLang(String(form.get("lang") ?? ""));
+  const image = form.get("image");
+
+  if (
+    !BARCODE_RE.test(barcode) ||
+    !PHOTO_KINDS.includes(kind) ||
+    !(image instanceof Blob) ||
+    !PHOTO_MIME.has(image.type) ||
+    image.size === 0 ||
+    image.size > MAX_PHOTO_BYTES
+  ) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  try {
+    const res = await uploadFoodImage(barcode, image, kind, lang);
+    return toWriteResult(res, 201);
+  } catch (error) {
+    console.error("[v0] uploadFoodPhoto failed:", (error as Error).message);
+    return { ok: false, reason: "error" };
+  }
+}
+
+// Read the ingredients list off the product's ingredients photo (OCR). This
+// saves nothing — the user reviews the text, then calls saveFoodIngredients.
+export async function readIngredientsFromPhoto(
+  barcode: string,
+  lang?: string,
+): Promise<IngredientsOcrResult> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, reason: "unauthenticated" };
+
+  const clean = (barcode ?? "").replace(/\D+/g, "");
+  if (!BARCODE_RE.test(clean)) return { ok: false, reason: "invalid" };
+
+  try {
+    const res = await readFoodIngredientsFromPhoto(clean, cleanLang(lang));
+    const { status, body } = res;
+    if (status === 200 && typeof body.ingredients === "string") {
+      return {
+        ok: true,
+        ingredients: body.ingredients,
+        lang: typeof body.lang === "string" ? body.lang : cleanLang(lang),
+      };
+    }
+    // 404 with an `available` list = the product exists but has no
+    // ingredients photo in that language.
+    if (status === 404 && Array.isArray(body.available)) {
+      return { ok: false, reason: "no-photo", available: body.available };
+    }
+    const failure = toWriteResult(res, 200);
+    return failure.ok ? { ok: false, reason: "error" } : failure;
+  } catch (error) {
+    console.error("[v0] readIngredientsFromPhoto failed:", (error as Error).message);
     return { ok: false, reason: "error" };
   }
 }

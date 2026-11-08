@@ -72,6 +72,57 @@ export type FoodLookupResult =
   | { ok: true; product: FoodProduct }
   | { ok: false; reason: "unauthenticated" | "not-found" | "error" };
 
+// Open Food Facts nutrient names accepted by the Food API's `nutriments`
+// object (values per 100 g / 100 ml, grams except energy in kcal).
+export const NUTRIMENT_KEYS = [
+  "energy-kcal",
+  "fat",
+  "saturated-fat",
+  "carbohydrates",
+  "sugars",
+  "fiber",
+  "proteins",
+  "salt",
+] as const;
+export type NutrimentKey = (typeof NUTRIMENT_KEYS)[number];
+
+// What the register form sends for a barcode Open Food Facts doesn't have.
+export type NewFoodProductInput = {
+  name: string;
+  brand?: string;
+  quantity?: string;
+  servingSize?: string;
+  ingredients?: string;
+  nutriments?: Partial<Record<NutrimentKey, number>>;
+};
+
+// Photo kinds the app lets users send to Open Food Facts.
+export type FoodPhotoKind = "front" | "ingredients" | "nutrition";
+
+export type FoodWriteFailure =
+  | "unauthenticated"
+  | "invalid"
+  | "exists"
+  | "not-found"
+  | "rejected"
+  | "unavailable"
+  | "error";
+
+// Result of a create / update / photo-upload server action.
+export type FoodWriteResult =
+  | { ok: true }
+  | { ok: false; reason: FoodWriteFailure; message?: string };
+
+// Result of reading the ingredients text from the ingredients photo (OCR).
+export type IngredientsOcrResult =
+  | { ok: true; ingredients: string; lang: string }
+  | {
+      ok: false;
+      reason: FoodWriteFailure | "no-photo";
+      message?: string;
+      available?: string[];
+    };
+
 // The two bases a product's nutrition can be shown/logged in.
 export type Basis = "serving" | "100g";
 
