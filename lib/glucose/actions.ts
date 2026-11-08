@@ -38,6 +38,22 @@ import {
   type LibreSession,
 } from "./librelinkup";
 import { CARELINK_IMPORT_CHUNK, isPlausibleReading, type CareLinkCsvReading } from "./carelink-csv";
+import {
+  CareLinkError,
+  buildAuthorizeUrl,
+  createPkce,
+  exchangeCode,
+  getCareLinkConfig,
+  getCareLinkPatients,
+  getCareLinkUser,
+  isCarePartnerRole,
+  parseRedirectInput,
+  usernameFromTokens,
+  type CareLinkRegion,
+  type CareLinkSnapshot,
+} from "./carelink";
+import { CARELINK_MIN_SYNC_INTERVAL_MS, isCareLinkLive, syncCareLink } from "./carelink-sync";
+import { openSecret, sealSecret } from "./secret-box";
 
 // The signed-in glucose user: their role (owner / watcher, see access.ts),
 // their stable per-user key (same pattern as day-log: prefer the Thruxion
@@ -137,6 +153,10 @@ function toClientSettings(row: SettingsRow, role: GlucoseRole): GlucoseSettings 
     librePatientId: row.librePatientId,
     careLinkLastImportAt: row.carelinkLastImportAt ? row.carelinkLastImportAt.getTime() : null,
     careLinkReadingCount: row.carelinkReadingCount ?? 0,
+    careLinkConnected: isCareLinkLive(row),
+    careLinkNeedsReconnect: Boolean(row.carelinkRefreshToken) && row.carelinkNeedsReconnect,
+    careLinkPatientName: row.carelinkPatientName,
+    careLinkLastSyncAt: row.carelinkLastSyncAt ? row.carelinkLastSyncAt.getTime() : null,
     unit: (row.unit === "mmol" ? "mmol" : "mgdl") as GlucoseUnit,
     lowThreshold: row.lowThreshold,
     highThreshold: row.highThreshold,
@@ -677,10 +697,28 @@ export async function fetchGlucoseData(hours: number): Promise<GlucoseFetchResul
  * state, not a configuration error.
  */
 async function fetchFromCareLinkImport(
-  row: SettingsRow,
+  initialRow: SettingsRow,
   role: GlucoseRole,
   windowHours: number,
 ): Promise<GlucoseFetchResult> {
+  let row = initialRow;
+  // Live connection: pull from Medtronic when the stored data is older than
+  // one upload cycle. Failures fall back to what's already stored.
+  if (
+    isCareLinkLive(row) &&
+    (!row.carelinkLastSyncAt || Date.now() - row.carelinkLastSyncAt.getTime() > CARELINK_MIN_SYNC_INTERVAL_MS)
+  ) {
+    try {
+      row = (await syncCareLink(row)).row;
+    } catch (err) {
+      const code = err instanceof CareLinkError ? err.code : "unknown";
+      console.error("[carelink] live sync failed:", code, (err as Error).message);
+      if (code === "invalid-grant") {
+        row = (await getSettingsRow(row.userKey)) ?? row;
+      }
+    }
+  }
+
   const [latest] = await db
     .select({ date: carelinkReadings.date })
     .from(carelinkReadings)
@@ -701,12 +739,13 @@ async function fetchFromCareLinkImport(
         .orderBy(carelinkReadings.date)
     : [];
 
-  // CareLink's export carries no trend-direction equivalent to Nightscout's
-  // `direction` field, so every reading is reported as NONE.
+  // Stored readings carry no trend; the live snapshot provides it for the
+  // latest reading only.
+  const snapshot = (isCareLinkLive(row) ? row.carelinkSnapshot : null) as CareLinkSnapshot | null;
   const readings: GlucoseReading[] = rows.map((r) => ({
     sgv: r.sgv,
     date: r.date.getTime(),
-    direction: "NONE" as TrendDirection,
+    direction: (snapshot?.lastSgAt === r.date.getTime() ? snapshot.trend : "NONE") as TrendDirection,
   }));
 
   return {
@@ -715,13 +754,211 @@ async function fetchFromCareLinkImport(
       current: readings.length > 0 ? readings[readings.length - 1] : null,
       readings,
       settings: toClientSettings(row, role),
-      patientName: null,
+      patientName: snapshot ? row.carelinkPatientName : null,
       patients: [],
-      // CSV imports carry no sensor or LibreLink threshold data.
       sensor: null,
       libreThresholds: null,
+      careLinkStatus: snapshot
+        ? {
+            sensorHoursLeft: snapshot.sensorHoursLeft,
+            sensorState: snapshot.sensorState,
+            activeInsulin: snapshot.activeInsulin,
+            reservoirUnits: snapshot.reservoirUnits,
+            pumpBatteryPercent: snapshot.pumpBatteryPercent,
+            lowLimit: snapshot.lowLimit,
+            highLimit: snapshot.highLimit,
+            fetchedAt: snapshot.fetchedAt,
+          }
+        : null,
     },
   };
+}
+
+// --- CareLink live connection (owner only) -----------------------------------
+
+const PENDING_LOGIN_TTL_MS = 15 * 60_000;
+
+export type StartCareLinkConnectResult =
+  | { ok: true; authorizeUrl: string }
+  | { ok: false; error: "unauthenticated" | "unreachable" };
+
+/**
+ * Step 1: create a PKCE pair and return Medtronic's sign-in URL. The owner
+ * opens it in their own browser (Medtronic shows a captcha).
+ */
+export async function startCareLinkConnect(region: CareLinkRegion = "EU"): Promise<StartCareLinkConnectResult> {
+  const viewer = await getViewer();
+  if (viewer?.role !== "owner") return { ok: false, error: "unauthenticated" };
+  const safeRegion: CareLinkRegion = region === "US" ? "US" : "EU";
+
+  let config;
+  try {
+    config = await getCareLinkConfig(safeRegion);
+  } catch (err) {
+    console.error("[carelink] discovery failed:", (err as Error).message);
+    return { ok: false, error: "unreachable" };
+  }
+
+  const pkce = createPkce();
+  const existing = await getSettingsRow(viewer.userKey);
+  const values = {
+    userKey: viewer.userKey,
+    ownerEmail: viewer.email,
+    source: existing?.source ?? "carelink",
+    unit: existing?.unit ?? "mgdl",
+    ...(existing
+      ? {
+          lowThreshold: existing.lowThreshold,
+          highThreshold: existing.highThreshold,
+          targetLow: existing.targetLow,
+          targetHigh: existing.targetHigh,
+        }
+      : DEFAULT_THRESHOLDS),
+    enabled: true,
+    carelinkRegion: safeRegion,
+    carelinkPendingState: pkce.state,
+    carelinkPendingVerifier: sealSecret(pkce.verifier),
+    carelinkPendingAt: new Date(),
+  };
+  await db
+    .insert(glucoseSettings)
+    .values(values)
+    .onConflictDoUpdate({ target: glucoseSettings.userKey, set: values });
+
+  return { ok: true, authorizeUrl: buildAuthorizeUrl(config, pkce.state, pkce.challenge) };
+}
+
+export type CompleteCareLinkConnectResult =
+  | { ok: true; settings: GlucoseSettings; patientName: string | null; readingsAdded: number }
+  | {
+      ok: false;
+      error:
+        | "unauthenticated"
+        | "invalid-input"
+        | "expired"
+        | "state-mismatch"
+        | "invalid-grant"
+        | "no-username"
+        | "no-patients"
+        | "upgrade-required"
+        | "unreachable";
+    };
+
+/**
+ * Step 2: the owner pastes the `com.medtronic.carepartner:/sso?code=…`
+ * redirect. Exchange the code, detect the account role (patient or care
+ * partner), pick the followed patient and run the first sync.
+ */
+export async function completeCareLinkConnect(redirect: string): Promise<CompleteCareLinkConnectResult> {
+  const viewer = await getViewer();
+  if (viewer?.role !== "owner") return { ok: false, error: "unauthenticated" };
+
+  const parsed = parseRedirectInput(String(redirect ?? "").slice(0, 4000));
+  if (!parsed) return { ok: false, error: "invalid-input" };
+
+  const row = await getSettingsRow(viewer.userKey);
+  const verifier = openSecret(row?.carelinkPendingVerifier);
+  if (
+    !row ||
+    !verifier ||
+    !row.carelinkPendingAt ||
+    Date.now() - row.carelinkPendingAt.getTime() > PENDING_LOGIN_TTL_MS
+  ) {
+    return { ok: false, error: "expired" };
+  }
+  if (parsed.state && parsed.state !== row.carelinkPendingState) return { ok: false, error: "state-mismatch" };
+
+  const region: CareLinkRegion = row.carelinkRegion === "US" ? "US" : "EU";
+  try {
+    const config = await getCareLinkConfig(region);
+    const tokens = await exchangeCode(config, parsed.code, verifier);
+    if (!tokens.refreshToken) return { ok: false, error: "invalid-grant" };
+
+    const user = await getCareLinkUser(config, tokens.accessToken);
+    const username = user.username ?? usernameFromTokens(tokens);
+    if (!username) return { ok: false, error: "no-username" };
+
+    let patientId: string | null = null;
+    let patientName = [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+    if (isCarePartnerRole(user.role)) {
+      const patients = await getCareLinkPatients(config, tokens.accessToken);
+      const patient = patients[0];
+      if (!patient) return { ok: false, error: "no-patients" };
+      patientId = patient.username;
+      patientName = [patient.firstName, patient.lastName].filter(Boolean).join(" ") || patient.username;
+    }
+
+    const [connected] = await db
+      .update(glucoseSettings)
+      .set({
+        source: "carelink",
+        carelinkUsername: username,
+        carelinkPatientId: patientId,
+        carelinkPatientName: patientName,
+        carelinkRole: user.role,
+        carelinkClientId: config.clientId,
+        carelinkAccessToken: sealSecret(tokens.accessToken),
+        carelinkRefreshToken: sealSecret(tokens.refreshToken),
+        carelinkTokenExpires: tokens.expiresAt,
+        carelinkLastRefreshAt: new Date(),
+        carelinkNeedsReconnect: false,
+        carelinkRefreshLockUntil: null,
+        carelinkPendingState: null,
+        carelinkPendingVerifier: null,
+        carelinkPendingAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(glucoseSettings.id, row.id))
+      .returning();
+
+    let finalRow = connected;
+    let readingsAdded = 0;
+    try {
+      const synced = await syncCareLink(connected);
+      finalRow = synced.row;
+      readingsAdded = synced.added;
+    } catch (err) {
+      // Connected, but the first pull failed — the next poll retries.
+      console.error("[carelink] first sync failed:", (err as Error).message);
+      if (err instanceof CareLinkError && err.code === "upgrade-required") {
+        return { ok: false, error: "upgrade-required" };
+      }
+    }
+
+    return { ok: true, settings: toClientSettings(finalRow, "owner"), patientName, readingsAdded };
+  } catch (err) {
+    const code = err instanceof CareLinkError ? err.code : "unknown";
+    console.error("[carelink] connect failed:", code, (err as Error).message);
+    if (code === "invalid-grant" || code === "unauthorized") return { ok: false, error: "invalid-grant" };
+    if (code === "upgrade-required") return { ok: false, error: "upgrade-required" };
+    return { ok: false, error: "unreachable" };
+  }
+}
+
+/** Forgets the Medtronic session. Stored readings stay. */
+export async function disconnectCareLink(): Promise<{ ok: true; settings: GlucoseSettings | null } | { ok: false }> {
+  const userKey = await getOwnerKey();
+  if (!userKey) return { ok: false };
+  const [row] = await db
+    .update(glucoseSettings)
+    .set({
+      carelinkAccessToken: null,
+      carelinkRefreshToken: null,
+      carelinkTokenExpires: null,
+      carelinkUsername: null,
+      carelinkPatientId: null,
+      carelinkPatientName: null,
+      carelinkRole: null,
+      carelinkSnapshot: null,
+      carelinkNeedsReconnect: false,
+      carelinkPendingState: null,
+      carelinkPendingVerifier: null,
+      carelinkPendingAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(glucoseSettings.userKey, userKey))
+    .returning();
+  return { ok: true, settings: row ? toClientSettings(row, "owner") : null };
 }
 
 // --- CareLink CSV import -----------------------------------------------------
@@ -878,6 +1115,7 @@ async function fetchFromNightscout(
         // Nightscout entries carry no sensor or LibreLink threshold data.
         sensor: null,
         libreThresholds: null,
+        careLinkStatus: null,
       },
     };
   } catch {
@@ -988,6 +1226,7 @@ async function fetchFromLibre(
         })),
         sensor: result.graph.sensor,
         libreThresholds: result.graph.thresholds,
+        careLinkStatus: null,
       },
     };
   } catch (err) {

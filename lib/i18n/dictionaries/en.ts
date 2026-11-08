@@ -495,7 +495,31 @@ const en: Dictionary = {
     // Medtronic sensor; its readings reach CareLink through the MiniMed app.
     sourceCareLink: "Guardian 3",
     sourceCareLinkHint:
-      "Guardian 3 readings reach CareLink through the MiniMed app. There's no live connection: import the CareLink export from the Insulin pump page.",
+      "Guardian 3 readings reach CareLink through the MiniMed app. Connect your CareLink account (patient or care partner) to read them live, or import the CSV export from the Insulin pump page.",
+    careLinkLiveTitle: "Live CareLink connection",
+    careLinkLiveIntro:
+      "Use the same account as the MiniMed or CareLink Connect app. A Care Partner account is recommended.",
+    careLinkStep1: "1. Open the Medtronic sign-in in a new tab and log in with your account.",
+    careLinkOpenLogin: "Open CareLink sign-in",
+    careLinkStep2:
+      '2. When done, the page goes blank or shows an error because it tries to open the app. Open DevTools (F12) > Network, find the request starting with "com.medtronic.carepartner:/sso?code=" and copy that full address.',
+    careLinkRedirectLabel: "Redirect address (or just the code)",
+    careLinkRedirectPlaceholder: "com.medtronic.carepartner:/sso?code=...&state=...",
+    careLinkConnectButton: "Connect",
+    careLinkConnected: "Live connected · {name}",
+    careLinkLastSync: "Last sync: {time}",
+    careLinkNeverSynced: "Not synced yet.",
+    careLinkDisconnect: "Disconnect",
+    careLinkReconnectNeeded: "Medtronic ended the session. Sign in again to resume live readings.",
+    careLinkConnectSuccess: "Connected. {count} new reading(s).",
+    careLinkErrorInvalidInput: "No code found in what you pasted.",
+    careLinkErrorExpired: "The sign-in expired. Open it again and repeat the steps.",
+    careLinkErrorState: "That code belongs to a different sign-in attempt. Open it again.",
+    careLinkErrorGrant: "Medtronic rejected the code (already used or expired). Sign in again.",
+    careLinkErrorNoUsername: "Could not identify the CareLink account.",
+    careLinkErrorNoPatients: "This care partner account doesn't follow any patient. Invite it from the MiniMed app.",
+    careLinkErrorUpgrade: "Medtronic changed its API. This integration needs an update.",
+    careLinkErrorUnreachable: "Could not reach CareLink. Try again.",
     // --- LibreLinkUp settings ---
     libreSettingsTitle: "Connect LibreLinkUp",
     libreSettingsSubtitle:

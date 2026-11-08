@@ -9,6 +9,7 @@ import {
   date,
   integer,
   boolean,
+  jsonb,
   index,
   primaryKey,
   unique,
@@ -195,11 +196,27 @@ export const glucoseSettings = pgTable("glucose_settings", {
   // First + last name from the LibreView user object, used as display label.
   libreDisplayName: text("libre_display_name"),
   // --- CareLink (Medtronic) ---
-  // Reserved for a possible future automated-polling source (not built yet —
-  // see the project plan). CSV import needs no credentials, so these are
-  // unused placeholders today; no password/token column exists until then.
+  // Live connection (see drizzle/0014_add_carelink_live.sql and
+  // lib/glucose/carelink.ts). Username = the signed-in CareLink account;
+  // patientId = the followed patient's username (care partner accounts).
   carelinkUsername: text("carelink_username"),
   carelinkPatientId: text("carelink_patient_id"),
+  // Tokens are AES-GCM encrypted (lib/glucose/secret-box.ts).
+  carelinkAccessToken: text("carelink_access_token"),
+  carelinkRefreshToken: text("carelink_refresh_token"),
+  carelinkTokenExpires: timestamp("carelink_token_expires", { withTimezone: true }),
+  carelinkClientId: text("carelink_client_id"),
+  carelinkRegion: varchar("carelink_region", { length: 10 }),
+  carelinkRole: varchar("carelink_role", { length: 30 }),
+  carelinkPatientName: text("carelink_patient_name"),
+  carelinkPendingState: text("carelink_pending_state"),
+  carelinkPendingVerifier: text("carelink_pending_verifier"),
+  carelinkPendingAt: timestamp("carelink_pending_at", { withTimezone: true }),
+  carelinkRefreshLockUntil: timestamp("carelink_refresh_lock_until", { withTimezone: true }),
+  carelinkLastSyncAt: timestamp("carelink_last_sync_at", { withTimezone: true }),
+  carelinkLastRefreshAt: timestamp("carelink_last_refresh_at", { withTimezone: true }),
+  carelinkNeedsReconnect: boolean("carelink_needs_reconnect").notNull().default(false),
+  carelinkSnapshot: jsonb("carelink_snapshot"),
   // Cached from carelinkReadings so settings reads stay a synchronous row
   // mapper (see toClientSettings) instead of a second query on every poll.
   // Updated by importCareLinkCsv after each import.
@@ -238,6 +255,8 @@ export const carelinkReadings = pgTable(
     // Sensor glucose value in mg/dL (converted at import time if the export
     // was in mmol/L).
     sgv: integer("sgv").notNull(),
+    // "csv" (manual export) or "live" (CarePartner API sync).
+    origin: varchar("origin", { length: 10 }).notNull().default("csv"),
     importedAt: timestamp("imported_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -498,7 +498,31 @@ const es = {
     // Sensor de Medtronic; sus lecturas llegan a CareLink a través de la app MiniMed.
     sourceCareLink: "Guardian 3",
     sourceCareLinkHint:
-      "Las lecturas del Guardian 3 llegan a CareLink a través de la app MiniMed. No hay conexión en vivo: importa la exportación de CareLink desde la página Bomba de insulina.",
+      "Las lecturas del Guardian 3 llegan a CareLink a través de la app MiniMed. Conecta tu cuenta de CareLink (paciente o cuidador) para leerlas en vivo, o importa la exportación CSV desde la página Bomba de insulina.",
+    careLinkLiveTitle: "Conexión en vivo con CareLink",
+    careLinkLiveIntro:
+      "Usa la misma cuenta que la app MiniMed o CareLink Connect. Una cuenta de cuidador (Care Partner) es lo recomendado.",
+    careLinkStep1: "1. Abre el inicio de sesión de Medtronic en una pestaña nueva e ingresa con tu cuenta.",
+    careLinkOpenLogin: "Abrir inicio de sesión de CareLink",
+    careLinkStep2:
+      '2. Al terminar, la página queda en blanco o muestra un error porque intenta abrir la app. Abre DevTools (F12) > Red, busca la solicitud que empieza con "com.medtronic.carepartner:/sso?code=" y copia esa dirección completa.',
+    careLinkRedirectLabel: "Dirección de retorno (o solo el código)",
+    careLinkRedirectPlaceholder: "com.medtronic.carepartner:/sso?code=...&state=...",
+    careLinkConnectButton: "Conectar",
+    careLinkConnected: "Conectado en vivo · {name}",
+    careLinkLastSync: "Última sincronización: {time}",
+    careLinkNeverSynced: "Aún sin sincronizar.",
+    careLinkDisconnect: "Desconectar",
+    careLinkReconnectNeeded: "Medtronic cerró la sesión. Vuelve a iniciar sesión para reanudar las lecturas en vivo.",
+    careLinkConnectSuccess: "Conectado. {count} lectura(s) nueva(s).",
+    careLinkErrorInvalidInput: "No se encontró un código en lo que pegaste.",
+    careLinkErrorExpired: "El inicio de sesión expiró. Ábrelo de nuevo y repite los pasos.",
+    careLinkErrorState: "Ese código pertenece a otro intento de inicio de sesión. Ábrelo de nuevo.",
+    careLinkErrorGrant: "Medtronic rechazó el código (ya se usó o expiró). Inicia sesión otra vez.",
+    careLinkErrorNoUsername: "No se pudo identificar la cuenta de CareLink.",
+    careLinkErrorNoPatients: "Esta cuenta de cuidador no sigue a ningún paciente. Invítala desde la app MiniMed.",
+    careLinkErrorUpgrade: "Medtronic cambió su API. Esta integración necesita una actualización.",
+    careLinkErrorUnreachable: "No se pudo conectar con CareLink. Inténtalo de nuevo.",
     // --- Configuración de LibreLinkUp ---
     libreSettingsTitle: "Conectar LibreLinkUp",
     libreSettingsSubtitle:

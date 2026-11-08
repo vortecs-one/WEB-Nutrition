@@ -1,0 +1,186 @@
+"use client";
+
+// Live CareLink (CarePartner API) sign-in. Medtronic's Auth0 login has a
+// captcha and redirects to the app's custom scheme, so the owner signs in in
+// their own tab and pastes the redirect address back here.
+
+import { useState, type FormEvent } from "react";
+import { CheckCircle2, ExternalLink, Loader2, XCircle } from "lucide-react";
+import { useI18n } from "@/lib/i18n/provider";
+import { completeCareLinkConnect, disconnectCareLink, startCareLinkConnect } from "@/lib/glucose/actions";
+import type { GlucoseSettings } from "@/lib/glucose/types";
+
+type Message = { ok: boolean; text: string } | null;
+
+export default function CareLinkConnect({
+  settings,
+  onChanged,
+}: {
+  settings: GlucoseSettings | null;
+  onChanged: (settings: GlucoseSettings) => void;
+}) {
+  const { dict, locale } = useI18n();
+  const t = dict.glucose;
+
+  const [started, setStarted] = useState(false);
+  const [redirect, setRedirect] = useState("");
+  const [busy, setBusy] = useState<"start" | "connect" | "disconnect" | null>(null);
+  const [message, setMessage] = useState<Message>(null);
+
+  const connected = Boolean(settings?.careLinkConnected);
+  const needsReconnect = Boolean(settings?.careLinkNeedsReconnect);
+
+  const errorText = (error: string) => {
+    switch (error) {
+      case "invalid-input":
+        return t.careLinkErrorInvalidInput;
+      case "expired":
+        return t.careLinkErrorExpired;
+      case "state-mismatch":
+        return t.careLinkErrorState;
+      case "invalid-grant":
+        return t.careLinkErrorGrant;
+      case "no-username":
+        return t.careLinkErrorNoUsername;
+      case "no-patients":
+        return t.careLinkErrorNoPatients;
+      case "upgrade-required":
+        return t.careLinkErrorUpgrade;
+      default:
+        return t.careLinkErrorUnreachable;
+    }
+  };
+
+  const handleStart = async () => {
+    // Open synchronously so the popup isn't blocked, then point it at the URL.
+    const tab = window.open("about:blank", "_blank");
+    setBusy("start");
+    setMessage(null);
+    const result = await startCareLinkConnect("EU");
+    setBusy(null);
+    if (!result.ok) {
+      tab?.close();
+      setMessage({ ok: false, text: errorText(result.error) });
+      return;
+    }
+    if (tab) tab.location.href = result.authorizeUrl;
+    else window.open(result.authorizeUrl, "_blank", "noopener");
+    setStarted(true);
+  };
+
+  const handleConnect = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy("connect");
+    setMessage(null);
+    const result = await completeCareLinkConnect(redirect);
+    setBusy(null);
+    if (!result.ok) {
+      setMessage({ ok: false, text: errorText(result.error) });
+      return;
+    }
+    setRedirect("");
+    setStarted(false);
+    setMessage({ ok: true, text: t.careLinkConnectSuccess.replace("{count}", String(result.readingsAdded)) });
+    onChanged(result.settings);
+  };
+
+  const handleDisconnect = async () => {
+    setBusy("disconnect");
+    const result = await disconnectCareLink();
+    setBusy(null);
+    setMessage(null);
+    if (result.ok && result.settings) onChanged(result.settings);
+  };
+
+  return (
+    <section className="rounded-xl border border-sidebar-border p-4" aria-labelledby="carelink-live-title">
+      <h3 id="carelink-live-title" className="text-sm font-semibold">
+        {t.careLinkLiveTitle}
+      </h3>
+
+      {connected ? (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5">
+            <p className="flex items-center gap-1.5 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+              {t.careLinkConnected.replace("{name}", settings?.careLinkPatientName ?? "CareLink")}
+            </p>
+            <p className="text-xs text-sidebar-foreground/60">
+              {settings?.careLinkLastSyncAt
+                ? t.careLinkLastSync.replace("{time}", new Date(settings.careLinkLastSyncAt).toLocaleString(locale))
+                : t.careLinkNeverSynced}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleDisconnect}
+            disabled={busy !== null}
+            className="rounded-full bg-sidebar-accent px-3 py-1.5 text-xs font-medium hover:text-sidebar-foreground disabled:opacity-50"
+          >
+            {busy === "disconnect" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : t.careLinkDisconnect}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-col gap-3">
+          <p className="text-xs leading-relaxed text-sidebar-foreground/70 text-pretty">
+            {needsReconnect ? t.careLinkReconnectNeeded : t.careLinkLiveIntro}
+          </p>
+          <p className="text-xs leading-relaxed text-sidebar-foreground/70 text-pretty">{t.careLinkStep1}</p>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={busy !== null}
+            className="flex w-fit items-center gap-1.5 rounded-full bg-sidebar-accent px-3 py-1.5 text-xs font-medium hover:text-sidebar-foreground disabled:opacity-50"
+          >
+            {busy === "start" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {t.careLinkOpenLogin}
+          </button>
+
+          {started && (
+            <form onSubmit={handleConnect} className="flex flex-col gap-2">
+              <p className="text-xs leading-relaxed text-sidebar-foreground/70 text-pretty">{t.careLinkStep2}</p>
+              <label htmlFor="carelink-redirect" className="text-xs font-medium text-sidebar-foreground/70">
+                {t.careLinkRedirectLabel}
+              </label>
+              <input
+                id="carelink-redirect"
+                value={redirect}
+                onChange={(e) => setRedirect(e.target.value)}
+                placeholder={t.careLinkRedirectPlaceholder}
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                type="submit"
+                disabled={!redirect.trim() || busy !== null}
+                className="flex w-fit items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {busy === "connect" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                {t.careLinkConnectButton}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p
+          role="status"
+          className={`mt-3 flex items-start gap-1.5 text-xs ${message.ok ? "text-primary" : "text-destructive"}`}
+        >
+          {message.ok ? (
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          )}
+          {message.text}
+        </p>
+      )}
+    </section>
+  );
+}
