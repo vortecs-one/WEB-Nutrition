@@ -526,6 +526,47 @@ export default function GlucoseTracker({
     />
   );
 
+  // Sensor switcher: picks which configured source feeds the readings. Owner
+  // only, and only once more than one source is set up. Rendered in the
+  // detail popup, right under the chart.
+  const configuredSources = (
+    [
+      ["carelink", "Guardian 3", settings.careLinkConnected || settings.careLinkReadingCount > 0],
+      ["librelinkup", "LibreLink", settings.hasLibreCredentials],
+      ["nightscout", "Nightscout", Boolean(settings.nightscoutUrl)],
+    ] as const
+  ).filter(([, , ok]) => ok);
+  const sourceSwitcher =
+    isOwner && configuredSources.length > 1 ? (
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+          <span className="text-xs font-medium text-sidebar-foreground/70">{t.sourceLabel}</span>
+        </div>
+        <div role="group" aria-label={t.sourceLabel} className="flex flex-wrap gap-2">
+          {configuredSources.map(([id, label]) => {
+            const selected = settings.source === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleSwitchSource(id)}
+                disabled={switchingSource || selected}
+                aria-pressed={selected}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition active:scale-95 disabled:pointer-events-none ${
+                  selected
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                } ${switchingSource && !selected ? "opacity-50" : ""}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ) : null;
+
   // Current-reading pill — big value + trend arrow, tinted by status. The
   // compact card header shows it plain; the detail view header merges the
   // display-unit switch into it (withUnitSwitch).
@@ -883,49 +924,6 @@ export default function GlucoseTracker({
         settings={settings}
       />
 
-      {/* Sensor switcher: picks which configured source feeds the readings.
-          Owner only, and only once more than one source is set up. */}
-      {isOwner &&
-        (() => {
-          const sources = (
-            [
-              ["carelink", "Guardian 3", settings.careLinkConnected || settings.careLinkReadingCount > 0],
-              ["librelinkup", "LibreLink", settings.hasLibreCredentials],
-              ["nightscout", "Nightscout", Boolean(settings.nightscoutUrl)],
-            ] as const
-          ).filter(([, , ok]) => ok);
-          if (sources.length < 2) return null;
-          return (
-            <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
-                <span className="text-xs font-medium text-sidebar-foreground/70">{t.sourceLabel}</span>
-              </div>
-              <div role="group" aria-label={t.sourceLabel} className="mt-2 flex flex-wrap gap-2">
-                {sources.map(([id, label]) => {
-                  const selected = settings.source === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => handleSwitchSource(id)}
-                      disabled={switchingSource || selected}
-                      aria-pressed={selected}
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition active:scale-95 disabled:pointer-events-none ${
-                        selected
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground"
-                      } ${switchingSource && !selected ? "opacity-50" : ""}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })()}
-
       {/* Patient switcher (LibreLinkUp: main sensor + followed patients).
           Owner only: switching changes the shared selection. */}
       {isOwner && settings.source === "librelinkup" && (data?.patients?.length ?? 0) > 1 && (
@@ -1057,6 +1055,7 @@ export default function GlucoseTracker({
         {/* Wide/rectangular plot box — the aspect ratio includes the x-axis
             band, so the axis labels never spill into a nested scroll. */}
         <div className="aspect-[16/9] max-h-[360px] w-full">{chartContent}</div>
+        {sourceSwitcher}
 
         {/* The two info panels sit side by side — settings left, sensor right.
             Visual order is set with `order-*`; the DOM keeps sensor first so
