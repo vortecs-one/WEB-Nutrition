@@ -52,7 +52,7 @@ import {
   type CareLinkRegion,
   type CareLinkSnapshot,
 } from "./carelink";
-import { CARELINK_MIN_SYNC_INTERVAL_MS, isCareLinkLive, syncCareLink } from "./carelink-sync";
+import { careLinkSyncDue, isCareLinkLive, syncCareLink } from "./carelink-sync";
 import { openSecret, sealSecret } from "./secret-box";
 
 // The signed-in glucose user: their role (owner / watcher, see access.ts),
@@ -736,10 +736,7 @@ async function fetchFromCareLinkImport(
   let row = initialRow;
   // Live connection: pull from Medtronic when the stored data is older than
   // one upload cycle. Failures fall back to what's already stored.
-  if (
-    isCareLinkLive(row) &&
-    (!row.carelinkLastSyncAt || Date.now() - row.carelinkLastSyncAt.getTime() > CARELINK_MIN_SYNC_INTERVAL_MS)
-  ) {
+  if (isCareLinkLive(row) && careLinkSyncDue(row)) {
     try {
       row = (await syncCareLink(row)).row;
     } catch (err) {

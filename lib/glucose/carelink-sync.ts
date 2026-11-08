@@ -23,6 +23,23 @@ export const CARELINK_MIN_SYNC_INTERVAL_MS = 4 * 60_000;
 const TOKEN_EXPIRY_MARGIN_MS = 2 * 60_000;
 const REFRESH_LEASE_MS = 30_000;
 
+const READING_CADENCE_MS = 5 * 60_000;
+const DUE_RETRY_MS = 60_000;
+
+/**
+ * Sync when a new reading should already exist (last one is over a cadence
+ * old), retrying at most once a minute; otherwise fall back to the slow
+ * interval so status fields still refresh.
+ */
+export function careLinkSyncDue(row: SettingsRow, now = Date.now()): boolean {
+  if (!row.carelinkLastSyncAt) return true;
+  const sinceSync = now - row.carelinkLastSyncAt.getTime();
+  if (sinceSync > CARELINK_MIN_SYNC_INTERVAL_MS) return true;
+  const lastSgAt = (row.carelinkSnapshot as CareLinkSnapshot | null)?.lastSgAt ?? null;
+  const readingOverdue = lastSgAt === null || now - lastSgAt > READING_CADENCE_MS + 30_000;
+  return readingOverdue && sinceSync > DUE_RETRY_MS;
+}
+
 export const isCareLinkLive = (row: SettingsRow | null | undefined) =>
   Boolean(row?.carelinkRefreshToken && row.carelinkUsername && !row.carelinkNeedsReconnect);
 

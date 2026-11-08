@@ -406,35 +406,75 @@ function tzOffsetMs(utcMs: number, timeZone: string): number {
   return asUtc - Math.floor(utcMs / 1000) * 1000;
 }
 
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+const WALL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/;
+
+function wallClockAsUtc(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const m = WALL_RE.exec(value);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0)) : null;
+}
+
+const isIanaZone = (zone: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
- * v13 timestamps are the patient's wall-clock time with no reliable offset
- * (see carelink-cumulus-bridge). Interpret them in clientTimeZoneName.
+ * Pump wall-clock minus UTC. clientTimeZoneName is often a display label
+ * ("Chile Summer Time") rather than an IANA id, so derive the offset from
+ * pairs the payload sends in both wall-clock and server-epoch form.
  */
-export function parseCareLinkTimestamp(value: unknown, timeZone: string | null): number | null {
+export function deriveWallClockOffsetMs(pd: Record<string, unknown>): number | null {
+  const pairs: [number | null, number | null][] = [
+    [wallClockAsUtc(pd.lastConduitDateTime), num(pd.lastConduitUpdateServerDateTime)],
+    [num(pd.medicalDeviceTime), num(pd.lastMedicalDeviceDataUpdateServerTime)],
+  ];
+  for (const [wall, utc] of pairs) {
+    if (wall === null || utc === null || wall <= 0 || utc <= 0) continue;
+    const quarterHour = 15 * 60_000;
+    const offset = Math.round((wall - utc) / quarterHour) * quarterHour;
+    if (Math.abs(offset) <= 14 * 3600_000) return offset;
+  }
+  return null;
+}
+
+/**
+ * v13 timestamps are the patient's wall-clock time with no offset. Convert
+ * using the derived offset, then a valid IANA zone, then as a last resort
+ * whatever the string itself says.
+ */
+export function parseCareLinkTimestamp(
+  value: unknown,
+  zone: { offsetMs: number | null; timeZone: string | null },
+): number | null {
   if (typeof value === "number") return value;
   if (typeof value !== "string") return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(value);
-  if (!m) {
+  const wall = wallClockAsUtc(value);
+  const hasExplicitOffset = /(Z|[+-]\d{2}:?\d{2})$/.test(value);
+  if (wall === null || hasExplicitOffset) {
     const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
-  const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0));
-  if (!timeZone) return Date.parse(value);
-  try {
-    const first = wall - tzOffsetMs(wall, timeZone);
-    return wall - tzOffsetMs(first, timeZone);
-  } catch {
-    return Date.parse(value);
+  if (zone.offsetMs !== null) return wall - zone.offsetMs;
+  if (zone.timeZone && isIanaZone(zone.timeZone)) {
+    const first = wall - tzOffsetMs(wall, zone.timeZone);
+    return wall - tzOffsetMs(first, zone.timeZone);
   }
+  return wall;
 }
-
-const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 export function parsePatientData(pd: Record<string, unknown>): {
   readings: { date: number; sgv: number }[];
   snapshot: CareLinkSnapshot;
 } {
   const timeZone = typeof pd.clientTimeZoneName === "string" ? pd.clientTimeZoneName : null;
+  const zone = { offsetMs: deriveWallClockOffsetMs(pd), timeZone };
   const futureLimit = Date.now() + 10 * 60_000;
 
   const readings: { date: number; sgv: number }[] = [];
@@ -442,7 +482,7 @@ export function parsePatientData(pd: Record<string, unknown>): {
     const value = num((sg as Record<string, unknown>)?.sg);
     const date = parseCareLinkTimestamp(
       (sg as Record<string, unknown>)?.timestamp ?? (sg as Record<string, unknown>)?.datetime,
-      timeZone,
+      zone,
     );
     // sg 0 = no value (warm-up, calibration, signal loss).
     if (value && value > 0 && date && date <= futureLimit) readings.push({ date, sgv: Math.round(value) });
@@ -451,7 +491,7 @@ export function parsePatientData(pd: Record<string, unknown>): {
 
   const last = (pd.lastSG ?? {}) as Record<string, unknown>;
   const lastSg = num(last.sg);
-  const lastSgAt = parseCareLinkTimestamp(last.timestamp ?? last.datetime, timeZone);
+  const lastSgAt = parseCareLinkTimestamp(last.timestamp ?? last.datetime, zone);
   if (lastSg && lastSg > 0 && lastSgAt && lastSgAt <= futureLimit && !readings.some((r) => r.date === lastSgAt)) {
     readings.push({ date: lastSgAt, sgv: Math.round(lastSg) });
     readings.sort((a, b) => a.date - b.date);
