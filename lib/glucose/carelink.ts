@@ -196,8 +196,9 @@ export function buildAuthorizeUrl(config: CareLinkConfig, state: string, challen
 export function parseRedirectInput(input: string): { code: string; state: string | null } | null {
   const raw = input.trim();
   if (!raw) return null;
-  const code = /[?&]code=([^&#\s]+)/.exec(raw)?.[1];
-  const state = /[?&]state=([^&#\s]+)/.exec(raw)?.[1];
+  // Chrome's console wraps it in quotes: Failed to launch '…?code=…&state=…'
+  const code = /[?&]code=([^&#\s'"<>]+)/.exec(raw)?.[1];
+  const state = /[?&]state=([^&#\s'"<>]+)/.exec(raw)?.[1];
   if (code) return { code: decodeURIComponent(code), state: state ? decodeURIComponent(state) : null };
   if (/^[\w.-]{10,}$/.test(raw)) return { code: raw, state: null };
   return null;

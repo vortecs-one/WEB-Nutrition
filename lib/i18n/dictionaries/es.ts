@@ -505,7 +505,21 @@ const es = {
     careLinkStep1: "1. Abre el inicio de sesión de Medtronic en una pestaña nueva e ingresa con tu cuenta.",
     careLinkOpenLogin: "Abrir inicio de sesión de CareLink",
     careLinkStep2:
-      '2. Al terminar, la página queda en blanco o muestra un error porque intenta abrir la app. Abre DevTools (F12) > Red, busca la solicitud que empieza con "com.medtronic.carepartner:/sso?code=" y copia esa dirección completa.',
+      "2. Al terminar, la pestaña de Medtronic queda en blanco porque intenta abrir la app. Copia la dirección de retorno y pégala aquí: se conecta sola.",
+    careLinkOnceNote: "Solo se hace una vez. Después la sesión se renueva sola en segundo plano.",
+    careLinkHelpTitle: "¿Dónde encuentro la dirección de retorno?",
+    careLinkHelpChrome:
+      "Chrome / Edge: antes de iniciar sesión, presiona F12 y abre la pestaña Consola. Al terminar aparece un error rojo «Failed to launch 'com.medtronic.carepartner:/sso?code=…'». Copia esa línea completa.",
+    careLinkHelpFirefox:
+      "Firefox: antes de iniciar sesión, presiona F12, abre Red y activa «Persistir registros». Al terminar, abre la última solicitud con estado 302 y copia el valor del encabezado Location.",
+    careLinkHelpSafari:
+      "Safari: activa el menú Desarrollo (Ajustes > Avanzado), abre Inspector web > Red antes de iniciar sesión y copia el encabezado Location de la última respuesta 302.",
+    careLinkHelpMobile: "En el teléfono no se puede ver esta dirección: hazlo una vez desde un computador.",
+    careLinkPasteHint: "Pega la línea completa; el código se detecta automáticamente.",
+    careLinkConnecting: "Conectando con CareLink…",
+    careLinkReconnect: "Reconectar",
+    careLinkCancel: "Cancelar",
+    careLinkKeepAlive: "La sesión se renueva automáticamente cada pocas horas.",
     careLinkRedirectLabel: "Dirección de retorno (o solo el código)",
     careLinkRedirectPlaceholder: "com.medtronic.carepartner:/sso?code=...&state=...",
     careLinkConnectButton: "Conectar",

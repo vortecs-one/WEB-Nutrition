@@ -502,7 +502,21 @@ const en: Dictionary = {
     careLinkStep1: "1. Open the Medtronic sign-in in a new tab and log in with your account.",
     careLinkOpenLogin: "Open CareLink sign-in",
     careLinkStep2:
-      '2. When done, the page goes blank or shows an error because it tries to open the app. Open DevTools (F12) > Network, find the request starting with "com.medtronic.carepartner:/sso?code=" and copy that full address.',
+      "2. When you finish, the Medtronic tab goes blank because it tries to open the app. Copy the redirect address and paste it here: it connects on its own.",
+    careLinkOnceNote: "You only do this once. After that the session renews itself in the background.",
+    careLinkHelpTitle: "Where do I find the redirect address?",
+    careLinkHelpChrome:
+      "Chrome / Edge: before signing in, press F12 and open the Console tab. When you finish, a red error appears: \"Failed to launch 'com.medtronic.carepartner:/sso?code=…'\". Copy that whole line.",
+    careLinkHelpFirefox:
+      "Firefox: before signing in, press F12, open Network and enable \"Persist Logs\". When you finish, open the last request with status 302 and copy its Location header.",
+    careLinkHelpSafari:
+      "Safari: enable the Develop menu (Settings > Advanced), open Web Inspector > Network before signing in, and copy the Location header of the last 302 response.",
+    careLinkHelpMobile: "Phones don't show this address: do it once from a computer.",
+    careLinkPasteHint: "Paste the whole line; the code is detected automatically.",
+    careLinkConnecting: "Connecting to CareLink…",
+    careLinkReconnect: "Reconnect",
+    careLinkCancel: "Cancel",
+    careLinkKeepAlive: "The session renews automatically every few hours.",
     careLinkRedirectLabel: "Redirect address (or just the code)",
     careLinkRedirectPlaceholder: "com.medtronic.carepartner:/sso?code=...&state=...",
     careLinkConnectButton: "Connect",
