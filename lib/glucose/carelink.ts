@@ -55,10 +55,51 @@ export class CareLinkError extends Error {
 const configCache = new Map<CareLinkRegion, { config: CareLinkConfig; at: number }>();
 const CONFIG_TTL_MS = 6 * 3600_000;
 
+// Medtronic's CDN sometimes answers datacenter requests (e.g. Vercel gru1)
+// with a non-JSON page. These are the values the live discovery returned on
+// 2026-11-08 and are used when discovery is unusable.
+const FALLBACK_CONFIG: Record<CareLinkRegion, CareLinkConfig> = {
+  EU: {
+    region: "EU",
+    authBase: "https://carelink-login.minimed.eu",
+    clientId: "PeAhkbhQWlQRxJiQxWfcFBiGus1lxfe9",
+    scope: "profile openid offline_access",
+    audience: "carepartner.patient.ous",
+    redirectUri: "com.medtronic.carepartner:/sso",
+    baseUrlCareLink: "https://carelink.minimed.eu/api/carepartner/v2",
+    baseUrlCumulus: "https://clcloud.minimed.eu/connect/carepartner/v13",
+  },
+  US: {
+    region: "US",
+    authBase: "https://carelink-login.minimed.com",
+    clientId: "",
+    scope: "profile openid offline_access",
+    audience: "carepartner.patient.us",
+    redirectUri: "com.medtronic.carepartner:/sso",
+    baseUrlCareLink: "https://carelink.minimed.com/api/carepartner/v2",
+    baseUrlCumulus: "https://clcloud.minimed.com/connect/carepartner/v13",
+  },
+};
+
+const DEFAULT_HEADERS: Record<string, string> = {
+  Accept: "application/json, text/plain, */*",
+  "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 14; Pixel 7 Build/UQ1A.240205.004) CarePartner/3.8.0",
+};
+
+function describe(body: unknown): string {
+  const text = typeof body === "string" ? body : JSON.stringify(body);
+  return (text ?? "").slice(0, 160).replace(/\s+/g, " ");
+}
+
 async function getJson(url: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
   let res: Response;
   try {
-    res = await fetch(url, { ...init, signal: AbortSignal.timeout(15_000), cache: "no-store" });
+    res = await fetch(url, {
+      ...init,
+      headers: { ...DEFAULT_HEADERS, ...(init?.headers as Record<string, string> | undefined) },
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
   } catch (err) {
     throw new CareLinkError("unreachable", (err as Error).message);
   }
@@ -76,20 +117,39 @@ export async function getCareLinkConfig(region: CareLinkRegion): Promise<CareLin
   const cached = configCache.get(region);
   if (cached && Date.now() - cached.at < CONFIG_TTL_MS) return cached.config;
 
+  try {
+    return await discoverCareLinkConfig(region);
+  } catch (err) {
+    const fallback = FALLBACK_CONFIG[region];
+    if (!fallback.clientId) throw err;
+    console.warn("[carelink] discovery unusable, using built-in config:", (err as Error).message);
+    configCache.set(region, { config: fallback, at: Date.now() - CONFIG_TTL_MS + 15 * 60_000 });
+    return fallback;
+  }
+}
+
+async function discoverCareLinkConfig(region: CareLinkRegion): Promise<CareLinkConfig> {
   const discovery = await getJson(DISCOVERY_URL);
   const cp = (discovery.body as { CP?: Record<string, string>[] } | null)?.CP;
   const entry = cp?.find((c) => c.region === region);
   const ssoUrl = entry ? entry[entry.UseSSOConfiguration] : undefined;
   if (!entry || !ssoUrl || !entry.baseUrlCareLink || !entry.baseUrlCumulus) {
-    throw new CareLinkError("bad-response", "discovery: region not found");
+    throw new CareLinkError(
+      "bad-response",
+      `discovery: region not found (HTTP ${discovery.status}: ${describe(discovery.body)})`,
+    );
   }
 
-  const sso = (await getJson(ssoUrl)).body as {
+  const ssoResponse = await getJson(ssoUrl);
+  const sso = ssoResponse.body as {
     server?: { hostname?: string; port?: number; prefix?: string };
     client?: { client_id?: string; scope?: string; audience?: string; redirect_uri?: string };
   } | null;
   if (!sso?.server?.hostname || !sso.client?.client_id || !sso.client.redirect_uri) {
-    throw new CareLinkError("bad-response", "discovery: invalid SSO config");
+    throw new CareLinkError(
+      "bad-response",
+      `discovery: invalid SSO config (HTTP ${ssoResponse.status}: ${describe(ssoResponse.body)})`,
+    );
   }
 
   const port = sso.server.port && sso.server.port !== 443 ? `:${sso.server.port}` : "";
