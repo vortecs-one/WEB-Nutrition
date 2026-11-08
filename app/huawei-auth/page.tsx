@@ -1,6 +1,6 @@
 // app/huawei-auth/page.tsx
 // OAuth redirect target registered with Huawei:
-//   https://web-nutrition.vercel.app/huawei-auth?code=<code>&state=<state>
+//   https://vhealthy.vercel.app/huawei-auth?code=<code>&state=<state>
 // Huawei can only redirect to an https URL, so this page catches the redirect
 // and forwards the query string to the native app's custom scheme,
 // com.thruxion.app://huawei-auth. The app does the code->token exchange; this
