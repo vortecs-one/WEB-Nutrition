@@ -146,6 +146,11 @@ export type CareLinkStatus = {
   pumpBatteryPercent: number | null;
   lowLimit: number | null;
   highLimit: number | null;
+  sensorMinutesLeft: number | null;
+  transmitterBatteryPercent: number | null;
+  calibrationMinutesLeft: number | null;
+  reservoirPercent: number | null;
+  autoMode: string | null;
   fetchedAt: number;
 };
 

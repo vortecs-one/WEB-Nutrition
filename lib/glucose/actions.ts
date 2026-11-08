@@ -799,6 +799,14 @@ async function fetchFromCareLinkImport(
             pumpBatteryPercent: snapshot.pumpBatteryPercent,
             lowLimit: snapshot.lowLimit,
             highLimit: snapshot.highLimit,
+            // Older snapshots predate these fields; the next sync fills them.
+            sensorMinutesLeft:
+              snapshot.sensorMinutesLeft ??
+              (snapshot.sensorHoursLeft !== null ? snapshot.sensorHoursLeft * 60 : null),
+            transmitterBatteryPercent: snapshot.transmitterBatteryPercent ?? null,
+            calibrationMinutesLeft: snapshot.calibrationMinutesLeft ?? null,
+            reservoirPercent: snapshot.reservoirPercent ?? null,
+            autoMode: snapshot.autoMode ?? null,
             fetchedAt: snapshot.fetchedAt,
           }
         : null,

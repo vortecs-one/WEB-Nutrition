@@ -367,6 +367,15 @@ export type CareLinkSnapshot = {
   /** Alert limits configured on the pump (mg/dL). */
   lowLimit: number | null;
   highLimit: number | null;
+  /** Minutes of sensor life left (finer than sensorHoursLeft). */
+  sensorMinutesLeft?: number | null;
+  /** Guardian transmitter battery, 0–100. */
+  transmitterBatteryPercent?: number | null;
+  /** Minutes until the next calibration is due. */
+  calibrationMinutesLeft?: number | null;
+  reservoirPercent?: number | null;
+  /** SmartGuard state, e.g. AUTO_BASAL, SAFE_BASAL, FEATURE_OFF. */
+  autoMode?: string | null;
   timeZone: string | null;
   fetchedAt: number;
 };
@@ -449,6 +458,20 @@ export function parsePatientData(pd: Record<string, unknown>): {
   }
 
   const activeInsulin = pd.activeInsulin as Record<string, unknown> | undefined;
+  const algorithm = pd.therapyAlgorithmState as Record<string, unknown> | undefined;
+  const limits = (Array.isArray(pd.limits) ? pd.limits[0] : null) as Record<string, unknown> | null;
+  // Medtronic sends 255 / negative values as "unknown" sentinels.
+  const pct = (v: unknown) => {
+    const n = num(v);
+    return n !== null && n >= 0 && n <= 100 ? n : null;
+  };
+  const minutes = (hours: unknown, mins: unknown) => {
+    const m = num(mins);
+    if (m !== null && m >= 0 && m < 255 * 60) return m;
+    const h = num(hours);
+    return h !== null && h >= 0 && h < 255 ? h * 60 : null;
+  };
+  const sensorMinutesLeft = minutes(pd.sensorDurationHours, pd.sensorDurationMinutes);
   return {
     readings,
     snapshot: {
@@ -456,12 +479,17 @@ export function parsePatientData(pd: Record<string, unknown>): {
       lastSg: lastSg && lastSg > 0 ? Math.round(lastSg) : null,
       trend: TREND_MAP[String(pd.lastSGTrend ?? "")] ?? "NONE",
       sensorState: typeof last.sensorState === "string" ? last.sensorState : null,
-      sensorHoursLeft: num(pd.sensorDurationHours),
+      sensorHoursLeft: sensorMinutesLeft !== null ? Math.floor(sensorMinutesLeft / 60) : null,
+      sensorMinutesLeft,
       activeInsulin: num(activeInsulin?.amount),
-      reservoirUnits: num(pd.reservoirRemainingUnits),
-      pumpBatteryPercent: num(pd.pumpBatteryLevelPercent),
-      lowLimit: num(pd.sgBelowLimit),
-      highLimit: num(pd.sgAboveLimit),
+      reservoirUnits: num(pd.reservoirRemainingUnits) ?? num(pd.reservoirAmount),
+      reservoirPercent: pct(pd.reservoirLevelPercent),
+      pumpBatteryPercent: pct(pd.pumpBatteryLevelPercent) ?? pct(pd.medicalDeviceBatteryLevelPercent),
+      transmitterBatteryPercent: pct(pd.gstBatteryLevel),
+      calibrationMinutesLeft: minutes(pd.timeToNextCalibHours, pd.timeToNextCalibrationMinutes),
+      autoMode: typeof algorithm?.autoModeShieldState === "string" ? algorithm.autoModeShieldState : null,
+      lowLimit: num(pd.sgBelowLimit) ?? num(limits?.lowLimit),
+      highLimit: num(pd.sgAboveLimit) ?? num(limits?.highLimit),
       timeZone,
       fetchedAt: Date.now(),
     },

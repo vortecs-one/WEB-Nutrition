@@ -289,6 +289,45 @@ export default function GlucoseTracker({
   const sensorLeft = splitDuration(sensorRemaining);
   const sensorPct = sensorState ? Math.round(sensorState.fraction * 100) : 0;
 
+  // Guardian 3 status from the live CareLink snapshot (pump + sensor).
+  const careLink = settings?.source === "carelink" ? (data?.careLinkStatus ?? null) : null;
+  const G3_LIFE_MIN = 7 * 24 * 60;
+  // The pump reports remaining life at snapshot time; age it to now.
+  const clSensorLeftMin =
+    careLink?.sensorMinutesLeft != null
+      ? Math.max(0, careLink.sensorMinutesLeft - (Date.now() - careLink.fetchedAt) / 60_000)
+      : null;
+  const clSensorPct =
+    clSensorLeftMin !== null ? Math.min(100, Math.round((clSensorLeftMin / G3_LIFE_MIN) * 100)) : 0;
+  const clSensorLeft = splitDuration((clSensorLeftMin ?? 0) * 60_000);
+  const clSensorLabel =
+    clSensorLeftMin === null
+      ? null
+      : clSensorLeftMin <= 0
+        ? t.sensorExpired
+        : clSensorLeft.days > 0
+          ? t.sensorRemainingDays
+              .replace("{d}", String(clSensorLeft.days))
+              .replace("{h}", String(clSensorLeft.hours))
+          : t.sensorRemainingHours
+              .replace("{h}", String(clSensorLeft.hours))
+              .replace("{m}", String(clSensorLeft.minutes));
+  const levelBarClass = (pct: number) =>
+    pct <= 10 ? "bg-destructive" : pct <= 25 ? "bg-amber-500" : "bg-chart-2";
+  const formatHoursMinutes = (min: number) => {
+    const h = Math.floor(min / 60);
+    const m = Math.round(min % 60);
+    return h > 0 ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
+  };
+  const autoModeLabel = (mode: string) =>
+    mode === "AUTO_BASAL"
+      ? t.careLinkAutoModeOn
+      : mode === "SAFE_BASAL"
+        ? t.careLinkAutoModeSafe
+        : mode === "FEATURE_OFF"
+          ? t.careLinkAutoModeOff
+          : mode.replace(/_/g, " ").toLowerCase();
+
   const formatDateTime = (ms: number) =>
     new Date(ms).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
   const formatTime = (ms: number) =>
@@ -1151,16 +1190,97 @@ export default function GlucoseTracker({
           </section>
         )}
 
+        {/* Guardian 3 sensor panel — remaining life, transmitter battery and
+            calibration, as reported by the pump through CareLink. */}
+        {!sensor && careLink && (
+          <section
+            className={`@container order-2 rounded-2xl bg-sidebar-accent/40 p-4 ${
+              showConnection ? "col-span-2" : ""
+            }`}
+          >
+            <div className="flex h-8 items-center gap-2">
+              <Cpu className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
+                {t.sensorTitle}
+              </h3>
+            </div>
+
+            {clSensorLabel && (
+              <div className="mt-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                  <span
+                    className={`text-sm font-semibold ${clSensorLeftMin === 0 ? "text-destructive" : ""}`}
+                  >
+                    {clSensorLabel}
+                  </span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-sidebar-foreground/60">
+                    {clSensorPct}%
+                  </span>
+                </div>
+                <div
+                  className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-sidebar-foreground/10"
+                  role="progressbar"
+                  aria-valuenow={clSensorPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={t.sensorLifeRemaining}
+                >
+                  <div
+                    className={`h-full rounded-full transition-all ${levelBarClass(clSensorPct)}`}
+                    style={{ width: `${clSensorPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {careLink.sensorMinutesLeft != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.sensorExpires}</span>
+                  <span className={infoValue}>
+                    {formatDateTime(careLink.fetchedAt + careLink.sensorMinutesLeft * 60_000)}
+                  </span>
+                </li>
+              )}
+              {careLink.transmitterBatteryPercent != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkTransmitterBattery}</span>
+                  <LevelValue
+                    pct={careLink.transmitterBatteryPercent}
+                    barClass={levelBarClass(careLink.transmitterBatteryPercent)}
+                    text={`${careLink.transmitterBatteryPercent}%`}
+                  />
+                </li>
+              )}
+              {careLink.calibrationMinutesLeft != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkNextCalibration}</span>
+                  <span
+                    className={`${infoValue} ${careLink.calibrationMinutesLeft === 0 ? "text-amber-500" : ""}`}
+                  >
+                    {careLink.calibrationMinutesLeft === 0
+                      ? t.careLinkCalibrationNow
+                      : formatHoursMinutes(careLink.calibrationMinutesLeft)}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
         {/* Settings panel: the ranges/alarms read from the source, plus the
             connection form behind the gear. Always rendered — gating it on
             libreThresholds (null for Nightscout) would leave Nightscout users
             with no way to reach their settings at all. */}
         <section
           className={`@container order-1 flex flex-col rounded-2xl bg-sidebar-accent/40 p-4 ${
-            showConnection || !sensor ? "col-span-2" : ""
+            showConnection || (!sensor && !careLink) ? "col-span-2" : ""
           }`}
         >
           <div className="flex h-8 items-center gap-2">
+            {careLink && (
+              <Droplet className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+            )}
             {libreThresholds && (
               <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
             )}
@@ -1233,6 +1353,71 @@ export default function GlucoseTracker({
             </ul>
           )}
 
+          {careLink && (
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {careLink.pumpBatteryPercent != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkPumpBattery}</span>
+                  <LevelValue
+                    pct={careLink.pumpBatteryPercent}
+                    barClass={levelBarClass(careLink.pumpBatteryPercent)}
+                    text={`${careLink.pumpBatteryPercent}%`}
+                  />
+                </li>
+              )}
+              {careLink.reservoirUnits != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkReservoir}</span>
+                  {careLink.reservoirPercent != null ? (
+                    <LevelValue
+                      pct={careLink.reservoirPercent}
+                      barClass={levelBarClass(careLink.reservoirPercent)}
+                      text={`${careLink.reservoirUnits.toFixed(1)} U`}
+                    />
+                  ) : (
+                    <span className={infoValue}>{careLink.reservoirUnits.toFixed(1)} U</span>
+                  )}
+                </li>
+              )}
+              {careLink.activeInsulin != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkActiveInsulin}</span>
+                  <span className={infoValue}>{careLink.activeInsulin.toFixed(2)} U</span>
+                </li>
+              )}
+              {careLink.autoMode && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkAutoMode}</span>
+                  <span className={infoValue}>{autoModeLabel(careLink.autoMode)}</span>
+                </li>
+              )}
+              {careLink.lowLimit != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkLowLimit}</span>
+                  <span className={infoValue}>
+                    {formatGlucose(careLink.lowLimit, unit)} {unitLabel(unit)}
+                  </span>
+                </li>
+              )}
+              {careLink.highLimit != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkHighLimit}</span>
+                  <span className={infoValue}>
+                    {formatGlucose(careLink.highLimit, unit)} {unitLabel(unit)}
+                  </span>
+                </li>
+              )}
+            </ul>
+          )}
+          {careLink && (
+            <p className="mt-auto pt-3 text-right text-[10px] text-sidebar-foreground/50">
+              {t.careLinkUpdatedAt.replace("{time}", formatTime(careLink.fetchedAt))}
+            </p>
+          )}
+          {settings?.source === "carelink" && settings.careLinkConnected && !careLink && (
+            <p className="mt-3 text-xs text-sidebar-foreground/60">{t.careLinkNoStatus}</p>
+          )}
+
           {/* Where these ranges come from — behind an icon rather than four
               lines of small print in a half-width column. mt-auto parks it in
               the panel's bottom-right corner once the panel is stretched to
@@ -1275,5 +1460,17 @@ export default function GlucoseTracker({
         onClose={() => setShowRangesInfo(false)}
       />
     </div>
+  );
+}
+
+// Value with a small level bar beside it (batteries, reservoir).
+function LevelValue({ pct, barClass, text }: { pct: number; barClass: string; text: string }) {
+  return (
+    <span className="flex shrink-0 items-center gap-2 font-medium tabular-nums">
+      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-sidebar-foreground/10" aria-hidden="true">
+        <span className={`block h-full rounded-full ${barClass}`} style={{ width: `${pct}%` }} />
+      </span>
+      {text}
+    </span>
   );
 }
