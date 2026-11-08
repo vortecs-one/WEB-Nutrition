@@ -55,6 +55,8 @@ import {
 import { chartTimeTicks } from "@/lib/glucose/chart-time";
 import { usePublishGlucose } from "@/lib/glucose/status-provider";
 import { TREND_ICON } from "@/lib/glucose/trend-icons";
+import { hasTrend, withDerivedTrends } from "@/lib/glucose/trend";
+import type { TrendDirection } from "@/lib/glucose/types";
 import { mgdlToMmol } from "@/lib/health-formulas";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
@@ -203,7 +205,15 @@ export default function GlucoseTracker({
   }, [rangeHours, load, Boolean(settings)]);
 
   const unit = settings?.unit ?? "mgdl";
-  const current = data?.current ?? null;
+  // Sources without trend data (CareLink imports) get directions derived from
+  // the rate of change, so the chart marker, pill and tooltip can show arrows.
+  const readings = useMemo(() => (data ? withDerivedTrends(data.readings) : []), [data]);
+  const current = useMemo(() => {
+    const raw = data?.current ?? null;
+    if (!raw || hasTrend(raw.direction)) return raw;
+    const derived = readings.find((r) => r.date === raw.date);
+    return derived ? { ...raw, direction: derived.direction } : raw;
+  }, [data, readings]);
   const currentMins = current ? minutesAgo(current.date) : null;
   const readingIsOld = currentMins !== null && currentMins > STALE_MINUTES;
   // CareLink has no live feed: its readings come from periodic CSV imports,
@@ -312,12 +322,12 @@ export default function GlucoseTracker({
 
   // Convert readings for the chart (respecting the display unit).
   const chartData = useMemo(() => {
-    if (!data) return [];
-    return data.readings.map((r) => ({
+    return readings.map((r) => ({
       date: r.date,
       value: unit === "mmol" ? mgdlToMmol(r.sgv) : r.sgv,
+      direction: r.direction,
     }));
-  }, [data, unit]);
+  }, [readings, unit]);
 
   const cv = (mgdl: number) => (unit === "mmol" ? mgdlToMmol(mgdl) : mgdl);
 
@@ -438,10 +448,11 @@ export default function GlucoseTracker({
   const renderTooltip = (props: unknown) => {
     const { active, payload } = props as {
       active?: boolean;
-      payload?: { payload: { date: number; value: number } }[];
+      payload?: { payload: { date: number; value: number; direction: TrendDirection } }[];
     };
     if (!active || !payload?.length) return null;
     const point = payload[0].payload;
+    const PointTrendIcon = TREND_ICON[point.direction];
     return (
       <div className="rounded-xl border border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground shadow-lg">
         <div className="flex items-center gap-2">
@@ -452,6 +463,14 @@ export default function GlucoseTracker({
           />
           <span className="text-base font-semibold tabular-nums">{point.value}</span>
           <span className="text-xs text-sidebar-foreground/60">{unitLabel(unit)}</span>
+          {PointTrendIcon && (
+            <PointTrendIcon
+              className="h-4 w-4"
+              style={{ color: zoneColorFor(point.value) }}
+              strokeWidth={2.75}
+              aria-hidden="true"
+            />
+          )}
         </div>
         <div className="mt-0.5 text-xs tabular-nums text-sidebar-foreground/60">
           {timeFormatter(point.date)}
