@@ -212,6 +212,15 @@ export default function GlucoseTracker({
   // was taken instead). An old reading is still old, though: it must not
   // pass for the current glucose in the insulin calculator or the companion.
   const isCareLink = settings?.source === "carelink";
+  const sourceLabel =
+    settings?.source === "carelink"
+      ? "Guardian 3"
+      : settings?.source === "librelinkup"
+        ? "LibreLink"
+        : settings?.source === "nightscout"
+          ? "Nightscout"
+          : null;
+  const sourceSuffix = sourceLabel ? ` (${sourceLabel})` : "";
   const isStale = !isCareLink && readingIsOld;
   const historicalOnly = isCareLink && readingIsOld;
   // null while there's no reading to classify. The reading is also published
@@ -779,8 +788,9 @@ export default function GlucoseTracker({
                       ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
                       : currentMins === 0
                         ? t.justNow
-                        : t.lastUpdated.replace("{min}", String(currentMins))}
-                  </div>
+  : t.lastUpdated.replace("{min}", String(currentMins))}
+  {sourceSuffix}
+  </div>
                   {isStale && (
                     <div className="flex min-w-[6.5rem] flex-1 items-start gap-1 text-destructive">
                       <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
@@ -960,8 +970,9 @@ export default function GlucoseTracker({
                       ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
                       : currentMins === 0
                         ? t.justNow
-                        : t.lastUpdated.replace("{min}", String(currentMins))}
-                  </div>
+  : t.lastUpdated.replace("{min}", String(currentMins))}
+  {sourceSuffix}
+  </div>
                   {isStale && (
                     <div className="flex items-start gap-1 text-destructive">
                       <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
