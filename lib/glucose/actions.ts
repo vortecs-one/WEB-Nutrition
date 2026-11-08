@@ -38,6 +38,7 @@ import {
   type LibreSession,
 } from "./librelinkup";
 import { CARELINK_IMPORT_CHUNK, isPlausibleReading, type CareLinkCsvReading } from "./carelink-csv";
+import { estimateGuardianSensor, GUARDIAN3_LOOKBACK_MS } from "./guardian-sensor";
 
 // The signed-in glucose user: their role (owner / watcher, see access.ts),
 // their stable per-user key (same pattern as day-log: prefer the Thruxion
@@ -709,6 +710,22 @@ async function fetchFromCareLinkImport(
     direction: "NONE" as TrendDirection,
   }));
 
+  // The sensor panel needs a full wear period of timestamps, which is
+  // usually longer than the chart window.
+  const sensorDates = latest
+    ? await db
+        .select({ date: carelinkReadings.date })
+        .from(carelinkReadings)
+        .where(
+          and(
+            eq(carelinkReadings.userKey, row.userKey),
+            gte(carelinkReadings.date, new Date(latest.date.getTime() - GUARDIAN3_LOOKBACK_MS)),
+          ),
+        )
+        .orderBy(carelinkReadings.date)
+    : [];
+  const sensor = estimateGuardianSensor(sensorDates.map((r) => r.date.getTime()));
+
   return {
     ok: true,
     data: {
@@ -717,8 +734,8 @@ async function fetchFromCareLinkImport(
       settings: toClientSettings(row, role),
       patientName: null,
       patients: [],
-      // CSV imports carry no sensor or LibreLink threshold data.
-      sensor: null,
+      // Estimated from reading gaps; CSV imports carry no device status.
+      sensor,
       libreThresholds: null,
     },
   };

@@ -639,6 +639,8 @@ const es = {
     sensorPastEstimate: "Supera la vida estimada",
     sensorWarmingUp: "Calentando",
     sensorWarmUpEnds: "Las lecturas empiezan a las {time}",
+    sensorEstimatedGuardian:
+      "Guardian 3 · uso de 7 días. Estimado a partir del último cambio de sensor en tus lecturas importadas.",
     // --- Rango objetivo y alarmas leídos de la app LibreLink (solo lectura) ---
     // Nombre de marca de la fuente conectada — igual en todos los idiomas.
     libreAppName: "LibreLink",

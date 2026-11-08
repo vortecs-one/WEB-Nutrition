@@ -62,6 +62,10 @@ export type SensorInfo = {
   warmUpMinutes: number;
   /** Abbott's undocumented per-model code (`pt` in the API), if reported. */
   productType: number | null;
+  /** Known wear duration (Guardian 3: 7 days); overrides the Libre inference. */
+  lifetimeMs?: number;
+  /** True when the start was inferred from reading gaps, not reported by the device. */
+  estimated?: boolean;
 };
 
 // A single glucose alarm as configured in the patient's LibreLink app.
@@ -239,6 +243,7 @@ export const SENSOR_LIFETIME_PROMOTION_GRACE_MS = 60 * 60_000;
  * reporting.
  */
 export function sensorLifetimeMs(sensor: SensorInfo, lastReadingAt: number | null = null): number {
+  if (sensor.lifetimeMs) return sensor.lifetimeMs;
   if (sensor.productType !== null && sensor.productType in SENSOR_LIFETIME_BY_PRODUCT_TYPE) {
     return SENSOR_LIFETIME_BY_PRODUCT_TYPE[sensor.productType];
   }

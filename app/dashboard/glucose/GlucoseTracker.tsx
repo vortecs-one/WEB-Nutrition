@@ -1094,6 +1094,11 @@ export default function GlucoseTracker({
                 {t.sensorWarmUpEnds.replace("{time}", formatTime(sensorWarmUpEndsAt(sensor)))}
               </p>
             )}
+            {sensor.estimated && (
+              <p className="mt-2 text-[11px] leading-relaxed text-sidebar-foreground/60">
+                {t.sensorEstimatedGuardian}
+              </p>
+            )}
           </section>
         )}
 

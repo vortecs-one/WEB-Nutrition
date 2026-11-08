@@ -632,6 +632,8 @@ const en: Dictionary = {
     sensorPastEstimate: "Past expected life",
     sensorWarmingUp: "Warming up",
     sensorWarmUpEnds: "Readings start at {time}",
+    sensorEstimatedGuardian:
+      "Guardian 3 · 7-day wear. Estimated from the last sensor change in your imported readings.",
     // --- Target range + alarms read from the LibreLink app (read-only) ---
     // Brand name of the connected source — same in every locale.
     libreAppName: "LibreLink",
