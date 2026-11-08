@@ -35,7 +35,7 @@ import {
   Tooltip,
 } from "recharts";
 import { useI18n } from "@/lib/i18n/provider";
-import { fetchGlucoseData, setGlucoseUnit, setLibrePatient } from "@/lib/glucose/actions";
+import { fetchGlucoseData, setGlucoseSource, setGlucoseUnit, setLibrePatient } from "@/lib/glucose/actions";
 import {
   type GlucoseData,
   type GlucoseRole,
@@ -151,6 +151,26 @@ export default function GlucoseTracker({
       setSwitchingPatient(false);
     },
     [load, switchingPatient],
+  );
+
+  // Switch which configured sensor feeds the readings, then reload its data.
+  const [switchingSource, setSwitchingSource] = useState(false);
+  const handleSwitchSource = useCallback(
+    async (next: GlucoseSettings["source"]) => {
+      if (switchingSource) return;
+      setSwitchingSource(true);
+      const result = await setGlucoseSource(next);
+      if (result.ok) {
+        setSettings(result.settings);
+        setData(null);
+        setLoading(true);
+        await load(rangeRef.current);
+      } else {
+        setError("source-switch");
+      }
+      setSwitchingSource(false);
+    },
+    [load, switchingSource],
   );
 
   // Switch the display unit. Applied optimistically so the chart and readout
@@ -862,6 +882,49 @@ export default function GlucoseTracker({
         isStale={isStale}
         settings={settings}
       />
+
+      {/* Sensor switcher: picks which configured source feeds the readings.
+          Owner only, and only once more than one source is set up. */}
+      {isOwner &&
+        (() => {
+          const sources = (
+            [
+              ["carelink", "Guardian 3", settings.careLinkConnected || settings.careLinkReadingCount > 0],
+              ["librelinkup", "LibreLink", settings.hasLibreCredentials],
+              ["nightscout", "Nightscout", Boolean(settings.nightscoutUrl)],
+            ] as const
+          ).filter(([, , ok]) => ok);
+          if (sources.length < 2) return null;
+          return (
+            <section className="bg-sidebar text-sidebar-foreground rounded-3xl shadow-sm p-4">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+                <span className="text-xs font-medium text-sidebar-foreground/70">{t.sourceLabel}</span>
+              </div>
+              <div role="group" aria-label={t.sourceLabel} className="mt-2 flex flex-wrap gap-2">
+                {sources.map(([id, label]) => {
+                  const selected = settings.source === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleSwitchSource(id)}
+                      disabled={switchingSource || selected}
+                      aria-pressed={selected}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition active:scale-95 disabled:pointer-events-none ${
+                        selected
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                      } ${switchingSource && !selected ? "opacity-50" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
 
       {/* Patient switcher (LibreLinkUp: main sensor + followed patients).
           Owner only: switching changes the shared selection. */}

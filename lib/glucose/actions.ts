@@ -548,6 +548,38 @@ export async function setGlucoseUnit(
   return { ok: true };
 }
 
+/**
+ * Switches which already-configured sensor feeds the readings, keeping every
+ * source's stored credentials so the owner can flip back and forth without
+ * re-entering them. Only sources that are actually set up can be selected.
+ */
+export async function setGlucoseSource(
+  source: GlucoseSettings["source"],
+): Promise<{ ok: true; settings: GlucoseSettings } | { ok: false; error: string }> {
+  const userKey = await getOwnerKey();
+  if (!userKey) return { ok: false, error: "unauthenticated" };
+
+  const row = await getSettingsRow(userKey);
+  if (!row) return { ok: false, error: "not-configured" };
+
+  const configured =
+    source === "librelinkup"
+      ? Boolean(row.libreEmail && row.librePassword)
+      : source === "nightscout"
+        ? Boolean(row.nightscoutUrl)
+        : source === "carelink"
+          ? isCareLinkLive(row) || (row.carelinkReadingCount ?? 0) > 0
+          : false;
+  if (!configured) return { ok: false, error: "not-configured" };
+
+  const [updated] = await db
+    .update(glucoseSettings)
+    .set({ source, updatedAt: new Date() })
+    .where(eq(glucoseSettings.id, row.id))
+    .returning();
+  return { ok: true, settings: toClientSettings(updated, "owner") };
+}
+
 /** Switches the selected LibreLinkUp patient connection. */
 export async function setLibrePatient(
   patientId: string,

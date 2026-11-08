@@ -185,7 +185,7 @@ export default function GlucoseSettingsForm({
         <fieldset>
           <legend className={labelClass}>{t.sourceLabel}</legend>
           <div className={pillGroupClass}>
-            {(["librelinkup", "nightscout", "carelink"] as const).map((s) => (
+            {(["carelink", "librelinkup", "nightscout"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
