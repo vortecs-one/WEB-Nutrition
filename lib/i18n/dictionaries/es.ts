@@ -511,7 +511,7 @@ const es = {
     careLinkHelpChrome:
       "Chrome / Edge: antes de iniciar sesión, presiona F12 y abre la pestaña Consola. Al terminar aparece un error rojo «Failed to launch 'com.medtronic.carepartner:/sso?code=…'». Copia esa línea completa.",
     careLinkHelpFirefox:
-      "Firefox: antes de iniciar sesión, presiona F12, abre Red y activa «Persistir registros». Al terminar, abre la última solicitud con estado 302 y copia el valor del encabezado Location.",
+      "Firefox: antes de iniciar sesión, presiona F12, abre Red y activa «Persistir registros». Al terminar, haz clic en la última solicitud 302 (resume?state=…). No copies esa dirección: abre Encabezados > Encabezados de respuesta, haz clic derecho en «location» (empieza con com.medtronic.carepartner:/sso?code=) y elige «Copiar valor».",
     careLinkHelpSafari:
       "Safari: activa el menú Desarrollo (Ajustes > Avanzado), abre Inspector web > Red antes de iniciar sesión y copia el encabezado Location de la última respuesta 302.",
     careLinkHelpMobile: "En el teléfono no se puede ver esta dirección: hazlo una vez desde un computador.",
@@ -530,6 +530,8 @@ const es = {
     careLinkReconnectNeeded: "Medtronic cerró la sesión. Vuelve a iniciar sesión para reanudar las lecturas en vivo.",
     careLinkConnectSuccess: "Conectado. {count} lectura(s) nueva(s).",
     careLinkErrorInvalidInput: "No se encontró un código en lo que pegaste.",
+    careLinkErrorRequestUrl:
+      "Esa es la dirección de la solicitud, no la de retorno. En esa misma solicitud 302, abre Encabezados de respuesta y copia el valor de «location», que empieza con com.medtronic.carepartner:/sso?code=. El código dura pocos minutos: si ya pasó tiempo, vuelve a abrir el inicio de sesión.",
     careLinkErrorExpired: "El inicio de sesión expiró. Ábrelo de nuevo y repite los pasos.",
     careLinkErrorState: "Ese código pertenece a otro intento de inicio de sesión. Ábrelo de nuevo.",
     careLinkErrorGrant: "Medtronic rechazó el código (ya se usó o expiró). Inicia sesión otra vez.",

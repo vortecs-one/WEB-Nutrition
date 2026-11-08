@@ -5,7 +5,7 @@
 // redirects to the app's custom scheme, so the owner signs in in their own tab
 // and pastes the redirect address back here. Done once; the cron keeps it alive.
 
-import { useState, type ClipboardEvent, type FormEvent } from "react";
+import { useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { CheckCircle2, ExternalLink, Loader2, RefreshCw, XCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { completeCareLinkConnect, disconnectCareLink, startCareLinkConnect } from "@/lib/glucose/actions";
@@ -15,6 +15,7 @@ type Message = { ok: boolean; text: string } | null;
 type Browser = "chrome" | "firefox" | "safari";
 
 const hasCode = (value: string) => /[?&]code=[^&#\s'"]+/.test(value);
+const isRequestUrl = (value: string) => /carelink-login\.|\/authorize\/resume|\/u\/login/i.test(value);
 
 function detectBrowser(): Browser {
   if (typeof navigator === "undefined") return "chrome";
@@ -100,17 +101,29 @@ export default function CareLinkConnect({
     onChanged(result.settings);
   };
 
-  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    const pasted = e.clipboardData.getData("text");
-    if (!hasCode(pasted)) return;
-    e.preventDefault();
-    setRedirect(pasted.trim());
-    void connect(pasted);
+  // The DevTools request URL (…/authorize/resume?state=…) is the easy thing
+  // to copy by mistake; the code lives in that response's Location header.
+  const submitRedirect = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (!hasCode(trimmed) && isRequestUrl(trimmed)) {
+      setMessage({ ok: false, text: t.careLinkErrorRequestUrl });
+      return;
+    }
+    void connect(trimmed);
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text").trim();
     e.preventDefault();
-    if (redirect.trim()) void connect(redirect);
+    setRedirect(pasted);
+    if (hasCode(pasted) || isRequestUrl(pasted)) submitRedirect(pasted);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    submitRedirect(redirect);
   };
 
   const handleDisconnect = async () => {
@@ -206,7 +219,7 @@ export default function CareLinkConnect({
 
             {started && (
               <li>
-                <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2">
                   <p className="text-xs leading-relaxed text-sidebar-foreground/70 text-pretty">{t.careLinkStep2}</p>
                   <label htmlFor="carelink-redirect" className="text-xs font-medium text-sidebar-foreground/70">
                     {t.careLinkRedirectLabel}
@@ -216,6 +229,7 @@ export default function CareLinkConnect({
                     value={redirect}
                     onChange={(e) => setRedirect(e.target.value)}
                     onPaste={handlePaste}
+                    onKeyDown={handleKeyDown}
                     placeholder={t.careLinkRedirectPlaceholder}
                     autoComplete="off"
                     spellCheck={false}
@@ -243,7 +257,8 @@ export default function CareLinkConnect({
 
                   <div className="flex items-center gap-2">
                     <button
-                      type="submit"
+                      type="button"
+                      onClick={() => submitRedirect(redirect)}
                       disabled={!redirect.trim() || busy !== null}
                       className="flex w-fit items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                     >
@@ -251,7 +266,7 @@ export default function CareLinkConnect({
                       {busy === "connect" ? t.careLinkConnecting : t.careLinkConnectButton}
                     </button>
                   </div>
-                </form>
+                </div>
               </li>
             )}
           </ol>

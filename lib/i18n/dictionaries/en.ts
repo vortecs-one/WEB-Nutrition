@@ -508,7 +508,7 @@ const en: Dictionary = {
     careLinkHelpChrome:
       "Chrome / Edge: before signing in, press F12 and open the Console tab. When you finish, a red error appears: \"Failed to launch 'com.medtronic.carepartner:/sso?code=…'\". Copy that whole line.",
     careLinkHelpFirefox:
-      "Firefox: before signing in, press F12, open Network and enable \"Persist Logs\". When you finish, open the last request with status 302 and copy its Location header.",
+      "Firefox: before signing in, press F12, open Network and enable \"Persist Logs\". When you finish, click the last 302 request (resume?state=…). Don't copy that address: open Headers > Response Headers, right-click \"location\" (it starts with com.medtronic.carepartner:/sso?code=) and choose \"Copy Value\".",
     careLinkHelpSafari:
       "Safari: enable the Develop menu (Settings > Advanced), open Web Inspector > Network before signing in, and copy the Location header of the last 302 response.",
     careLinkHelpMobile: "Phones don't show this address: do it once from a computer.",
@@ -527,6 +527,8 @@ const en: Dictionary = {
     careLinkReconnectNeeded: "Medtronic ended the session. Sign in again to resume live readings.",
     careLinkConnectSuccess: "Connected. {count} new reading(s).",
     careLinkErrorInvalidInput: "No code found in what you pasted.",
+    careLinkErrorRequestUrl:
+      "That's the request address, not the redirect. On that same 302 request, open Response Headers and copy the \"location\" value, which starts with com.medtronic.carepartner:/sso?code=. The code only lasts a few minutes, so if some time has passed, open the sign-in again.",
     careLinkErrorExpired: "The sign-in expired. Open it again and repeat the steps.",
     careLinkErrorState: "That code belongs to a different sign-in attempt. Open it again.",
     careLinkErrorGrant: "Medtronic rejected the code (already used or expired). Sign in again.",
