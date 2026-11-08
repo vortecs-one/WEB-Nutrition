@@ -223,11 +223,13 @@ async function tokenRequest(config: CareLinkConfig, params: Record<string, strin
     id_token?: string;
     expires_in?: number;
     error?: string;
+    error_description?: string;
   } | null;
-  if (status === 400 || status === 401 || status === 403) {
+  // A 403 without an OAuth error body is a firewall/WAF block, not a bad code.
+  if ((status === 400 || status === 401 || status === 403) && data?.error) {
     throw new CareLinkError(
-      data?.error === "invalid_grant" || data?.error === "access_denied" ? "invalid-grant" : "unauthorized",
-      data?.error,
+      data.error === "invalid_grant" || data.error === "access_denied" ? "invalid-grant" : "unauthorized",
+      `${data.error}: ${data.error_description ?? ""}`,
     );
   }
   if (status !== 200 || !data?.access_token) throw new CareLinkError("bad-response", `token ${status}`);

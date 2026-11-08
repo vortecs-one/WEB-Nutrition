@@ -502,7 +502,7 @@ const en: Dictionary = {
     careLinkStep1: "1. Open the Medtronic sign-in in a new tab and log in with your account.",
     careLinkOpenLogin: "Open CareLink sign-in",
     careLinkStep2:
-      "2. When you finish, the Medtronic tab goes blank because it tries to open the app. Copy the redirect address and paste it here: it connects on its own.",
+      "2. When you finish, the Medtronic tab goes blank because it tries to open the app. Copy the redirect address and paste it here: it connects on its own. Be quick: the code expires in about a minute.",
     careLinkOnceNote: "You only do this once. After that the session renews itself in the background.",
     careLinkHelpTitle: "Where do I find the redirect address?",
     careLinkHelpChrome:

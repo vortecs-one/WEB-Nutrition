@@ -505,7 +505,7 @@ const es = {
     careLinkStep1: "1. Abre el inicio de sesión de Medtronic en una pestaña nueva e ingresa con tu cuenta.",
     careLinkOpenLogin: "Abrir inicio de sesión de CareLink",
     careLinkStep2:
-      "2. Al terminar, la pestaña de Medtronic queda en blanco porque intenta abrir la app. Copia la dirección de retorno y pégala aquí: se conecta sola.",
+      "2. Al terminar, la pestaña de Medtronic queda en blanco porque intenta abrir la app. Copia la dirección de retorno y pégala aquí: se conecta sola. Hazlo rápido: el código caduca en aproximadamente un minuto.",
     careLinkOnceNote: "Solo se hace una vez. Después la sesión se renueva sola en segundo plano.",
     careLinkHelpTitle: "¿Dónde encuentro la dirección de retorno?",
     careLinkHelpChrome:
