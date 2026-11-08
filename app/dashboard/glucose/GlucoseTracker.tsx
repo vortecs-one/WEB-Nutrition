@@ -819,13 +819,13 @@ export default function GlucoseTracker({
         {/* Panoramic simplified chart — full detail + range selector in the expand popup */}
         <div className="mt-3 h-32 sm:h-40 w-full">{compactChart}</div>
 
-        {/* Calculator, plus the way to the Insulin pump page — users have no
-            menu on small screens, so this is its only entry point there. */}
+        {/* Calculator (70%) plus the way to the Insulin pump page (30%) —
+            this is the pump page's only entry point. */}
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={() => setShowCalculator(true)}
-            className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-purple-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-purple-500 active:scale-[0.99]"
+            className="flex min-w-0 flex-[7] items-center justify-center gap-2 rounded-2xl bg-purple-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-purple-500 active:scale-[0.99]"
           >
             <Syringe className="h-4 w-4 shrink-0" aria-hidden="true" />
             {/* Wraps rather than truncates: the Spanish label doesn't fit
@@ -835,7 +835,7 @@ export default function GlucoseTracker({
           <Link
             href="/dashboard/pump"
             aria-label={t.pump.title}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-sidebar-accent px-4 py-3 text-sm font-medium transition hover:text-sidebar-foreground active:scale-[0.99]"
+            className="flex min-w-0 flex-[3] items-center justify-center gap-2 rounded-2xl bg-sidebar-accent px-4 py-3 text-sm font-medium transition hover:text-sidebar-foreground active:scale-[0.99]"
           >
             <Droplet className="h-4 w-4" aria-hidden="true" />
             {t.pump.open}
