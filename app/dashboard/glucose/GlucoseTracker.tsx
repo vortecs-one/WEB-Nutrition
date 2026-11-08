@@ -35,7 +35,7 @@ import {
   Tooltip,
 } from "recharts";
 import { useI18n } from "@/lib/i18n/provider";
-import { fetchGlucoseData, setGlucoseUnit, setLibrePatient } from "@/lib/glucose/actions";
+import { fetchGlucoseData, setGlucoseSource, setGlucoseUnit, setLibrePatient } from "@/lib/glucose/actions";
 import {
   type GlucoseData,
   type GlucoseRole,
@@ -155,6 +155,26 @@ export default function GlucoseTracker({
     [load, switchingPatient],
   );
 
+  // Switch which configured sensor feeds the readings, then reload its data.
+  const [switchingSource, setSwitchingSource] = useState(false);
+  const handleSwitchSource = useCallback(
+    async (next: GlucoseSettings["source"]) => {
+      if (switchingSource) return;
+      setSwitchingSource(true);
+      const result = await setGlucoseSource(next);
+      if (result.ok) {
+        setSettings(result.settings);
+        setData(null);
+        setLoading(true);
+        await load(rangeRef.current);
+      } else {
+        setError("source-switch");
+      }
+      setSwitchingSource(false);
+    },
+    [load, switchingSource],
+  );
+
   // Switch the display unit. Applied optimistically so the chart and readout
   // reformat instantly, then persisted; a failed save rolls the toggle back.
   const handleUnitChange = useCallback(
@@ -222,6 +242,15 @@ export default function GlucoseTracker({
   // was taken instead). An old reading is still old, though: it must not
   // pass for the current glucose in the insulin calculator or the companion.
   const isCareLink = settings?.source === "carelink";
+  const sourceLabel =
+    settings?.source === "carelink"
+      ? "Guardian 3"
+      : settings?.source === "librelinkup"
+        ? "LibreLink"
+        : settings?.source === "nightscout"
+          ? "Nightscout"
+          : null;
+  const sourceSuffix = sourceLabel ? ` (${sourceLabel})` : "";
   const isStale = !isCareLink && readingIsOld;
   const historicalOnly = isCareLink && readingIsOld;
   // null while there's no reading to classify. The reading is also published
@@ -269,6 +298,45 @@ export default function GlucoseTracker({
   const sensorWarmUp = sensorState?.warmingUp ?? false;
   const sensorLeft = splitDuration(sensorRemaining);
   const sensorPct = sensorState ? Math.round(sensorState.fraction * 100) : 0;
+
+  // Guardian 3 status from the live CareLink snapshot (pump + sensor).
+  const careLink = settings?.source === "carelink" ? (data?.careLinkStatus ?? null) : null;
+  const G3_LIFE_MIN = 7 * 24 * 60;
+  // The pump reports remaining life at snapshot time; age it to now.
+  const clSensorLeftMin =
+    careLink?.sensorMinutesLeft != null
+      ? Math.max(0, careLink.sensorMinutesLeft - (Date.now() - careLink.fetchedAt) / 60_000)
+      : null;
+  const clSensorPct =
+    clSensorLeftMin !== null ? Math.min(100, Math.round((clSensorLeftMin / G3_LIFE_MIN) * 100)) : 0;
+  const clSensorLeft = splitDuration((clSensorLeftMin ?? 0) * 60_000);
+  const clSensorLabel =
+    clSensorLeftMin === null
+      ? null
+      : clSensorLeftMin <= 0
+        ? t.sensorExpired
+        : clSensorLeft.days > 0
+          ? t.sensorRemainingDays
+              .replace("{d}", String(clSensorLeft.days))
+              .replace("{h}", String(clSensorLeft.hours))
+          : t.sensorRemainingHours
+              .replace("{h}", String(clSensorLeft.hours))
+              .replace("{m}", String(clSensorLeft.minutes));
+  const levelBarClass = (pct: number) =>
+    pct <= 10 ? "bg-destructive" : pct <= 25 ? "bg-amber-500" : "bg-chart-2";
+  const formatHoursMinutes = (min: number) => {
+    const h = Math.floor(min / 60);
+    const m = Math.round(min % 60);
+    return h > 0 ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
+  };
+  const autoModeLabel = (mode: string) =>
+    mode === "AUTO_BASAL"
+      ? t.careLinkAutoModeOn
+      : mode === "SAFE_BASAL"
+        ? t.careLinkAutoModeSafe
+        : mode === "FEATURE_OFF"
+          ? t.careLinkAutoModeOff
+          : mode.replace(/_/g, " ").toLowerCase();
 
   const formatDateTime = (ms: number) =>
     new Date(ms).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
@@ -515,6 +583,47 @@ export default function GlucoseTracker({
       ariaLabel={t.chartTitle}
     />
   );
+
+  // Sensor switcher: picks which configured source feeds the readings. Owner
+  // only, and only once more than one source is set up. Rendered in the
+  // detail popup, right under the chart.
+  const configuredSources = (
+    [
+      ["carelink", "Guardian 3", settings.careLinkConnected || settings.careLinkReadingCount > 0],
+      ["librelinkup", "LibreLink", settings.hasLibreCredentials],
+      ["nightscout", "Nightscout", Boolean(settings.nightscoutUrl)],
+    ] as const
+  ).filter(([, , ok]) => ok);
+  const sourceSwitcher =
+    isOwner && configuredSources.length > 1 ? (
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+          <span className="text-xs font-medium text-sidebar-foreground/70">{t.sourceLabel}</span>
+        </div>
+        <div role="group" aria-label={t.sourceLabel} className="flex flex-wrap gap-2">
+          {configuredSources.map(([id, label]) => {
+            const selected = settings.source === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleSwitchSource(id)}
+                disabled={switchingSource || selected}
+                aria-pressed={selected}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition active:scale-95 disabled:pointer-events-none ${
+                  selected
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                } ${switchingSource && !selected ? "opacity-50" : ""}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ) : null;
 
   // Current-reading pill — big value + trend arrow, tinted by status. The
   // compact card header shows it plain; the detail view header merges the
@@ -798,8 +907,9 @@ export default function GlucoseTracker({
                       ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
                       : currentMins === 0
                         ? t.justNow
-                        : t.lastUpdated.replace("{min}", String(currentMins))}
-                  </div>
+  : t.lastUpdated.replace("{min}", String(currentMins))}
+  {sourceSuffix}
+  </div>
                   {isStale && (
                     <div className="flex min-w-[6.5rem] flex-1 items-start gap-1 text-destructive">
                       <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
@@ -979,8 +1089,9 @@ export default function GlucoseTracker({
                       ? t.careLinkReadingFrom.replace("{time}", formatDateTime(current.date))
                       : currentMins === 0
                         ? t.justNow
-                        : t.lastUpdated.replace("{min}", String(currentMins))}
-                  </div>
+  : t.lastUpdated.replace("{min}", String(currentMins))}
+  {sourceSuffix}
+  </div>
                   {isStale && (
                     <div className="flex items-start gap-1 text-destructive">
                       <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -1002,6 +1113,7 @@ export default function GlucoseTracker({
         {/* Wide/rectangular plot box — the aspect ratio includes the x-axis
             band, so the axis labels never spill into a nested scroll. */}
         <div className="aspect-[16/9] max-h-[360px] w-full">{chartContent}</div>
+        {sourceSwitcher}
 
         {/* The two info panels sit side by side — settings left, sensor right.
             Visual order is set with `order-*`; the DOM keeps sensor first so
@@ -1102,16 +1214,97 @@ export default function GlucoseTracker({
           </section>
         )}
 
+        {/* Guardian 3 sensor panel — remaining life, transmitter battery and
+            calibration, as reported by the pump through CareLink. */}
+        {!sensor && careLink && (
+          <section
+            className={`@container order-2 rounded-2xl bg-sidebar-accent/40 p-4 ${
+              showConnection ? "col-span-2" : ""
+            }`}
+          >
+            <div className="flex h-8 items-center gap-2">
+              <Cpu className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/70">
+                {t.sensorTitle}
+              </h3>
+            </div>
+
+            {clSensorLabel && (
+              <div className="mt-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                  <span
+                    className={`text-sm font-semibold ${clSensorLeftMin === 0 ? "text-destructive" : ""}`}
+                  >
+                    {clSensorLabel}
+                  </span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-sidebar-foreground/60">
+                    {clSensorPct}%
+                  </span>
+                </div>
+                <div
+                  className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-sidebar-foreground/10"
+                  role="progressbar"
+                  aria-valuenow={clSensorPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={t.sensorLifeRemaining}
+                >
+                  <div
+                    className={`h-full rounded-full transition-all ${levelBarClass(clSensorPct)}`}
+                    style={{ width: `${clSensorPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {careLink.sensorMinutesLeft != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.sensorExpires}</span>
+                  <span className={infoValue}>
+                    {formatDateTime(careLink.fetchedAt + careLink.sensorMinutesLeft * 60_000)}
+                  </span>
+                </li>
+              )}
+              {careLink.transmitterBatteryPercent != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkTransmitterBattery}</span>
+                  <LevelValue
+                    pct={careLink.transmitterBatteryPercent}
+                    barClass={levelBarClass(careLink.transmitterBatteryPercent)}
+                    text={`${careLink.transmitterBatteryPercent}%`}
+                  />
+                </li>
+              )}
+              {careLink.calibrationMinutesLeft != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkNextCalibration}</span>
+                  <span
+                    className={`${infoValue} ${careLink.calibrationMinutesLeft === 0 ? "text-amber-500" : ""}`}
+                  >
+                    {careLink.calibrationMinutesLeft === 0
+                      ? t.careLinkCalibrationNow
+                      : formatHoursMinutes(careLink.calibrationMinutesLeft)}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
         {/* Settings panel: the ranges/alarms read from the source, plus the
             connection form behind the gear. Always rendered — gating it on
             libreThresholds (null for Nightscout) would leave Nightscout users
             with no way to reach their settings at all. */}
         <section
           className={`@container order-1 flex flex-col rounded-2xl bg-sidebar-accent/40 p-4 ${
-            showConnection || !sensor ? "col-span-2" : ""
+            showConnection || (!sensor && !careLink) ? "col-span-2" : ""
           }`}
         >
           <div className="flex h-8 items-center gap-2">
+            {careLink && (
+              <Droplet className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
+            )}
             {libreThresholds && (
               <BellRing className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
             )}
@@ -1184,6 +1377,71 @@ export default function GlucoseTracker({
             </ul>
           )}
 
+          {careLink && (
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {careLink.pumpBatteryPercent != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkPumpBattery}</span>
+                  <LevelValue
+                    pct={careLink.pumpBatteryPercent}
+                    barClass={levelBarClass(careLink.pumpBatteryPercent)}
+                    text={`${careLink.pumpBatteryPercent}%`}
+                  />
+                </li>
+              )}
+              {careLink.reservoirUnits != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkReservoir}</span>
+                  {careLink.reservoirPercent != null ? (
+                    <LevelValue
+                      pct={careLink.reservoirPercent}
+                      barClass={levelBarClass(careLink.reservoirPercent)}
+                      text={`${careLink.reservoirUnits.toFixed(1)} U`}
+                    />
+                  ) : (
+                    <span className={infoValue}>{careLink.reservoirUnits.toFixed(1)} U</span>
+                  )}
+                </li>
+              )}
+              {careLink.activeInsulin != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkActiveInsulin}</span>
+                  <span className={infoValue}>{careLink.activeInsulin.toFixed(2)} U</span>
+                </li>
+              )}
+              {careLink.autoMode && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkAutoMode}</span>
+                  <span className={infoValue}>{autoModeLabel(careLink.autoMode)}</span>
+                </li>
+              )}
+              {careLink.lowLimit != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkLowLimit}</span>
+                  <span className={infoValue}>
+                    {formatGlucose(careLink.lowLimit, unit)} {unitLabel(unit)}
+                  </span>
+                </li>
+              )}
+              {careLink.highLimit != null && (
+                <li className={infoRow}>
+                  <span className={infoLabel}>{t.careLinkHighLimit}</span>
+                  <span className={infoValue}>
+                    {formatGlucose(careLink.highLimit, unit)} {unitLabel(unit)}
+                  </span>
+                </li>
+              )}
+            </ul>
+          )}
+          {careLink && (
+            <p className="mt-auto pt-3 text-right text-[10px] text-sidebar-foreground/50">
+              {t.careLinkUpdatedAt.replace("{time}", formatTime(careLink.fetchedAt))}
+            </p>
+          )}
+          {settings?.source === "carelink" && settings.careLinkConnected && !careLink && (
+            <p className="mt-3 text-xs text-sidebar-foreground/60">{t.careLinkNoStatus}</p>
+          )}
+
           {/* Where these ranges come from — behind an icon rather than four
               lines of small print in a half-width column. mt-auto parks it in
               the panel's bottom-right corner once the panel is stretched to
@@ -1226,5 +1484,17 @@ export default function GlucoseTracker({
         onClose={() => setShowRangesInfo(false)}
       />
     </div>
+  );
+}
+
+// Value with a small level bar beside it (batteries, reservoir).
+function LevelValue({ pct, barClass, text }: { pct: number; barClass: string; text: string }) {
+  return (
+    <span className="flex shrink-0 items-center gap-2 font-medium tabular-nums">
+      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-sidebar-foreground/10" aria-hidden="true">
+        <span className={`block h-full rounded-full ${barClass}`} style={{ width: `${pct}%` }} />
+      </span>
+      {text}
+    </span>
   );
 }

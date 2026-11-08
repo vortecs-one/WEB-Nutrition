@@ -18,6 +18,7 @@ import {
   testNightscoutConnection,
 } from "@/lib/glucose/actions";
 import { type GlucoseSettings, type GlucoseSource } from "@/lib/glucose/types";
+import CareLinkConnect from "./CareLinkConnect";
 
 type TestState =
   | { kind: "idle" }
@@ -184,7 +185,7 @@ export default function GlucoseSettingsForm({
         <fieldset>
           <legend className={labelClass}>{t.sourceLabel}</legend>
           <div className={pillGroupClass}>
-            {(["librelinkup", "nightscout", "carelink"] as const).map((s) => (
+            {(["carelink", "librelinkup", "nightscout"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -253,8 +254,9 @@ export default function GlucoseSettingsForm({
           </>
         ) : source === "carelink" ? (
           <>
-            {/* Guardian 3: no credentials. Readings come from CareLink CSV
-                imports, done on the Insulin pump page. */}
+            {/* Guardian 3: live CarePartner connection, plus CSV imports on
+                the Insulin pump page as a backfill. */}
+            <CareLinkConnect settings={settings} onChanged={onSaved} />
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-sidebar-foreground/60 text-pretty">
                 {careLinkLastImportAt

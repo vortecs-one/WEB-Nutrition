@@ -542,7 +542,47 @@ const en: Dictionary = {
     // Medtronic sensor; its readings reach CareLink through the MiniMed app.
     sourceCareLink: "Guardian 3",
     sourceCareLinkHint:
-      "Guardian 3 readings reach CareLink through the MiniMed app. There's no live connection: import the CareLink export from the Insulin pump page.",
+      "Guardian 3 readings reach CareLink through the MiniMed app. Connect your CareLink account (patient or care partner) to read them live, or import the CSV export from the Insulin pump page.",
+    careLinkLiveTitle: "Live CareLink connection",
+    careLinkLiveIntro:
+      "Use the same account as the MiniMed or CareLink Connect app. A Care Partner account is recommended.",
+    careLinkStep1: "1. Open the Medtronic sign-in in a new tab and log in with your account.",
+    careLinkOpenLogin: "Open CareLink sign-in",
+    careLinkStep2:
+      "2. When you finish, the Medtronic tab goes blank because it tries to open the app. Copy the redirect address and paste it here: it connects on its own. Be quick: the code expires in about a minute.",
+    careLinkOnceNote: "You only do this once. After that the session renews itself in the background.",
+    careLinkHelpTitle: "Where do I find the redirect address?",
+    careLinkHelpChrome:
+      "Chrome / Edge: before signing in, press F12 and open the Console tab. When you finish, a red error appears: \"Failed to launch 'com.medtronic.carepartner:/sso?code=…'\". Copy that whole line.",
+    careLinkHelpFirefox:
+      "Firefox: before signing in, press F12, open Network and enable \"Persist Logs\". When you finish, click the last 302 request (resume?state=…). Don't copy that address: open Headers > Response Headers, right-click \"location\" (it starts with com.medtronic.carepartner:/sso?code=) and choose \"Copy Value\".",
+    careLinkHelpSafari:
+      "Safari: enable the Develop menu (Settings > Advanced), open Web Inspector > Network before signing in, and copy the Location header of the last 302 response.",
+    careLinkHelpMobile: "Phones don't show this address: do it once from a computer.",
+    careLinkPasteHint: "Paste the whole line; the code is detected automatically.",
+    careLinkConnecting: "Connecting to CareLink…",
+    careLinkReconnect: "Reconnect",
+    careLinkCancel: "Cancel",
+    careLinkKeepAlive: "The session renews automatically every few hours.",
+    careLinkRedirectLabel: "Redirect address (or just the code)",
+    careLinkRedirectPlaceholder: "com.medtronic.carepartner:/sso?code=...&state=...",
+    careLinkConnectButton: "Connect",
+    careLinkConnected: "Live connected · {name}",
+    careLinkLastSync: "Last sync: {time}",
+    careLinkNeverSynced: "Not synced yet.",
+    careLinkDisconnect: "Disconnect",
+    careLinkReconnectNeeded: "Medtronic ended the session. Sign in again to resume live readings.",
+    careLinkConnectSuccess: "Connected. {count} new reading(s).",
+    careLinkErrorInvalidInput: "No code found in what you pasted.",
+    careLinkErrorRequestUrl:
+      "That's the request address, not the redirect. On that same 302 request, open Response Headers and copy the \"location\" value, which starts with com.medtronic.carepartner:/sso?code=. The code only lasts a few minutes, so if some time has passed, open the sign-in again.",
+    careLinkErrorExpired: "The sign-in expired. Open it again and repeat the steps.",
+    careLinkErrorState: "That code belongs to a different sign-in attempt. Open it again.",
+    careLinkErrorGrant: "Medtronic rejected the code (already used or expired). Sign in again.",
+    careLinkErrorNoUsername: "Could not identify the CareLink account.",
+    careLinkErrorNoPatients: "This care partner account doesn't follow any patient. Invite it from the MiniMed app.",
+    careLinkErrorUpgrade: "Medtronic changed its API. This integration needs an update.",
+    careLinkErrorUnreachable: "Could not reach CareLink. Try again.",
     // --- LibreLinkUp settings ---
     libreSettingsTitle: "Connect LibreLinkUp",
     libreSettingsSubtitle:
@@ -565,6 +605,21 @@ const en: Dictionary = {
     // --- Guardian 3 / CareLink (CSV import, on the Insulin pump page) ---
     // Brand name of the app behind the source — same in every locale.
     careLinkAppName: "MiniMed",
+  careLinkPump: "Insulin pump",
+  careLinkPumpBattery: "Pump battery",
+  careLinkReservoir: "Reservoir",
+  careLinkActiveInsulin: "Active insulin",
+  careLinkAutoMode: "SmartGuard",
+  careLinkAutoModeOn: "Auto",
+  careLinkAutoModeSafe: "Safe basal",
+  careLinkAutoModeOff: "Manual",
+  careLinkLowLimit: "Low limit",
+  careLinkHighLimit: "High limit",
+  careLinkTransmitterBattery: "Transmitter battery",
+  careLinkNextCalibration: "Next calibration",
+  careLinkCalibrationNow: "Calibrate now",
+  careLinkUpdatedAt: "Updated {time}",
+  careLinkNoStatus: "No status yet. It arrives with the next sync.",
     careLinkSettingsTitle: "Guardian 3 sensor",
     careLinkSettingsSubtitle: "Medtronic · via the MiniMed app and CareLink",
     careLinkImportTitle: "Import from CareLink",

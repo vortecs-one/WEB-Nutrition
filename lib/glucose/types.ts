@@ -36,11 +36,9 @@ export type GlucoseUnit = "mgdl" | "mmol";
 //   LibreLink / LibreLinkUp apps show, main sensor + followed patients)
 // - "carelink": the Guardian 3 sensor (shown under that name), worn with a
 //   MiniMed 780G pump; the MiniMed app uploads its readings to Medtronic
-//   CareLink Personal. No API exists, so this is CSV-import based — see
-//   lib/glucose/carelink-csv.ts and the Insulin pump page
-//   (app/dashboard/pump) — and, unlike the other two sources, readings are
-//   persisted (carelinkReadings in drizzle/schema.ts) rather than fetched
-//   live on every poll.
+//   CareLink. Two feeds land in carelinkReadings: the live CarePartner API
+//   (lib/glucose/carelink.ts, synced at most every few minutes) and CSV
+//   imports on the Insulin pump page (lib/glucose/carelink-csv.ts).
 export type GlucoseSource = "nightscout" | "librelinkup" | "carelink";
 
 // A patient connection visible to the LibreLinkUp account (client-safe).
@@ -108,6 +106,14 @@ export type GlucoseSettings = {
   careLinkLastImportAt: number | null;
   /** Total readings currently stored from CareLink imports. */
   careLinkReadingCount: number;
+  /** Live CareLink (CarePartner API) connection is active. */
+  careLinkConnected: boolean;
+  /** Medtronic rejected the stored session — the owner must sign in again. */
+  careLinkNeedsReconnect: boolean;
+  /** Name of the followed patient (care partner accounts) or the account owner. */
+  careLinkPatientName: string | null;
+  /** Epoch ms of the last successful live sync. */
+  careLinkLastSyncAt: number | null;
   unit: GlucoseUnit;
   lowThreshold: number;
   highThreshold: number;
@@ -132,6 +138,24 @@ export type GlucoseData = {
   sensor: SensorInfo | null;
   /** Target range + alarms from the patient's LibreLink app (LibreLinkUp only). */
   libreThresholds: LibreThresholds | null;
+  /** Pump + sensor status from the live CareLink connection (Guardian 3 only). */
+  careLinkStatus: CareLinkStatus | null;
+};
+
+export type CareLinkStatus = {
+  sensorHoursLeft: number | null;
+  sensorState: string | null;
+  activeInsulin: number | null;
+  reservoirUnits: number | null;
+  pumpBatteryPercent: number | null;
+  lowLimit: number | null;
+  highLimit: number | null;
+  sensorMinutesLeft: number | null;
+  transmitterBatteryPercent: number | null;
+  calibrationMinutesLeft: number | null;
+  reservoirPercent: number | null;
+  autoMode: string | null;
+  fetchedAt: number;
 };
 
 export type GlucoseFetchError =

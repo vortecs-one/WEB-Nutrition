@@ -545,7 +545,47 @@ const es = {
     // Sensor de Medtronic; sus lecturas llegan a CareLink a través de la app MiniMed.
     sourceCareLink: "Guardian 3",
     sourceCareLinkHint:
-      "Las lecturas del Guardian 3 llegan a CareLink a través de la app MiniMed. No hay conexión en vivo: importa la exportación de CareLink desde la página Bomba de insulina.",
+      "Las lecturas del Guardian 3 llegan a CareLink a través de la app MiniMed. Conecta tu cuenta de CareLink (paciente o cuidador) para leerlas en vivo, o importa la exportación CSV desde la página Bomba de insulina.",
+    careLinkLiveTitle: "Conexión en vivo con CareLink",
+    careLinkLiveIntro:
+      "Usa la misma cuenta que la app MiniMed o CareLink Connect. Una cuenta de cuidador (Care Partner) es lo recomendado.",
+    careLinkStep1: "1. Abre el inicio de sesión de Medtronic en una pestaña nueva e ingresa con tu cuenta.",
+    careLinkOpenLogin: "Abrir inicio de sesión de CareLink",
+    careLinkStep2:
+      "2. Al terminar, la pestaña de Medtronic queda en blanco porque intenta abrir la app. Copia la dirección de retorno y pégala aquí: se conecta sola. Hazlo rápido: el código caduca en aproximadamente un minuto.",
+    careLinkOnceNote: "Solo se hace una vez. Después la sesión se renueva sola en segundo plano.",
+    careLinkHelpTitle: "¿Dónde encuentro la dirección de retorno?",
+    careLinkHelpChrome:
+      "Chrome / Edge: antes de iniciar sesión, presiona F12 y abre la pestaña Consola. Al terminar aparece un error rojo «Failed to launch 'com.medtronic.carepartner:/sso?code=…'». Copia esa línea completa.",
+    careLinkHelpFirefox:
+      "Firefox: antes de iniciar sesión, presiona F12, abre Red y activa «Persistir registros». Al terminar, haz clic en la última solicitud 302 (resume?state=…). No copies esa dirección: abre Encabezados > Encabezados de respuesta, haz clic derecho en «location» (empieza con com.medtronic.carepartner:/sso?code=) y elige «Copiar valor».",
+    careLinkHelpSafari:
+      "Safari: activa el menú Desarrollo (Ajustes > Avanzado), abre Inspector web > Red antes de iniciar sesión y copia el encabezado Location de la última respuesta 302.",
+    careLinkHelpMobile: "En el teléfono no se puede ver esta dirección: hazlo una vez desde un computador.",
+    careLinkPasteHint: "Pega la línea completa; el código se detecta automáticamente.",
+    careLinkConnecting: "Conectando con CareLink…",
+    careLinkReconnect: "Reconectar",
+    careLinkCancel: "Cancelar",
+    careLinkKeepAlive: "La sesión se renueva automáticamente cada pocas horas.",
+    careLinkRedirectLabel: "Dirección de retorno (o solo el código)",
+    careLinkRedirectPlaceholder: "com.medtronic.carepartner:/sso?code=...&state=...",
+    careLinkConnectButton: "Conectar",
+    careLinkConnected: "Conectado en vivo · {name}",
+    careLinkLastSync: "Última sincronización: {time}",
+    careLinkNeverSynced: "Aún sin sincronizar.",
+    careLinkDisconnect: "Desconectar",
+    careLinkReconnectNeeded: "Medtronic cerró la sesión. Vuelve a iniciar sesión para reanudar las lecturas en vivo.",
+    careLinkConnectSuccess: "Conectado. {count} lectura(s) nueva(s).",
+    careLinkErrorInvalidInput: "No se encontró un código en lo que pegaste.",
+    careLinkErrorRequestUrl:
+      "Esa es la dirección de la solicitud, no la de retorno. En esa misma solicitud 302, abre Encabezados de respuesta y copia el valor de «location», que empieza con com.medtronic.carepartner:/sso?code=. El código dura pocos minutos: si ya pasó tiempo, vuelve a abrir el inicio de sesión.",
+    careLinkErrorExpired: "El inicio de sesión expiró. Ábrelo de nuevo y repite los pasos.",
+    careLinkErrorState: "Ese código pertenece a otro intento de inicio de sesión. Ábrelo de nuevo.",
+    careLinkErrorGrant: "Medtronic rechazó el código (ya se usó o expiró). Inicia sesión otra vez.",
+    careLinkErrorNoUsername: "No se pudo identificar la cuenta de CareLink.",
+    careLinkErrorNoPatients: "Esta cuenta de cuidador no sigue a ningún paciente. Invítala desde la app MiniMed.",
+    careLinkErrorUpgrade: "Medtronic cambió su API. Esta integración necesita una actualización.",
+    careLinkErrorUnreachable: "No se pudo conectar con CareLink. Inténtalo de nuevo.",
     // --- Configuración de LibreLinkUp ---
     libreSettingsTitle: "Conectar LibreLinkUp",
     libreSettingsSubtitle:
@@ -571,6 +611,21 @@ const es = {
     // --- Guardian 3 / CareLink (importación de CSV, en la página Bomba de insulina) ---
     // Nombre de marca de la app detrás de la fuente — igual en todos los idiomas.
     careLinkAppName: "MiniMed",
+  careLinkPump: "Bomba de insulina",
+  careLinkPumpBattery: "Batería de la bomba",
+  careLinkReservoir: "Reservorio",
+  careLinkActiveInsulin: "Insulina activa",
+  careLinkAutoMode: "SmartGuard",
+  careLinkAutoModeOn: "Automático",
+  careLinkAutoModeSafe: "Basal segura",
+  careLinkAutoModeOff: "Manual",
+  careLinkLowLimit: "Límite bajo",
+  careLinkHighLimit: "Límite alto",
+  careLinkTransmitterBattery: "Batería del transmisor",
+  careLinkNextCalibration: "Próxima calibración",
+  careLinkCalibrationNow: "Calibrar ahora",
+  careLinkUpdatedAt: "Actualizado {time}",
+  careLinkNoStatus: "Aún sin estado. Llegará con la próxima sincronización.",
     careLinkSettingsTitle: "Sensor Guardian 3",
     careLinkSettingsSubtitle: "Medtronic · a través de la app MiniMed y CareLink",
     careLinkImportTitle: "Importar desde CareLink",
