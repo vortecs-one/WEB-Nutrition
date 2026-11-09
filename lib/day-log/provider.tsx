@@ -70,7 +70,8 @@ type DayLogValue = {
   weighIns: { dateKey: string; kg: number }[];
   /** The latest weigh-in on or before a day, or null. */
   weightOn: (dateKey: string) => { dateKey: string; kg: number } | null;
-  setWeight: (dateKey: string, kg: number) => void;
+  /** Resolves once saved (and mirrored to the Thruxion history). */
+  setWeight: (dateKey: string, kg: number) => Promise<void>;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
@@ -122,8 +123,8 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
   // cache with fresh server state (so temporary ids become real row ids).
   // Rolls the optimistic change back if the server write fails.
   const runMutation = useCallback(
-    (optimistic: (log: DayLog) => DayLog, action: () => Promise<unknown>) => {
-      void mutate(
+    (optimistic: (log: DayLog) => DayLog, action: () => Promise<unknown>) =>
+      mutate(
         async () => {
           await action();
           return fetchUserDayLog();
@@ -134,8 +135,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
           revalidate: false,
           populateCache: true,
         },
-      );
-    },
+      ).then(() => undefined),
     [mutate],
   );
 
@@ -308,7 +308,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
   const setWeight = useCallback(
     (dateKey: string, kg: number) => {
       const grams = Math.round(kg * 1000);
-      runMutation(
+      return runMutation(
         (l) =>
           patchDay(l, dateKey, (d) => ({
             ...d,

@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { bodyProfiles } from "@/drizzle/schema";
-import { getHuman } from "@/lib/thruxion-api";
+import { createBodyMeasurement, getHuman, getLatestBodyMeasurement } from "@/lib/thruxion-api";
+import { measurementDateKey } from "@/lib/body-measurements/types";
 import {
   DEFAULT_ACTIVITY_LEVEL,
   isActivityLevel,
@@ -48,28 +49,67 @@ export async function fetchBodyProfile(): Promise<BodyProfile | null> {
 
   let sex = isSex(row?.sex) ? row.sex : null;
   let birthDate = row?.birthDate ?? null;
-  const fromThruxion = { sex: false, birthDate: false };
-  if ((!sex || !birthDate) && user.humanId) {
-    try {
-      const human = await getHuman(user.humanId);
-      const thruxionSex = sexFromGender(human?.gender);
-      const thruxionBirth = human?.birthdate?.slice(0, 10) ?? null;
-      if (!sex && thruxionSex) { sex = thruxionSex; fromThruxion.sex = true; }
-      if (!birthDate && isBirthDate(thruxionBirth, todayKey())) { birthDate = thruxionBirth; fromThruxion.birthDate = true; }
-    } catch (err) {
-      console.log("[body-profile] Thruxion read failed:", (err as Error).message);
+  let heightCm = row?.heightCm ?? null;
+  let latestWeight: BodyProfile["latestWeight"] = null;
+  const fromThruxion = { sex: false, birthDate: false, height: false };
+  if (user.humanId) {
+    const humanId = user.humanId;
+    const [human, latest] = await Promise.all([
+      !sex || !birthDate
+        ? getHuman(humanId).catch((err) => {
+            console.log("[body-profile] Thruxion read failed:", (err as Error).message);
+            return null;
+          })
+        : null,
+      getLatestBodyMeasurement(humanId).catch((err) => {
+        console.log("[body-profile] Thruxion measurements read failed:", (err as Error).message);
+        return null;
+      }),
+    ]);
+
+    const thruxionSex = sexFromGender(human?.gender);
+    const thruxionBirth = human?.birthdate?.slice(0, 10) ?? null;
+    if (!sex && thruxionSex) { sex = thruxionSex; fromThruxion.sex = true; }
+    if (!birthDate && isBirthDate(thruxionBirth, todayKey())) { birthDate = thruxionBirth; fromThruxion.birthDate = true; }
+
+    // The measurement history wins when it's newer than the last profile save
+    // (e.g. measured on another Thruxion platform).
+    const thruxionHeight = latest?.height_cm != null ? Math.round(latest.height_cm) : null;
+    const heightAt = latest?.height_measured_at ? Date.parse(latest.height_measured_at) : NaN;
+    if (
+      isHeightCm(thruxionHeight) &&
+      thruxionHeight !== heightCm &&
+      (heightCm === null || !row?.updatedAt || heightAt > row.updatedAt.getTime())
+    ) {
+      heightCm = thruxionHeight;
+      fromThruxion.height = true;
+    }
+    if (latest?.weight_kg != null && latest.weight_measured_at) {
+      latestWeight = { kg: latest.weight_kg, dateKey: measurementDateKey(latest.weight_measured_at) };
     }
   }
 
   return {
     sex,
     birthDate,
-    heightCm: row?.heightCm ?? null,
+    heightCm,
     activityLevel: isActivityLevel(row?.activityLevel) ? row.activityLevel : DEFAULT_ACTIVITY_LEVEL,
     goal: isWeightGoal(row?.goal) ? row.goal : "maintain",
     weeklyRateKg: row ? row.weeklyRateG / 1000 : 0.25,
     fromThruxion,
+    latestWeight,
   };
+}
+
+// Adds a changed height to the Thruxion history. Best effort, like weigh-ins.
+async function syncHeight(humanId: string, heightCm: number): Promise<void> {
+  try {
+    const latest = await getLatestBodyMeasurement(humanId);
+    const current = latest?.height_cm != null ? Math.round(latest.height_cm) : null;
+    if (current !== heightCm) await createBodyMeasurement(humanId, { height_cm: heightCm });
+  } catch (err) {
+    console.log("[body-profile] height sync failed:", (err as Error).message);
+  }
 }
 
 export type SaveBodyProfileResult = { ok: true } | { ok: false; error: "unauthenticated" | "invalid" | "failed" };
@@ -105,6 +145,7 @@ export async function saveBodyProfile(input: BodyProfileInput): Promise<SaveBody
       .insert(bodyProfiles)
       .values({ userKey: user.userKey, ...values })
       .onConflictDoUpdate({ target: bodyProfiles.userKey, set: values });
+    if (heightCm !== null && user.humanId) await syncHeight(user.humanId, heightCm);
     return { ok: true };
   } catch (err) {
     console.log("[body-profile] save failed:", err);

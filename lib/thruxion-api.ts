@@ -63,6 +63,35 @@ export type HumanData = {
   facial_recognitions?: unknown[];
   cards?: unknown[];
   space_time?: unknown[];
+  /** The 50 most recent body measurements. */
+  body_measurements?: BodyMeasurement[];
+};
+
+// One height/weight record (either value can be null). Dates are ISO UTC.
+export type BodyMeasurement = {
+  id: number;
+  human_id?: number;
+  height_cm: number | null;
+  weight_kg: number | null;
+  measured_at: string;
+  created_at?: string;
+};
+
+// GET /human/<id>/measurements/latest: the newest height and newest weight,
+// possibly from different records.
+export type LatestBodyMeasurement = {
+  human_id: number;
+  height_cm: number | null;
+  height_measured_at: string | null;
+  weight_kg: number | null;
+  weight_measured_at: string | null;
+};
+
+export type BodyMeasurementFields = {
+  height_cm?: number;
+  weight_kg?: number;
+  /** "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"; cannot be in the future. */
+  measured_at?: string;
 };
 
 /**
@@ -387,6 +416,113 @@ export function readFoodIngredientsFromPhoto(
   return foodApiCall(`${barcodePath(barcode)}/ingredients-from-photo${query}`, {
     method: "GET",
   });
+}
+
+// === Body measurements (height / weight over time) ===
+
+// The Humans API answers an expired token with 403, so retry once on it too.
+async function humansCall(path: string, init: RequestInit): Promise<Response> {
+  const res = await thruxionFetch(path, init);
+  if (res.status !== 403) return res;
+  invalidateSystemToken();
+  return thruxionFetch(path, init, true);
+}
+
+async function humansJson<T>(res: Response, what: string): Promise<T> {
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "<no body>");
+    throw new Error(`${what} failed (${res.status} ${res.statusText}): ${detail}`);
+  }
+  return (await res.json().catch(() => ({}))) as T;
+}
+
+// Height and weight can arrive as numeric strings (DECIMAL columns).
+function toMeasurement(raw: Record<string, unknown>): BodyMeasurement {
+  return {
+    id: Number(raw.id),
+    human_id: raw.human_id != null ? Number(raw.human_id) : undefined,
+    height_cm: asNumber(raw.height_cm),
+    weight_kg: asNumber(raw.weight_kg),
+    measured_at: String(raw.measured_at ?? ""),
+    created_at: typeof raw.created_at === "string" ? raw.created_at : undefined,
+  };
+}
+
+const humanMeasurementsPath = (humanId: string | number) =>
+  `/api/humans/human/${encodeURIComponent(String(humanId))}/measurements`;
+const measurementPath = (id: number) =>
+  `/api/humans/measurements/${encodeURIComponent(String(id))}`;
+
+/** POST /human/<id>/measurements — returns the new record id. */
+export async function createBodyMeasurement(
+  humanId: string | number,
+  fields: BodyMeasurementFields,
+): Promise<number> {
+  const res = await humansCall(humanMeasurementsPath(humanId), {
+    method: "POST",
+    body: JSON.stringify(fields),
+  });
+  const json = await humansJson<{ id?: number }>(res, "create measurement");
+  return Number(json.id);
+}
+
+/** GET /human/<id>/measurements — newest first. `from`/`to` accept YYYY-MM-DD. */
+export async function listBodyMeasurements(
+  humanId: string | number,
+  opts: { from?: string; to?: string; page?: number; limit?: number } = {},
+): Promise<BodyMeasurement[]> {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(opts)) if (v != null) params.set(k, String(v));
+  const query = params.size ? `?${params}` : "";
+  const res = await humansCall(`${humanMeasurementsPath(humanId)}${query}`, { method: "GET" });
+  if (res.status === 404) return [];
+  const json = await humansJson<{ data?: Record<string, unknown>[] }>(res, "list measurements");
+  return (json.data ?? []).map(toMeasurement);
+}
+
+/** GET /human/<id>/measurements/latest — null when the human doesn't exist. */
+export async function getLatestBodyMeasurement(
+  humanId: string | number,
+): Promise<LatestBodyMeasurement | null> {
+  const res = await humansCall(`${humanMeasurementsPath(humanId)}/latest`, { method: "GET" });
+  if (res.status === 404) return null;
+  const json = await humansJson<{ data?: Record<string, unknown> }>(res, "latest measurement");
+  const d = json.data;
+  if (!d) return null;
+  return {
+    human_id: Number(d.human_id),
+    height_cm: asNumber(d.height_cm),
+    height_measured_at: asString(d.height_measured_at),
+    weight_kg: asNumber(d.weight_kg),
+    weight_measured_at: asString(d.weight_measured_at),
+  };
+}
+
+/** GET /measurements/<id> — null when not found. */
+export async function getBodyMeasurement(id: number): Promise<BodyMeasurement | null> {
+  const res = await humansCall(measurementPath(id), { method: "GET" });
+  if (res.status === 404) return null;
+  const json = await humansJson<{ data?: Record<string, unknown> }>(res, "get measurement");
+  return json.data ? toMeasurement(json.data) : null;
+}
+
+/** PUT /measurements/<id> — only the given fields change; values can't be cleared. */
+export async function updateBodyMeasurement(
+  id: number,
+  fields: BodyMeasurementFields,
+): Promise<void> {
+  const res = await humansCall(measurementPath(id), {
+    method: "PUT",
+    body: JSON.stringify(fields),
+  });
+  await humansJson(res, "update measurement");
+}
+
+/** DELETE /measurements/<id>. */
+export async function deleteBodyMeasurement(id: number): Promise<void> {
+  const res = await humansCall(measurementPath(id), { method: "DELETE" });
+  if (res.status === 404) return;
+  await humansJson(res, "delete measurement");
 }
 
 // Re-export the token accessor for callers that need the raw bearer token.

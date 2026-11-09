@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { dayLogEntries } from "@/drizzle/schema";
 import { auth } from "@/auth";
+import { syncDayWeight } from "@/lib/body-measurements/sync";
 import type {
   Meal,
   Activity,
@@ -281,7 +282,10 @@ export async function setWeightEntry(
 ): Promise<WeightEntry | null> {
   if (!isWeightGrams(grams)) return null;
   const id = await setDailyValue("weight", dateKey, grams);
-  return id === null ? null : { id, grams };
+  if (id === null) return null;
+  // Mirror the weigh-in into the human's Thruxion measurement history.
+  await syncDayWeight(dateKey, grams / 1000);
+  return { id, grams };
 }
 
 // Deletes one entry, always scoped to the signed-in user so a user can never

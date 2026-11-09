@@ -78,7 +78,12 @@ export function useEnergyBudget(dateKey: string): EnergyBudget {
   const workouts = dateKey ? burnedFor(dateKey) : 0;
 
   return useMemo(() => {
-    const weighIn = (dateKey ? weightOn(dateKey) : null) ?? weighIns[0] ?? null;
+    const local = (dateKey ? weightOn(dateKey) : null) ?? weighIns[0] ?? null;
+    // A newer weight in the Thruxion history (e.g. another platform) wins.
+    const remote = profile?.latestWeight ?? null;
+    const remoteUsable = remote && (!dateKey || remote.dateKey <= dateKey);
+    const weighIn =
+      remoteUsable && (!local || remote.dateKey > local.dateKey) ? remote : (local ?? remote);
     const weightKg = weighIn?.kg ?? null;
     const missing: MissingBodyField[] = [];
     if (!profile?.sex) missing.push("sex");
