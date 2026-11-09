@@ -101,7 +101,8 @@ async function getJson(url: string, init?: RequestInit): Promise<{ status: numbe
       cache: "no-store",
     });
   } catch (err) {
-    throw new CareLinkError("unreachable", (err as Error).message);
+    const cause = (err as { cause?: { code?: string } }).cause?.code;
+    throw new CareLinkError("unreachable", `${(err as Error).message}${cause ? ` (${cause})` : ""}`);
   }
   const text = await res.text();
   let body: unknown = null;
@@ -232,7 +233,9 @@ async function tokenRequest(config: CareLinkConfig, params: Record<string, strin
       `${data.error}: ${data.error_description ?? ""}`,
     );
   }
-  if (status !== 200 || !data?.access_token) throw new CareLinkError("bad-response", `token ${status}`);
+  if (status !== 200 || !data?.access_token) {
+    throw new CareLinkError("bad-response", `token ${status}: ${describe(body)}`);
+  }
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? null,
@@ -241,13 +244,37 @@ async function tokenRequest(config: CareLinkConfig, params: Record<string, strin
   };
 }
 
-export function exchangeCode(config: CareLinkConfig, code: string, verifier: string) {
-  return tokenRequest(config, {
+export async function exchangeCode(config: CareLinkConfig, code: string, verifier: string) {
+  const params = {
     grant_type: "authorization_code",
     code,
     redirect_uri: config.redirectUri,
     code_verifier: verifier,
-  });
+  };
+  try {
+    return await tokenRequest(config, params);
+  } catch (err) {
+    // The code lives about a minute and the paste is a one-shot, so one quick
+    // retry on a connection failure is worth it. A timeout may mean Medtronic
+    // already consumed the code, so that case is not retried.
+    const connectionFailure =
+      err instanceof CareLinkError && err.code === "unreachable" && !/timeout|aborted/i.test(err.message);
+    if (!connectionFailure) throw err;
+    await new Promise((r) => setTimeout(r, 400));
+    return tokenRequest(config, params);
+  }
+}
+
+/** Retries a read-only call once; the one-time code is already spent by then. */
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const transient = err instanceof CareLinkError && (err.code === "unreachable" || err.code === "bad-response");
+    if (!transient) throw err;
+    await new Promise((r) => setTimeout(r, 800));
+    return fn();
+  }
 }
 
 export function refreshTokens(config: CareLinkConfig, refreshToken: string) {

@@ -50,6 +50,7 @@ import {
   isCarePartnerRole,
   parseRedirectInput,
   usernameFromTokens,
+  withRetry,
   type CareLinkRegion,
   type CareLinkSnapshot,
 } from "./carelink";
@@ -897,6 +898,8 @@ export type CompleteCareLinkConnectResult =
         | "no-patients"
         | "upgrade-required"
         | "unreachable";
+      /** Which step failed and why, e.g. "token: bad-response: token 403 …". Owner-only. */
+      detail?: string;
     };
 
 /**
@@ -924,25 +927,31 @@ export async function completeCareLinkConnect(redirect: string): Promise<Complet
   if (parsed.state && parsed.state !== row.carelinkPendingState) return { ok: false, error: "state-mismatch" };
 
   const region: CareLinkRegion = row.carelinkRegion === "US" ? "US" : "EU";
+  let step: "config" | "token" | "profile" | "patients" | "save" = "config";
   try {
     const config = await getCareLinkConfig(region);
+    step = "token";
     const tokens = await exchangeCode(config, parsed.code, verifier);
-    if (!tokens.refreshToken) return { ok: false, error: "invalid-grant" };
+    if (!tokens.refreshToken) return { ok: false, error: "invalid-grant", detail: "token: no refresh_token returned" };
 
-    const user = await getCareLinkUser(config, tokens.accessToken);
+    // The code is spent now, so transient hiccups below get a retry.
+    step = "profile";
+    const user = await withRetry(() => getCareLinkUser(config, tokens.accessToken));
     const username = user.username ?? usernameFromTokens(tokens);
     if (!username) return { ok: false, error: "no-username" };
 
     let patientId: string | null = null;
     let patientName = [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
     if (isCarePartnerRole(user.role)) {
-      const patients = await getCareLinkPatients(config, tokens.accessToken);
+      step = "patients";
+      const patients = await withRetry(() => getCareLinkPatients(config, tokens.accessToken));
       const patient = patients[0];
       if (!patient) return { ok: false, error: "no-patients" };
       patientId = patient.username;
       patientName = [patient.firstName, patient.lastName].filter(Boolean).join(" ") || patient.username;
     }
 
+    step = "save";
     const [connected] = await db
       .update(glucoseSettings)
       .set({
@@ -983,10 +992,14 @@ export async function completeCareLinkConnect(redirect: string): Promise<Complet
     return { ok: true, settings: toClientSettings(finalRow, "owner"), patientName, readingsAdded };
   } catch (err) {
     const code = err instanceof CareLinkError ? err.code : "unknown";
-    console.error("[carelink] connect failed:", code, (err as Error).message);
-    if (code === "invalid-grant" || code === "unauthorized") return { ok: false, error: "invalid-grant" };
-    if (code === "upgrade-required") return { ok: false, error: "upgrade-required" };
-    return { ok: false, error: "unreachable" };
+    const detail = `${step}: ${code}: ${(err as Error).message}`.slice(0, 220);
+    console.error("[carelink] connect failed:", detail);
+    // Only the token step can mean "bad code"; a 401 later is a different problem.
+    if (code === "invalid-grant" || (code === "unauthorized" && step === "token")) {
+      return { ok: false, error: "invalid-grant", detail };
+    }
+    if (code === "upgrade-required") return { ok: false, error: "upgrade-required", detail };
+    return { ok: false, error: "unreachable", detail };
   }
 }
 
