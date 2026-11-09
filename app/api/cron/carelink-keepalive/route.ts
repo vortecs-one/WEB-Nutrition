@@ -2,6 +2,7 @@ import { keepCareLinkAlive } from "@/lib/glucose/carelink-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+export const preferredRegion = "fra1";
 
 // Vercel Cron sends `Authorization: Bearer $CRON_SECRET` when CRON_SECRET is set.
 export async function GET(request: Request) {

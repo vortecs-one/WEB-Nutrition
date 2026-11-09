@@ -212,12 +212,44 @@ export type CareLinkTokens = {
   expiresAt: Date;
 };
 
+// Client identities tried in order when Medtronic's CDN (Akamai) answers a token
+// request with its HTML "Access Denied" page. A WAF block never reaches Auth0,
+// so the one-time code is not consumed and trying the next identity is safe.
+const CLIENT_IDENTITIES: Record<string, string>[] = [
+  {},
+  {
+    "User-Agent": "okhttp/4.12.0",
+    "Accept-Encoding": "gzip",
+    "Accept-Language": "en-US",
+  },
+  {
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+  },
+];
+
+const isWafBlock = (status: number, body: unknown) =>
+  (status === 403 || status === 429) && typeof body === "string" && /<html/i.test(body);
+
 async function tokenRequest(config: CareLinkConfig, params: Record<string, string>): Promise<CareLinkTokens> {
-  const { status, body } = await getJson(`${config.authBase}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: new URLSearchParams({ client_id: config.clientId, ...params }).toString(),
-  });
+  const formBody = new URLSearchParams({ client_id: config.clientId, ...params }).toString();
+  let status = 0;
+  let body: unknown = null;
+  for (const identity of CLIENT_IDENTITIES) {
+    ({ status, body } = await getJson(`${config.authBase}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", ...identity },
+      body: formBody,
+    }));
+    if (!isWafBlock(status, body)) break;
+  }
+  if (isWafBlock(status, body)) {
+    throw new CareLinkError(
+      "bad-response",
+      `token ${status}: blocked by Medtronic's firewall (this server's IP or region is refused; ${describe(body)})`,
+    );
+  }
   const data = body as {
     access_token?: string;
     refresh_token?: string;
