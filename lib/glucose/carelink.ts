@@ -247,7 +247,7 @@ async function tokenRequest(config: CareLinkConfig, params: Record<string, strin
   if (isWafBlock(status, body)) {
     throw new CareLinkError(
       "bad-response",
-      `token ${status}: blocked by Medtronic's firewall (this server's IP or region is refused; ${describe(body)})`,
+      `token ${status}: blocked by Medtronic's firewall (server region ${process.env.VERCEL_REGION ?? "local"} is refused; ${describe(body)})`,
     );
   }
   const data = body as {

@@ -2,7 +2,8 @@ import { keepCareLinkAlive } from "@/lib/glucose/carelink-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-export const preferredRegion = "fra1";
+// Same region as the pages that connect; Medtronic blocks some datacenter IPs.
+export const preferredRegion = "sfo1";
 
 // Vercel Cron sends `Authorization: Bearer $CRON_SECRET` when CRON_SECRET is set.
 export async function GET(request: Request) {
