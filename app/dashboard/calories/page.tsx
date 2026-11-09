@@ -8,6 +8,12 @@ import GlucoseTracker from "../glucose/GlucoseTracker";
 import CaloriesTracker from "./CaloriesTracker";
 import CompanionCard from "../pets/CompanionCard";
 
+// The glucose card is mounted here too, and its CareLink server actions run in
+// this page's region. Medtronic's EU CDN refuses some datacenter regions;
+// Frankfurt is accepted (Chile is served by the EU region).
+export const preferredRegion = "fra1";
+export const maxDuration = 60;
+
 // Personal dashboard for normal users: calorie balance at top, then glucose
 // monitoring, with the companion card last (it takes its color from the
 // glucose card's latest reading).
