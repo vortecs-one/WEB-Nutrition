@@ -11,7 +11,10 @@ import { useI18n } from "@/lib/i18n/provider";
 import { completeCareLinkConnect, disconnectCareLink, startCareLinkConnect } from "@/lib/glucose/actions";
 import type { GlucoseSettings } from "@/lib/glucose/types";
 
-type Message = { ok: boolean; text: string } | null;
+type Message = { ok: boolean; text: string; detail?: string } | null;
+
+// These mean the one-time code is spent or stale, so pasting it again is pointless.
+const CODE_SPENT_ERRORS = new Set(["invalid-grant", "expired", "state-mismatch"]);
 type Browser = "chrome" | "firefox" | "safari";
 
 const hasCode = (value: string) => /[?&]code=[^&#\s'"]+/.test(value);
@@ -91,7 +94,8 @@ export default function CareLinkConnect({
     const result = await completeCareLinkConnect(value);
     setBusy(null);
     if (!result.ok) {
-      setMessage({ ok: false, text: errorText(result.error) });
+      if (CODE_SPENT_ERRORS.has(result.error)) setRedirect("");
+      setMessage({ ok: false, text: errorText(result.error), detail: result.detail });
       return;
     }
     setRedirect("");
@@ -299,7 +303,12 @@ export default function CareLinkConnect({
           ) : (
             <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           )}
-          {message.text}
+          <span className="flex min-w-0 flex-col gap-1">
+            {message.text}
+            {message.detail && (
+              <span className="break-words font-mono text-[11px] text-sidebar-foreground/50">{message.detail}</span>
+            )}
+          </span>
         </p>
       )}
     </section>

@@ -1,6 +1,6 @@
 // Server-only CareLink live sync: token lifecycle + storing readings.
 // Used by the glucose server actions (on-demand while someone is watching)
-// and by /api/cron/carelink (keep-alive, twice a day).
+// and by /api/cron/carelink-keepalive (keep-alive, every 6 hours).
 
 import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/lib/db";

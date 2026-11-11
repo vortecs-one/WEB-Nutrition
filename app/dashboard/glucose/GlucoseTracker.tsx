@@ -64,6 +64,7 @@ import GlucoseRangeSelector from "./GlucoseRangeSelector";
 import GlucoseReadingPill from "./GlucoseReadingPill";
 import GlucoseRoleBadge from "./GlucoseRoleBadge";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
+import DoseParametersPanel from "./DoseParametersPanel";
 import InsulinCalculator from "./InsulinCalculator";
 
 const RANGES = [3, 6, 12, 24] as const;
@@ -1474,6 +1475,21 @@ export default function GlucoseTracker({
             </div>
           )}
         </section>
+
+        {/* Dosing parameters follow the active sensor, so they live with it.
+            Keyed so the fields reset when the sensor, unit or saved values change. */}
+        <DoseParametersPanel
+          key={`${settings.source}-${settings.unit}-${JSON.stringify(settings.doseParams[settings.source] ?? null)}`}
+          settings={settings}
+          sensorName={
+            settings.source === "librelinkup"
+              ? t.libreAppName
+              : settings.source === "carelink"
+                ? t.careLinkAppName
+                : t.sourceNightscout
+          }
+          onSaved={(s) => setSettings(s)}
+        />
         </div>
       </Modal>
 

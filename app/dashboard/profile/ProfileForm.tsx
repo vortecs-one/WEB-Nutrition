@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { useSWRConfig } from "swr";
+import { MEASUREMENTS_KEY } from "@/lib/body-measurements/types";
+import MeasurementHistory from "./MeasurementHistory";
 import { useI18n } from "@/lib/i18n/provider";
 import type { HumanData } from "@/lib/thruxion-api";
 import { saveBodyProfile } from "@/lib/body-profile/actions";
@@ -71,7 +74,8 @@ export default function ProfileForm({
   const t = dict.profile;
   const tn = dict.nutritionUser;
   const { weighIns, setWeight } = useDayLog();
-  const { mutate: refreshBodyProfile } = useBodyProfile();
+  const { profile: liveProfile, mutate: refreshBodyProfile } = useBodyProfile();
+  const { mutate: globalMutate } = useSWRConfig();
 
   const [form, setForm] = useState({
     sex: bodyProfile?.sex ?? "",
@@ -83,7 +87,12 @@ export default function ProfileForm({
   });
   // Weight shows the latest weigh-in until edited (the log loads after the page).
   const [weightInput, setWeightInput] = useState<string | null>(null);
-  const latestKg = weighIns.at(-1)?.kg ?? null;
+  const localLatest = weighIns.at(-1) ?? null;
+  const remoteLatest = (liveProfile ?? bodyProfile)?.latestWeight ?? null;
+  const latestKg =
+    (remoteLatest && (!localLatest || remoteLatest.dateKey > localLatest.dateKey)
+      ? remoteLatest.kg
+      : localLatest?.kg) ?? null;
   const weight = weightInput ?? (latestKg !== null ? String(latestKg) : "");
   const [status, setStatus] = useState<Status>("idle");
 
@@ -120,9 +129,9 @@ export default function ProfileForm({
       return;
     }
     // A changed weight becomes today's weigh-in (its history lives in the day log).
-    if (weightKg !== null && weightKg !== latestKg) setWeight(localDateKey(new Date()), weightKg);
+    if (weightKg !== null && weightKg !== latestKg) await setWeight(localDateKey(new Date()), weightKg);
     setWeightInput(null);
-    await refreshBodyProfile();
+    await Promise.all([refreshBodyProfile(), globalMutate(MEASUREMENTS_KEY)]);
     setStatus("saved");
   };
 
@@ -182,7 +191,7 @@ export default function ProfileForm({
                 onChange={(e) => update("birthDate", e.target.value)}
               />
             </Field>
-            <Field label={t.height}>
+            <Field label={t.height} hint={bodyProfile?.fromThruxion.height ? t.fromThruxionHistory : undefined}>
               <input
                 type="number"
                 inputMode="numeric"
@@ -297,6 +306,8 @@ export default function ProfileForm({
           )}
         </div>
       </form>
+
+      <MeasurementHistory />
     </div>
   );
 }

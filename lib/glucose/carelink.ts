@@ -101,7 +101,8 @@ async function getJson(url: string, init?: RequestInit): Promise<{ status: numbe
       cache: "no-store",
     });
   } catch (err) {
-    throw new CareLinkError("unreachable", (err as Error).message);
+    const cause = (err as { cause?: { code?: string } }).cause?.code;
+    throw new CareLinkError("unreachable", `${(err as Error).message}${cause ? ` (${cause})` : ""}`);
   }
   const text = await res.text();
   let body: unknown = null;
@@ -211,12 +212,44 @@ export type CareLinkTokens = {
   expiresAt: Date;
 };
 
+// Client identities tried in order when Medtronic's CDN (Akamai) answers a token
+// request with its HTML "Access Denied" page. A WAF block never reaches Auth0,
+// so the one-time code is not consumed and trying the next identity is safe.
+const CLIENT_IDENTITIES: Record<string, string>[] = [
+  {},
+  {
+    "User-Agent": "okhttp/4.12.0",
+    "Accept-Encoding": "gzip",
+    "Accept-Language": "en-US",
+  },
+  {
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+  },
+];
+
+const isWafBlock = (status: number, body: unknown) =>
+  (status === 403 || status === 429) && typeof body === "string" && /<html/i.test(body);
+
 async function tokenRequest(config: CareLinkConfig, params: Record<string, string>): Promise<CareLinkTokens> {
-  const { status, body } = await getJson(`${config.authBase}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: new URLSearchParams({ client_id: config.clientId, ...params }).toString(),
-  });
+  const formBody = new URLSearchParams({ client_id: config.clientId, ...params }).toString();
+  let status = 0;
+  let body: unknown = null;
+  for (const identity of CLIENT_IDENTITIES) {
+    ({ status, body } = await getJson(`${config.authBase}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", ...identity },
+      body: formBody,
+    }));
+    if (!isWafBlock(status, body)) break;
+  }
+  if (isWafBlock(status, body)) {
+    throw new CareLinkError(
+      "bad-response",
+      `token ${status}: blocked by Medtronic's firewall (server region ${process.env.VERCEL_REGION ?? "local"} is refused; ${describe(body)})`,
+    );
+  }
   const data = body as {
     access_token?: string;
     refresh_token?: string;
@@ -232,7 +265,9 @@ async function tokenRequest(config: CareLinkConfig, params: Record<string, strin
       `${data.error}: ${data.error_description ?? ""}`,
     );
   }
-  if (status !== 200 || !data?.access_token) throw new CareLinkError("bad-response", `token ${status}`);
+  if (status !== 200 || !data?.access_token) {
+    throw new CareLinkError("bad-response", `token ${status}: ${describe(body)}`);
+  }
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? null,
@@ -241,13 +276,37 @@ async function tokenRequest(config: CareLinkConfig, params: Record<string, strin
   };
 }
 
-export function exchangeCode(config: CareLinkConfig, code: string, verifier: string) {
-  return tokenRequest(config, {
+export async function exchangeCode(config: CareLinkConfig, code: string, verifier: string) {
+  const params = {
     grant_type: "authorization_code",
     code,
     redirect_uri: config.redirectUri,
     code_verifier: verifier,
-  });
+  };
+  try {
+    return await tokenRequest(config, params);
+  } catch (err) {
+    // The code lives about a minute and the paste is a one-shot, so one quick
+    // retry on a connection failure is worth it. A timeout may mean Medtronic
+    // already consumed the code, so that case is not retried.
+    const connectionFailure =
+      err instanceof CareLinkError && err.code === "unreachable" && !/timeout|aborted/i.test(err.message);
+    if (!connectionFailure) throw err;
+    await new Promise((r) => setTimeout(r, 400));
+    return tokenRequest(config, params);
+  }
+}
+
+/** Retries a read-only call once; the one-time code is already spent by then. */
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const transient = err instanceof CareLinkError && (err.code === "unreachable" || err.code === "bad-response");
+    if (!transient) throw err;
+    await new Promise((r) => setTimeout(r, 800));
+    return fn();
+  }
 }
 
 export function refreshTokens(config: CareLinkConfig, refreshToken: string) {

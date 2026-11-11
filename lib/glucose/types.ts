@@ -41,6 +41,36 @@ export type GlucoseUnit = "mgdl" | "mmol";
 //   imports on the Insulin pump page (lib/glucose/carelink-csv.ts).
 export type GlucoseSource = "nightscout" | "librelinkup" | "carelink";
 
+/**
+ * Insulin dosing parameters of one sensor setup. `ratio` is grams of carbs
+ * covered by 1 U; `isf` (sensitivity) and the target range are mg/dL.
+ */
+export type DoseParams = {
+  ratio: number;
+  isf: number;
+  low: number;
+  high: number;
+};
+
+// Defaults taken from the patient's dosing sheet (RATIO / SENSIBILIDAD /
+// RANGO MENOR / RANGO MAYOR).
+export const DEFAULT_DOSE_PARAMS: DoseParams = { ratio: 7, isf: 35, low: 100, high: 120 };
+
+export function isValidDoseParams(p: DoseParams): boolean {
+  return (
+    [p.ratio, p.isf, p.low, p.high].every((n) => Number.isFinite(n) && n > 0 && n < 1000) &&
+    p.high >= p.low
+  );
+}
+
+/** Parameters saved for the settings' active source, or the defaults. */
+export function doseParamsFor(
+  settings: Pick<GlucoseSettings, "source" | "doseParams">,
+  source: GlucoseSource = settings.source,
+): DoseParams {
+  return settings.doseParams[source] ?? DEFAULT_DOSE_PARAMS;
+}
+
 // A patient connection visible to the LibreLinkUp account (client-safe).
 export type LibrePatientInfo = {
   patientId: string;
@@ -114,6 +144,8 @@ export type GlucoseSettings = {
   careLinkPatientName: string | null;
   /** Epoch ms of the last successful live sync. */
   careLinkLastSyncAt: number | null;
+  /** Saved insulin dosing parameters per source; missing sources use the defaults. */
+  doseParams: Partial<Record<GlucoseSource, DoseParams>>;
   unit: GlucoseUnit;
   lowThreshold: number;
   highThreshold: number;

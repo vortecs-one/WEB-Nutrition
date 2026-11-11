@@ -19,12 +19,14 @@ export type BodyProfile = {
   activityLevel: ActivityLevel;
   goal: WeightGoal;
   weeklyRateKg: number;
-  /** Sex / birth date read from the Thruxion record (not saved here yet). */
-  fromThruxion: { sex: boolean; birthDate: boolean };
+  /** Values read from the Thruxion record instead of this app's profile. */
+  fromThruxion: { sex: boolean; birthDate: boolean; height: boolean };
+  /** Newest weight in the Thruxion measurement history (any platform). */
+  latestWeight: { kg: number; dateKey: string } | null;
 };
 
 /** What the profile form saves (weight is a weigh-in in the day log). */
-export type BodyProfileInput = Omit<BodyProfile, "fromThruxion">;
+export type BodyProfileInput = Omit<BodyProfile, "fromThruxion" | "latestWeight">;
 
 export const DEFAULT_ACTIVITY_LEVEL: ActivityLevel = "light";
 export const MIN_HEIGHT_CM = 100;

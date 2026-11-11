@@ -217,6 +217,8 @@ export const glucoseSettings = pgTable("glucose_settings", {
   carelinkLastRefreshAt: timestamp("carelink_last_refresh_at", { withTimezone: true }),
   carelinkNeedsReconnect: boolean("carelink_needs_reconnect").notNull().default(false),
   carelinkSnapshot: jsonb("carelink_snapshot"),
+  // Insulin dosing parameters per source: { [source]: { ratio, isf, low, high } }.
+  doseParams: jsonb("dose_params"),
   // Cached from carelinkReadings so settings reads stay a synchronous row
   // mapper (see toClientSettings) instead of a second query on every poll.
   // Updated by importCareLinkCsv after each import.
