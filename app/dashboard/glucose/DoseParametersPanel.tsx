@@ -5,7 +5,6 @@ import { Check } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { saveDoseParams } from "@/lib/glucose/actions";
 import {
-  DEFAULT_DOSE_PARAMS,
   type DoseParams,
   type GlucoseSettings,
   doseParamsFor,
@@ -55,7 +54,7 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
   const [isf, setIsf] = useState(initial.isf);
   const [error, setError] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const next: DoseParams = {
     low: toMgdl(parse(low), unit),
@@ -66,11 +65,6 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
   const valid = isValidDoseParams(next);
   const dirty =
     low !== initial.low || high !== initial.high || ratio !== initial.ratio || isf !== initial.isf;
-  const isDefault =
-    display(DEFAULT_DOSE_PARAMS.low, unit) === low &&
-    display(DEFAULT_DOSE_PARAMS.high, unit) === high &&
-    String(DEFAULT_DOSE_PARAMS.ratio) === ratio &&
-    display(DEFAULT_DOSE_PARAMS.isf, unit) === isf;
 
   const touch = (set: (v: string) => void) => (v: string) => {
     set(v);
@@ -78,17 +72,10 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
     setJustSaved(false);
   };
 
-  const resetDefaults = () => {
-    setLow(display(DEFAULT_DOSE_PARAMS.low, unit));
-    setHigh(display(DEFAULT_DOSE_PARAMS.high, unit));
-    setRatio(String(DEFAULT_DOSE_PARAMS.ratio));
-    setIsf(display(DEFAULT_DOSE_PARAMS.isf, unit));
-    setError(false);
-    setJustSaved(false);
-  };
-
-  const save = () => {
-    if (!valid || !dirty) return;
+  // Confirming a field (check button or Enter) saves; invalid values keep the field open.
+  const commit = () => {
+    if (!valid) return false;
+    if (!dirty) return true;
     startTransition(async () => {
       const result = await saveDoseParams(settings.source, next);
       if (result.ok) {
@@ -98,6 +85,7 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
         setError(true);
       }
     });
+    return true;
   };
 
   const glucoseUnit = unitLabel(unit);
@@ -121,6 +109,7 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
           step={glucoseStep}
           lockable={lockLabels}
           readOnly={readOnly}
+          onCommit={commit}
         />
         <NumberField
           id={`${ids}-high`}
@@ -131,6 +120,7 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
           step={glucoseStep}
           lockable={lockLabels}
           readOnly={readOnly}
+          onCommit={commit}
         />
         <NumberField
           id={`${ids}-ratio`}
@@ -142,6 +132,7 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
           step="0.5"
           lockable={lockLabels}
           readOnly={readOnly}
+          onCommit={commit}
           compactHint
         />
         <NumberField
@@ -154,6 +145,7 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
           step={glucoseStep}
           lockable={lockLabels}
           readOnly={readOnly}
+          onCommit={commit}
           compactHint
         />
       </div>
@@ -165,34 +157,15 @@ export default function DoseParametersPanel({ settings, sensorName, onSaved }: P
       )}
 
       {isOwner ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || !valid || pending}
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition active:scale-95 disabled:opacity-50"
-          >
-            {t.save}
-          </button>
-          {!isDefault && (
-            <button
-              type="button"
-              onClick={resetDefaults}
-              className="rounded-full px-3 py-2 text-sm text-sidebar-foreground/70 transition hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            >
-              {t.resetDefaults}
-            </button>
+        <span role="status" aria-live="polite" className="text-xs empty:hidden">
+          {justSaved && !dirty && (
+            <span className="flex items-center gap-1 text-highlight">
+              <Check className="h-4 w-4" aria-hidden="true" />
+              {t.saved}
+            </span>
           )}
-          <span role="status" aria-live="polite" className="text-xs">
-            {justSaved && !dirty && (
-              <span className="flex items-center gap-1 text-highlight">
-                <Check className="h-4 w-4" aria-hidden="true" />
-                {t.saved}
-              </span>
-            )}
-            {error && <span className="text-destructive">{t.saveError}</span>}
-          </span>
-        </div>
+          {error && <span className="text-destructive">{t.saveError}</span>}
+        </span>
       ) : (
         <p className="text-xs text-sidebar-foreground/60">{t.paramsOwnerOnly}</p>
       )}
