@@ -234,14 +234,14 @@ export default function InsulinCalculator({
 
                 <dl className="flex min-w-0 flex-col justify-center divide-y divide-highlight/20 rounded-2xl border border-highlight/20 bg-sidebar-accent px-3 sm:px-4">
                   <ResultRow label={t.carbDose} value={fmtU(carbSteps)} />
+                  <ResultRow label={t.correctionDose} value={fmtU(correction)} />
+                  {iobApplied > 0 && <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied)} />}
                   {reference && (
                     <ResultRow
                       label={t.formulaReference}
                       value={`${reference.theoretical.toFixed(2)} ${t.units}`}
                     />
                   )}
-                  <ResultRow label={t.correctionDose} value={fmtU(correction)} />
-                  {iobApplied > 0 && <ResultRow label={t.iobDeduction} value={fmtU(-iobApplied)} />}
                 </dl>
               </div>
 

@@ -17,6 +17,8 @@ type Props = {
   lockable?: { edit: string; done: string };
   /** Permanently read-only, with no edit button (e.g. for watchers). */
   readOnly?: boolean;
+  /** Called when the user confirms an edit (check button or Enter). Return false to keep editing. */
+  onCommit?: () => boolean | void;
   className?: string;
 };
 
@@ -32,6 +34,7 @@ export default function NumberField({
   compactHint,
   lockable,
   readOnly,
+  onCommit,
   className = "",
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +47,11 @@ export default function NumberField({
     setEditing(true);
     // Focus after React re-renders the input without readOnly.
     requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const finish = () => {
+    if (onCommit?.() === false) return;
+    setEditing(false);
   };
 
   return (
@@ -72,7 +80,7 @@ export default function NumberField({
             if (!locked) e.target.select();
           }}
           onKeyDown={(e) => {
-            if (lockable && e.key === "Enter") setEditing(false);
+            if (lockable && !locked && e.key === "Enter") finish();
           }}
           aria-describedby={hint ? `${id}-hint` : undefined}
           className={`w-full min-w-0 bg-transparent py-2.5 tabular-nums outline-none ${
@@ -83,7 +91,7 @@ export default function NumberField({
         {lockable && !readOnly && (
           <button
             type="button"
-            onClick={locked ? unlock : () => setEditing(false)}
+            onClick={locked ? unlock : finish}
             aria-label={locked ? `${lockable.edit} ${label}` : lockable.done}
             title={locked ? lockable.edit : lockable.done}
             className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/60 transition hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
