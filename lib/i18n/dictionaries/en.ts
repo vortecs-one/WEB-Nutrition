@@ -501,7 +501,15 @@ const en: Dictionary = {
         "Fill in ratio, sensitivity and ranges with values above 0 (upper range can't be below lower range).",
       disclaimer:
         "Estimate only. It does not replace your care team's advice. Use the ratios prescribed by your doctor.",
-      sessionNote: "Parameters are kept while this page stays open.",
+      paramsMovedNote:
+        "Ratio, sensitivity and ranges come from the parameters saved for {sensor}. Change them in the Glucose popup.",
+      paramsSavedPerSensor: "Saved separately for each glucose sensor.",
+      paramsFor: "Parameters for {sensor}",
+      paramsOwnerOnly: "Only the sensor owner can change these.",
+      save: "Save",
+      saved: "Saved",
+      saveError: "Could not save. Try again.",
+      resetDefaults: "Reset",
     },
     settings: "Settings",
     settingsTitle: "Connect Nightscout",

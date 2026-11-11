@@ -21,11 +21,14 @@ import { db } from "@/lib/db";
 import { carelinkReadings, glucoseSettings } from "@/drizzle/schema";
 import { auth } from "@/auth";
 import { getGlucoseOwnerEmail, glucoseRoleForEmail } from "./access";
+import { isValidDoseParams } from "./types";
 import type {
+  DoseParams,
   GlucoseFetchResult,
   GlucoseReading,
   GlucoseRole,
   GlucoseSettings,
+  GlucoseSource,
   GlucoseUnit,
   LibrePatientInfo,
   TrendDirection,
@@ -136,6 +139,21 @@ async function nsFetch(
 
 type SettingsRow = typeof glucoseSettings.$inferSelect;
 
+const GLUCOSE_SOURCES: GlucoseSource[] = ["nightscout", "librelinkup", "carelink"];
+
+/** Reads the stored per-source dosing parameters, dropping malformed entries. */
+function readDoseParams(raw: unknown): Partial<Record<GlucoseSource, DoseParams>> {
+  const out: Partial<Record<GlucoseSource, DoseParams>> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const source of GLUCOSE_SOURCES) {
+    const p = (raw as Record<string, Partial<DoseParams> | undefined>)[source];
+    if (!p) continue;
+    const params = { ratio: Number(p.ratio), isf: Number(p.isf), low: Number(p.low), high: Number(p.high) };
+    if (isValidDoseParams(params)) out[source] = params;
+  }
+  return out;
+}
+
 // Watchers get the owner's settings without the connection details: the
 // owner's Nightscout address and LibreLinkUp login stay on the server.
 function toClientSettings(row: SettingsRow, role: GlucoseRole): GlucoseSettings {
@@ -159,6 +177,7 @@ function toClientSettings(row: SettingsRow, role: GlucoseRole): GlucoseSettings 
     careLinkNeedsReconnect: Boolean(row.carelinkRefreshToken) && row.carelinkNeedsReconnect,
     careLinkPatientName: row.carelinkPatientName,
     careLinkLastSyncAt: row.carelinkLastSyncAt ? row.carelinkLastSyncAt.getTime() : null,
+    doseParams: readDoseParams(row.doseParams),
     unit: (row.unit === "mmol" ? "mmol" : "mgdl") as GlucoseUnit,
     lowThreshold: row.lowThreshold,
     highThreshold: row.highThreshold,
@@ -577,6 +596,39 @@ export async function setGlucoseSource(
   const [updated] = await db
     .update(glucoseSettings)
     .set({ source, updatedAt: new Date() })
+    .where(eq(glucoseSettings.id, row.id))
+    .returning();
+  return { ok: true, settings: toClientSettings(updated, "owner") };
+}
+
+/**
+ * Saves the insulin dosing parameters (ratio, sensitivity, target range) of
+ * one sensor source. Each source keeps its own set because they change with
+ * the sensor and pump setup behind it. Owner only.
+ */
+export async function saveDoseParams(
+  source: GlucoseSource,
+  params: DoseParams,
+): Promise<{ ok: true; settings: GlucoseSettings } | { ok: false; error: string }> {
+  const userKey = await getOwnerKey();
+  if (!userKey) return { ok: false, error: "unauthenticated" };
+  if (!GLUCOSE_SOURCES.includes(source)) return { ok: false, error: "invalid" };
+
+  const clean: DoseParams = {
+    ratio: Number(params?.ratio),
+    isf: Number(params?.isf),
+    low: Number(params?.low),
+    high: Number(params?.high),
+  };
+  if (!isValidDoseParams(clean)) return { ok: false, error: "invalid" };
+
+  const row = await getSettingsRow(userKey);
+  if (!row) return { ok: false, error: "not-configured" };
+
+  const doseParams = { ...readDoseParams(row.doseParams), [source]: clean };
+  const [updated] = await db
+    .update(glucoseSettings)
+    .set({ doseParams, updatedAt: new Date() })
     .where(eq(glucoseSettings.id, row.id))
     .returning();
   return { ok: true, settings: toClientSettings(updated, "owner") };

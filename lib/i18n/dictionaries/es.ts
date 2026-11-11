@@ -500,7 +500,15 @@ const es = {
         "Completa ratio, sensibilidad y rangos con valores mayores a 0 (el rango mayor no puede ser menor que el rango menor).",
       disclaimer:
         "Estimación orientativa. No reemplaza las indicaciones de tu equipo médico. Usa los ratios que te haya indicado tu endocrinólogo.",
-      sessionNote: "Los parámetros se mantienen mientras la página esté abierta.",
+      paramsMovedNote:
+        "El ratio, la sensibilidad y los rangos vienen de los parámetros guardados para {sensor}. Cámbialos en la ventana de Glucosa.",
+      paramsSavedPerSensor: "Se guardan por separado para cada sensor de glucosa.",
+      paramsFor: "Parámetros de {sensor}",
+      paramsOwnerOnly: "Solo el dueño del sensor puede cambiarlos.",
+      save: "Guardar",
+      saved: "Guardado",
+      saveError: "No se pudo guardar. Inténtalo de nuevo.",
+      resetDefaults: "Restablecer",
     },
     settings: "Configuración",
     settingsTitle: "Conectar Nightscout",
