@@ -50,6 +50,10 @@ const en: Dictionary = {
   label: "v-healthy tokens",
   hint: "Your token wallet. You earn 1 token for every kcal burned in your logged workouts, and your balance keeps growing over time.",
   },
+  h2hTokens: {
+    label: "H2H tokens",
+    hint: "Your H2H token balance. This token is coming soon, so it stays at 0 for now.",
+  },
   dashboard: {
     title: "Nutrition dashboard",
     subtitle: "Select an option from the menu on the left to get started.",

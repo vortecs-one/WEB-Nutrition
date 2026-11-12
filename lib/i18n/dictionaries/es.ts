@@ -49,6 +49,10 @@ const es = {
   label: "Tokens v-healthy",
   hint: "Tu billetera de tokens. Ganas 1 token por cada kcal quemada en tus entrenamientos registrados y tu saldo sigue creciendo con el tiempo.",
   },
+  h2hTokens: {
+    label: "Tokens H2H",
+    hint: "Tu saldo de tokens H2H. Este token llegará pronto, por ahora se mantiene en 0.",
+  },
   dashboard: {
     title: "Dashboard nutricional",
     subtitle: "Selecciona una opción en el menú de la izquierda para comenzar.",

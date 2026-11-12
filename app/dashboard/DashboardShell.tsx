@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import MobileTabBar from "./MobileTabBar";
-import VTokensBadge from "./VTokensBadge";
+import TokensBar from "./TokensBar";
 import ThemeSelector from "@/components/ThemeSelector";
 
 // Responsive shell:
@@ -31,7 +31,7 @@ export default function DashboardShell({
         <Topbar />
         {/* The Topbar is desktop-only, so small screens get a slim tokens strip */}
         <div className="flex justify-end border-b border-border bg-card px-4 py-2 lg:hidden">
-          <VTokensBadge />
+          <TokensBar />
         </div>
         {/* Mobile top navigation, directly under the header */}
         <MobileTabBar />
