@@ -5,10 +5,9 @@
 // with target band and high/low threshold lines (modeled on the classic
 // Nightscout dark chart). Data comes from the configured sensor: LibreLinkUp
 // (same data as the LibreLink app), Nightscout, or Guardian 3 (imported from
-// CareLink on the Insulin pump page).
+// CareLink in the Insulin pump popup).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
   Activity,
@@ -66,6 +65,7 @@ import GlucoseRoleBadge from "./GlucoseRoleBadge";
 import GlucoseSettingsForm from "./GlucoseSettingsForm";
 import DoseParametersPanel from "./DoseParametersPanel";
 import InsulinCalculator from "./InsulinCalculator";
+import PumpModal from "../pump/PumpModal";
 
 const RANGES = [3, 6, 12, 24] as const;
 type RangeHours = (typeof RANGES)[number];
@@ -118,6 +118,7 @@ export default function GlucoseTracker({
   const isOwner = viewerRole === "owner";
   const [showChart, setShowChart] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showPump, setShowPump] = useState(false);
   // Connection form inside the settings panel — collapsed until the gear is used.
   const [showConnection, setShowConnection] = useState(false);
   // Toast explaining where the target range / alarms come from.
@@ -962,8 +963,8 @@ export default function GlucoseTracker({
         {/* Panoramic simplified chart — full detail + range selector in the expand popup */}
         <div className="mt-3 h-32 sm:h-40 w-full">{compactChart}</div>
 
-        {/* Calculator (70%) plus the way to the Insulin pump page (30%) —
-            this is the pump page's only entry point. */}
+        {/* Calculator (70%) plus the Insulin pump popup (30%), in the same
+            amber as the warning badges. */}
         <div className="mt-3 flex gap-2">
           <button
             type="button"
@@ -975,14 +976,16 @@ export default function GlucoseTracker({
                 beside the pump link on a phone. */}
             <span className="text-balance text-center leading-tight">{t.calculator.open}</span>
           </button>
-          <Link
-            href="/dashboard/pump"
+          <button
+            type="button"
+            onClick={() => setShowPump(true)}
             aria-label={t.pump.title}
-            className="flex min-w-0 flex-[3] items-center justify-center gap-2 rounded-2xl bg-sidebar-accent px-4 py-3 text-sm font-medium transition hover:text-sidebar-foreground active:scale-[0.99]"
+            aria-haspopup="dialog"
+            className="flex min-w-0 flex-[3] items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-amber-950 transition hover:bg-amber-400 active:scale-[0.99]"
           >
             <Droplet className="h-4 w-4" aria-hidden="true" />
             {t.pump.open}
-          </Link>
+          </button>
         </div>
       </section>
 
@@ -994,6 +997,23 @@ export default function GlucoseTracker({
         currentMgdl={historicalOnly ? null : (current?.sgv ?? null)}
         isStale={isStale}
         settings={settings}
+      />
+
+      <PumpModal
+        isOpen={showPump}
+        onClose={() => setShowPump(false)}
+        settings={settings}
+        role={viewerRole}
+        careLink={data?.careLinkStatus ?? null}
+        readings={readings}
+        ranges={RANGES.filter((h) => settings.source !== "librelinkup" || h <= 12)}
+        rangeHours={rangeHours}
+        rangeLabels={{ 3: t.range3h, 6: t.range6h, 12: t.range12h, 24: t.range24h }}
+        onRangeChange={(h) => setRangeHours(h as RangeHours)}
+        onSettingsChange={(s) => {
+          setSettings(s);
+          load(rangeRef.current);
+        }}
       />
 
       {/* Patient switcher (LibreLinkUp: main sensor + followed patients).
