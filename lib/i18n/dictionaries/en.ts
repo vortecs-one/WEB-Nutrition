@@ -475,6 +475,10 @@ const en: Dictionary = {
     waterLiters: "water liters",
     todayEntries: "Today's entries",
     noEntries: "You haven't logged any water today yet.",
+    custom: "Custom",
+    customAmount: "Amount in ml",
+    customAdd: "Add",
+    customInvalid: "Enter a whole number between 1 and 5000 ml.",
   },
   healthStats: {
     title: "Your health today",
