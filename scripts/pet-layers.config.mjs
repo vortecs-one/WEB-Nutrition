@@ -108,8 +108,6 @@ export const PETS = {
         shadowBand: 30,
         cells: {
           standing: { box: [4, 90, 302, 528] },
-          walking: { box: [308, 90, 596, 528] },
-          running: { box: [596, 90, 916, 528] },
           jumping: { box: [914, 90, 1240, 528], baseline: 518 },
           sitting: { box: [1236, 90, 1532, 528] },
           "looking-up": { box: [4, 580, 302, 966] },
