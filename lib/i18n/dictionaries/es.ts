@@ -474,6 +474,10 @@ const es = {
     waterLiters: "litros de agua",
     todayEntries: "Registros del día",
     noEntries: "Aún no has registrado agua hoy.",
+  custom: "Otra cantidad",
+  customAmount: "Cantidad en ml",
+  customAdd: "Agregar",
+  customInvalid: "Ingresa un número entero entre 1 y 5000 ml.",
   },
   healthStats: {
     title: "Tu salud hoy",

@@ -216,6 +216,8 @@ export async function addWaterEntry(
   dateKey: string,
   amountMl: number,
 ): Promise<WaterEntry | null> {
+  if (!Number.isInteger(amountMl) || amountMl < 1 || amountMl > 5000) return null;
+
   const userKey = await getUserKey();
   if (!userKey) return null;
 
