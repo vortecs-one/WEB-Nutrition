@@ -77,6 +77,8 @@ export function AnimatedPortrait({
   const poses = layers?.poses;
   const shownPose = jumping && poses?.jumping ? "jumping" : pose;
   const bodySrc = (shownPose && poses?.[shownPose]) || layers?.body || "";
+  const asleep = shownPose === "sleeping" && Boolean(poses?.sleeping);
+  const emote = asleep ? "zzz" : profile?.emote ?? null;
   // A new pose fades in over the previous one, which stays underneath until
   // the new one has loaded and faded in (no gap while it downloads).
   const [bodies, setBodies] = useState({ current: bodySrc, previous: null as string | null, loaded: false });
@@ -155,6 +157,7 @@ export function AnimatedPortrait({
       data-idle={profile.idle}
       data-floor={floor ?? undefined}
       data-aura={aura ?? undefined}
+      data-asleep={asleep || undefined}
     >
       {floor === "ice" && <IceFloor className={`${stageBox} pointer-events-none`} bob={bob} />}
       {/* Above the floor, below the shadow, the pet and the particles. */}
@@ -236,7 +239,7 @@ export function AnimatedPortrait({
           />
         ))}
 
-      {profile.emote === "zzz" &&
+      {emote === "zzz" &&
         [0, 1, 2].map((i) => (
           <span
             key={i}
@@ -244,13 +247,13 @@ export function AnimatedPortrait({
             className="pet-zzz"
             style={{ animationDelay: `${i * 1.2}s` }}
           >
-            z
+            {asleep ? "Z" : "z"}
           </span>
         ))}
 
-      {(profile.emote === "exclaim" || profile.emote === "question") && (
-        <span key={profile.emote} aria-hidden="true" className={`pet-emote pet-emote-${profile.emote}`}>
-          {profile.emote === "exclaim" ? "!" : "?"}
+      {(emote === "exclaim" || emote === "question") && (
+        <span key={emote} aria-hidden="true" className={`pet-emote pet-emote-${emote}`}>
+          {emote === "exclaim" ? "!" : "?"}
         </span>
       )}
 
