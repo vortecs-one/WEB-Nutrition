@@ -33,6 +33,11 @@ import GlucoseRoleBadge from "../glucose/GlucoseRoleBadge";
 import CareLinkImport from "./CareLinkImport";
 import DeviceGauge, { toneForPercent } from "./DeviceGauge";
 import TimeInRange from "./TimeInRange";
+import PumpManualViewer from "./PumpManualViewer";
+import { getManualFor } from "@/lib/pump-manual/manuals";
+
+type PumpTab = "status" | "manual";
+const PUMP_TABS: readonly PumpTab[] = ["status", "manual"];
 
 const SENSOR_LIFE_MIN = 7 * 24 * 60;
 const CALIBRATION_WINDOW_MIN = 12 * 60;
@@ -69,6 +74,16 @@ export default function PumpModal({
   const t = dict.glucose;
   const isOwner = role === "owner";
   const unit = settings.unit;
+
+  const manual = getManualFor("minimed-780g-guardian-3");
+
+  // Start on Status every time the popup opens.
+  const [tab, setTab] = useState<PumpTab>("status");
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) setTab("status");
+  }
 
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState(false);
@@ -185,6 +200,56 @@ export default function PumpModal({
           <GlucoseRoleBadge role={role} />
         </div>
 
+        {manual && (
+          <div
+            role="tablist"
+            aria-label={t.pump.title}
+            className="grid grid-cols-2 gap-1 rounded-2xl bg-sidebar-accent p-1"
+          >
+            {PUMP_TABS.map((id) => {
+              const active = tab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  id={`pump-tab-${id}`}
+                  aria-selected={active}
+                  aria-controls={`pump-panel-${id}`}
+                  onClick={() => setTab(id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      const next = id === "status" ? "manual" : "status";
+                      setTab(next);
+                      document.getElementById(`pump-tab-${next}`)?.focus();
+                    }
+                  }}
+                  tabIndex={active ? 0 : -1}
+                  className={`min-h-11 rounded-xl text-sm font-semibold transition ${
+                    active
+                      ? "bg-sidebar text-sidebar-foreground shadow-sm"
+                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground"
+                  }`}
+                >
+                  {id === "status" ? t.pump.tabStatus : t.pump.tabManual}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {manual && tab === "manual" ? (
+          <div role="tabpanel" id="pump-panel-manual" aria-labelledby="pump-tab-manual">
+            <PumpManualViewer manual={manual} />
+          </div>
+        ) : (
+        <div
+          role={manual ? "tabpanel" : undefined}
+          id={manual ? "pump-panel-status" : undefined}
+          aria-labelledby={manual ? "pump-tab-status" : undefined}
+          className="flex flex-col gap-4"
+        >
         {offerSwitch && (
           <div className={`${panel} flex flex-col gap-3 sm:flex-row sm:items-center`}>
             <p className="flex-1 text-sm text-pretty">
@@ -351,6 +416,8 @@ export default function PumpModal({
         <section className={panel}>
           <CareLinkImport settings={settings} isOwner={isOwner} onSaved={onSettingsChange} />
         </section>
+        </div>
+        )}
       </div>
     </Modal>
   );
