@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import MobileTabBar from "./MobileTabBar";
+import VTokensBadge from "./VTokensBadge";
 import ThemeSelector from "@/components/ThemeSelector";
 
 // Responsive shell:
@@ -28,6 +29,10 @@ export default function DashboardShell({
       {/* Right side: top bar + mobile tabs + page content */}
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
+        {/* The Topbar is desktop-only, so small screens get a slim tokens strip */}
+        <div className="flex justify-end border-b border-border bg-card px-4 py-2 lg:hidden">
+          <VTokensBadge />
+        </div>
         {/* Mobile top navigation, directly under the header */}
         <MobileTabBar />
         <main className="flex-1 overflow-auto p-4 lg:p-8">{children}</main>

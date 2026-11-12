@@ -46,6 +46,10 @@ const en: Dictionary = {
     defaultUser: "User",
     logout: "Sign out",
   },
+  vtokens: {
+  label: "v-healthy tokens",
+  hint: "Earned today: 1 token for every kcal burned in your logged workouts.",
+  },
   dashboard: {
     title: "Nutrition dashboard",
     subtitle: "Select an option from the menu on the left to get started.",

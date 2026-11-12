@@ -45,6 +45,10 @@ const es = {
     defaultUser: "Usuario",
     logout: "Cerrar sesión",
   },
+  vtokens: {
+  label: "Tokens v-healthy",
+  hint: "Ganados hoy: 1 token por cada kcal quemada en tus entrenamientos registrados.",
+  },
   dashboard: {
     title: "Dashboard nutricional",
     subtitle: "Selecciona una opción en el menú de la izquierda para comenzar.",

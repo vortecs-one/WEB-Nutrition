@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSelector from "@/components/ThemeSelector";
 import RoleSwitcher from "@/components/RoleSwitcher";
+import VTokensBadge from "./VTokensBadge";
 
 function formatLocaleDate(locale: string) {
   const now = new Date();
@@ -43,8 +44,9 @@ export default function Topbar() {
         </div>
       </div>
 
-      {/* Right: controls */}
+      {/* Right: tokens + controls */}
       <div className="flex shrink-0 items-center gap-2">
+        <VTokensBadge className="mr-2" />
         {/* TEST control to preview each experience */}
         <RoleSwitcher variant="light" />
         <LanguageSwitcher variant="light" className="hidden sm:inline-flex" />
