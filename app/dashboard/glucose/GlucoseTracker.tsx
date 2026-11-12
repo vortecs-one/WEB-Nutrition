@@ -72,6 +72,19 @@ type RangeHours = (typeof RANGES)[number];
 
 const REFRESH_MS = 60_000;
 
+// "ago" wording lives in the dictionary string; this only builds the span.
+function formatElapsed(totalMinutes: number, justNow: string): string {
+  const mins = Math.max(0, Math.floor(totalMinutes));
+  if (mins < 1) return justNow;
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours < 24) return rest ? `${hours} h ${rest} min` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  const hoursLeft = hours % 24;
+  return hoursLeft ? `${days} d ${hoursLeft} h` : `${days} d`;
+}
+
 // SVG counterpart of the reading pill's status colors (statusCard in
 // GlucoseReadingPill.tsx), for the chart's endpoint badge — Tailwind classes
 // can't paint SVG fills, so keep the two in sync by hand.
@@ -1099,6 +1112,14 @@ export default function GlucoseTracker({
                       <span className="text-xs">{t.staleWarning}</span>
                     </div>
                   )}
+                </div>
+              )}
+              {/* The imported-reading line above shows a clock time; this one
+                  says how long ago that was. Other sources already print
+                  "x min ago" there, so it would only repeat itself. */}
+              {current && isCareLink && currentMins !== null && (
+                <div className="truncate text-xs sm:text-sm text-sidebar-foreground/60">
+                  {t.careLinkElapsed.replace("{time}", formatElapsed(currentMins, t.justNow))}
                 </div>
               )}
             </div>

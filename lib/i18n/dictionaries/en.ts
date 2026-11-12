@@ -672,6 +672,7 @@ const en: Dictionary = {
     // Card freshness line: CareLink data is historical, so it shows when the
     // reading was taken instead of "N min ago".
     careLinkReadingFrom: "Imported reading · {time}",
+ careLinkElapsed: "Last reading {time}",
     // --- Insulin pump page (MiniMed 780G + CareLink) ---
     pump: {
       title: "Insulin pump",

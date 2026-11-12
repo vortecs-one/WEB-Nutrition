@@ -679,6 +679,7 @@ const es = {
     // Línea de frescura de la tarjeta: los datos de CareLink son históricos,
     // así que se muestra la hora de la lectura en vez de "hace N min".
     careLinkReadingFrom: "Lectura importada · {time}",
+ careLinkElapsed: "Última lectura {time}",
     // --- Página Bomba de insulina (MiniMed 780G + CareLink) ---
     pump: {
       title: "Bomba de insulina",
