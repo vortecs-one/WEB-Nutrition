@@ -73,9 +73,11 @@ export type FoodLookupResult =
   | { ok: false; reason: "unauthenticated" | "not-found" | "error" };
 
 // Open Food Facts nutrient names accepted by the Food API's `nutriments`
-// object (values per 100 g / 100 ml, grams except energy in kcal).
+// object (grams, except energy in kcal / kJ; sodium is entered in mg and sent
+// with `sodium_unit: "mg"`).
 export const NUTRIMENT_KEYS = [
   "energy-kcal",
+  "energy-kj",
   "fat",
   "saturated-fat",
   "carbohydrates",
@@ -83,21 +85,68 @@ export const NUTRIMENT_KEYS = [
   "fiber",
   "proteins",
   "salt",
+  "sodium",
 ] as const;
 export type NutrimentKey = (typeof NUTRIMENT_KEYS)[number];
 
-// What the register form sends for a barcode Open Food Facts doesn't have.
+export type NutritionBasis = "100g" | "serving";
+
+// Product fields the app can send to Open Food Facts (create or update).
 export type NewFoodProductInput = {
   name: string;
   brand?: string;
   quantity?: string;
   servingSize?: string;
   ingredients?: string;
+  categories?: string[];
+  labels?: string[];
+  countries?: string[];
+  nutritionBasis?: NutritionBasis;
   nutriments?: Partial<Record<NutrimentKey, number>>;
 };
 
+// PATCH payload: every field optional, only the changed ones are sent.
+export type FoodProductPatch = Partial<NewFoodProductInput>;
+
 // Photo kinds the app lets users send to Open Food Facts.
-export type FoodPhotoKind = "front" | "ingredients" | "nutrition";
+export type FoodPhotoKind = "front" | "ingredients" | "nutrition" | "packaging";
+
+// Result of a photo upload: `imgid` is the photo's number on Open Food Facts,
+// used to find the text Open Food Facts reads from it.
+export type FoodPhotoUploadResult =
+  | { ok: true; imgid: number | null }
+  | { ok: false; reason: FoodWriteFailure; message?: string };
+
+// Where a pre-filled value came from, shown as a badge in the review form.
+export type ExtractSource = "off-ocr" | "robotoff" | "ai";
+
+export type Extracted<T> = { value: T; source: ExtractSource };
+
+// Values read from the product photos. Every field is optional; the form
+// only pre-fills what was found and the user confirms before anything is sent.
+export type ProductExtraction = {
+  brand?: Extracted<string>;
+  quantity?: Extracted<string>;
+  servingSize?: Extracted<string>;
+  ingredients?: Extracted<string>;
+  categories?: Extracted<string[]>;
+  labels?: Extracted<string[]>;
+  nutritionBasis?: Extracted<NutritionBasis>;
+  nutriments?: Partial<Record<NutrimentKey, Extracted<number>>>;
+};
+
+export type ExtractStatus = "ok" | "no-text" | "empty";
+
+export type ProductExtractionResult =
+  | { ok: true; data: ProductExtraction; status: Record<string, ExtractStatus> }
+  | { ok: false; reason: "unauthenticated" | "invalid" | "error" };
+
+export type LabelAiResult =
+  | { ok: true; data: ProductExtraction }
+  | {
+      ok: false;
+      reason: "unauthenticated" | "invalid" | "rate-limited" | "quota" | "error";
+    };
 
 export type FoodWriteFailure =
   | "unauthenticated"
