@@ -46,6 +46,10 @@ const en: Dictionary = {
     defaultUser: "User",
     logout: "Sign out",
   },
+  vtokens: {
+  label: "v-healthy tokens",
+  hint: "Your token wallet. You earn 1 token for every kcal burned in your logged workouts, and your balance keeps growing over time.",
+  },
   dashboard: {
     title: "Nutrition dashboard",
     subtitle: "Select an option from the menu on the left to get started.",
@@ -558,7 +562,7 @@ const en: Dictionary = {
       hypoTitle: "Hypoglycemia",
       hypoRule:
         "Take 15 g of fast-acting carbs, wait 15 minutes and check again. Do not take insulin.",
-      staleWarning: "The reading is over 15 minutes old. Confirm with a fresh check before dosing.",
+      lastReadingAge: "Last reading was {time} ago. Confirm with a fresh check before dosing.",
       invalid:
         "Fill in ratio, sensitivity and ranges with values above 0 (upper range can't be below lower range).",
       disclaimer:

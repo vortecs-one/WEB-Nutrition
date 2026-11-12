@@ -8,6 +8,7 @@ import {
   varchar,
   date,
   integer,
+  numeric,
   boolean,
   jsonb,
   index,
@@ -149,6 +150,41 @@ export const dayLogEntries = pgTable(
     userDayIdx: index("day_log_entries_user_day_idx").on(
       table.userKey,
       table.logDate,
+    ),
+  }),
+);
+
+// === Billetera de tokens v-healthy ===
+// Append-style ledger: a user's balance is the sum of their rows. Workout
+// rewards are one "earn_activity" row per day (ref "activity:YYYY-MM-DD")
+// kept equal to that day's burned kcal; spends and transfers are extra rows
+// with a negative/positive amount and a NULL ref.
+export const vtokenLedger = pgTable(
+  "vtoken_ledger",
+  {
+    id: serial("id").primaryKey(),
+    userKey: text("user_key").notNull(),
+    // Signed token amount as a decimal string (numeric), never zero.
+    amount: numeric("amount", { precision: 24, scale: 8 }).notNull(),
+    // "earn_activity" | "spend" | "transfer_in" | "transfer_out" | "adjustment".
+    kind: varchar("kind", { length: 20 }).notNull(),
+    ref: text("ref"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userRefUnique: unique("vtoken_ledger_user_ref_unique").on(
+      table.userKey,
+      table.ref,
+    ),
+    userCreatedIdx: index("vtoken_ledger_user_created_idx").on(
+      table.userKey,
+      table.createdAt,
     ),
   }),
 );
