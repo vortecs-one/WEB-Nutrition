@@ -48,7 +48,7 @@ const en: Dictionary = {
   },
   vtokens: {
   label: "v-healthy tokens",
-  hint: "Earned today: 1 token for every kcal burned in your logged workouts.",
+  hint: "Your token wallet. You earn 1 token for every kcal burned in your logged workouts, and your balance keeps growing over time.",
   },
   dashboard: {
     title: "Nutrition dashboard",

@@ -7,7 +7,8 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
+import { VTOKENS_WALLET_KEY } from "@/lib/vtokens/types";
 import {
   fetchUserDayLog,
   addMealEntry,
@@ -40,6 +41,10 @@ export * from "./types";
 // are restored on the next login. SWR caches the user's log on the client and
 // mutations update optimistically, then reconcile with the authoritative
 // server state (which carries the real row ids).
+
+// Workout rewards live in the token wallet, so re-read it once a workout has
+// been saved or removed.
+const refreshWallet = () => globalMutate(VTOKENS_WALLET_KEY);
 
 const emptyDay = (): DayData => ({
   meals: [],
@@ -198,7 +203,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
             activities: [optimisticActivity, ...d.activities],
           })),
         () => addActivityEntry(dateKey, activity),
-      );
+      ).then(refreshWallet);
     },
     [runMutation],
   );
@@ -212,7 +217,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
             activities: d.activities.filter((a) => a.id !== id),
           })),
         () => removeEntry(id),
-      );
+      ).then(refreshWallet);
     },
     [runMutation],
   );

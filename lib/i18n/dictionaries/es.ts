@@ -47,7 +47,7 @@ const es = {
   },
   vtokens: {
   label: "Tokens v-healthy",
-  hint: "Ganados hoy: 1 token por cada kcal quemada en tus entrenamientos registrados.",
+  hint: "Tu billetera de tokens. Ganas 1 token por cada kcal quemada en tus entrenamientos registrados y tu saldo sigue creciendo con el tiempo.",
   },
   dashboard: {
     title: "Dashboard nutricional",

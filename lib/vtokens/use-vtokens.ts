@@ -1,29 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { localDateKey } from "@/lib/day-log/date-key";
-import { useDayLog } from "@/lib/day-log/provider";
-import { tokensFromBurnedKcal } from "./calculate";
-import type { VTokenBalance } from "./types";
+import useSWR from "swr";
+import { getVTokenBalance } from "./actions";
+import { VTOKENS_WALLET_KEY, type VTokenBalance } from "./types";
 
-// Today's v-healthy token balance. Replace the body with a wallet / ledger
+// The user's v-healthy wallet balance. Replace the fetcher with a chain wallet
 // read when the coin goes on-chain; keep the `VTokenBalance` shape.
 export function useVTokens(): VTokenBalance {
-  const { burnedFor } = useDayLog();
-  const [todayKey, setTodayKey] = useState("");
-
-  // Client-only: the server has no notion of the user's local day.
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only init to avoid SSR/hydration mismatch
-  useEffect(() => setTodayKey(localDateKey(new Date())), []);
-
-  if (!todayKey) {
-    return { amount: 0, source: "calories", decimals: 0, loading: true };
-  }
+  const { data, error, isLoading } = useSWR(
+    VTOKENS_WALLET_KEY,
+    () => getVTokenBalance(),
+    { revalidateOnFocus: false },
+  );
 
   return {
-    amount: tokensFromBurnedKcal(burnedFor(todayKey)),
-    source: "calories",
+    amount: data ?? 0,
+    source: "ledger",
     decimals: 0,
-    loading: false,
+    loading: isLoading,
+    error: Boolean(error) || (!isLoading && data == null),
   };
 }

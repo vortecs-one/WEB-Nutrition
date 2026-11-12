@@ -4,15 +4,18 @@ import { Coins } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useVTokens } from "@/lib/vtokens/use-vtokens";
 
-// Today's v-healthy tokens, shown at the top of the dashboard.
+// The user's v-healthy token wallet balance, shown at the top of the dashboard.
 export default function VTokensBadge({ className = "" }: { className?: string }) {
   const { locale, dict } = useI18n();
-  const { amount, decimals, loading } = useVTokens();
+  const { amount, decimals, loading, error } = useVTokens();
+  const unavailable = loading || error;
 
-  const formatted = new Intl.NumberFormat(locale === "es" ? "es-CL" : locale, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(amount);
+  const formatted = unavailable
+    ? "–"
+    : new Intl.NumberFormat(locale === "es" ? "es-CL" : locale, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(amount);
 
   return (
     <div
@@ -29,9 +32,9 @@ export default function VTokensBadge({ className = "" }: { className?: string })
           {dict.vtokens.label}
         </span>
         <span
-          className={`mt-1 text-base font-semibold tabular-nums text-foreground ${loading ? "opacity-40" : ""}`}
+          className={`mt-1 text-base font-semibold tabular-nums text-foreground ${unavailable ? "opacity-40" : ""}`}
         >
-          {loading ? "–" : formatted}
+          {formatted}
         </span>
       </span>
     </div>
