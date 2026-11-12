@@ -767,6 +767,11 @@ const es = {
       manualDownload: "Descargar",
       manualLanguage: "Idioma del manual",
       manualMobileHint: "Si el manual no se ve completo aquí, ábrelo en otra pestaña.",
+    manualLoading: "Cargando manual…",
+    manualError: "No se pudo cargar el manual. Prueba a abrirlo en otra pestaña.",
+    manualZoomIn: "Acercar",
+    manualZoomOut: "Alejar",
+    manualPage: "Página {current} de {total}",
       manualDisclaimer: "Solo como referencia; sigue las indicaciones de tu equipo médico.",
       dataTitle: "Datos de la bomba",
       dataSoon:
