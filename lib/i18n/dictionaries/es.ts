@@ -557,7 +557,7 @@ const es = {
       hypoTitle: "Hipoglucemia",
       hypoRule:
         "Toma 15 g de carbohidratos de acción rápida, espera 15 minutos y vuelve a medir. No te administres insulina.",
-      staleWarning: "La lectura tiene más de 15 minutos. Confirma con una medición antes de dosificar.",
+      lastReadingAge: "La última lectura fue hace {time}. Confirma con una medición antes de dosificar.",
       invalid:
         "Completa ratio, sensibilidad y rangos con valores mayores a 0 (el rango mayor no puede ser menor que el rango menor).",
       disclaimer:

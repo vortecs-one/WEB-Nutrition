@@ -8,7 +8,9 @@ import {
   type GlucoseSettings,
   type GlucoseStatus,
   type GlucoseUnit,
+  STALE_MINUTES,
   doseParamsFor,
+  formatElapsed,
   formatGlucose,
   glucoseStatus,
   unitLabel,
@@ -49,7 +51,8 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   currentMgdl: number | null;
-  isStale: boolean;
+  /** Minutes since the latest reading was taken; null when there is none. */
+  readingMinutes: number | null;
   settings: GlucoseSettings;
 };
 
@@ -57,11 +60,15 @@ export default function InsulinCalculator({
   isOpen,
   onClose,
   currentMgdl,
-  isStale,
+  readingMinutes,
   settings,
 }: Props) {
   const { dict } = useI18n();
   const t = dict.glucose.calculator;
+  const readingAge =
+    currentMgdl !== null && readingMinutes !== null && readingMinutes > STALE_MINUTES
+      ? formatElapsed(readingMinutes, dict.glucose.justNow)
+      : null;
   const unit = settings.unit;
   const ids = useId();
 
@@ -247,11 +254,11 @@ export default function InsulinCalculator({
                       </button>
                     </div>
                   ) : (
-                    isStale &&
+                    readingAge &&
                     !editingGlucose && (
                       <p className="flex items-start gap-1.5 text-xs sm:text-sm">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                        {t.staleWarning}
+                        {t.lastReadingAge.replace("{time}", readingAge)}
                       </p>
                     )
                   )}

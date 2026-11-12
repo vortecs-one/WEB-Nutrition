@@ -558,7 +558,7 @@ const en: Dictionary = {
       hypoTitle: "Hypoglycemia",
       hypoRule:
         "Take 15 g of fast-acting carbs, wait 15 minutes and check again. Do not take insulin.",
-      staleWarning: "The reading is over 15 minutes old. Confirm with a fresh check before dosing.",
+      lastReadingAge: "Last reading was {time} ago. Confirm with a fresh check before dosing.",
       invalid:
         "Fill in ratio, sensitivity and ranges with values above 0 (upper range can't be below lower range).",
       disclaimer:

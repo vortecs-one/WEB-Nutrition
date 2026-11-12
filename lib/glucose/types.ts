@@ -256,6 +256,19 @@ export function minutesAgo(dateMs: number): number {
   return Math.max(0, Math.round((Date.now() - dateMs) / 60000));
 }
 
+/** Elapsed span as "12 min", "3 h 20 min" or "2 d 4 h". The "ago" wording lives in the dictionary string. */
+export function formatElapsed(totalMinutes: number, justNow: string): string {
+  const mins = Math.max(0, Math.floor(totalMinutes));
+  if (mins < 1) return justNow;
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours < 24) return rest ? `${hours} h ${rest} min` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  const hoursLeft = hours % 24;
+  return hoursLeft ? `${days} d ${hoursLeft} h` : `${days} d`;
+}
+
 /** A reading older than this is considered stale (sensor/upload gap). */
 export const STALE_MINUTES = 15;
 
