@@ -299,6 +299,16 @@
   animation: pet-zzz 3.6s ease-out infinite;
   pointer-events: none;
 }
+/* Lying down, the head is low and to the left, so the Zs rise from just
+   above it and drift up-right, a little larger, with a gentle wobble. */
+.pet-anim[data-asleep] .pet-zzz {
+  right: auto;
+  left: 52%;
+  top: 38%;
+  font-size: 1.35rem;
+  font-weight: 700;
+  animation-name: pet-zzz-sleep;
+}
 
 .pet-anim .pet-heart {
   position: absolute;
@@ -348,6 +358,13 @@
   0%   { transform: translate(0, 0) scale(0.7); opacity: 0; }
   20%  { opacity: 0.8; }
   100% { transform: translate(18px, -40px) scale(1.2); opacity: 0; }
+}
+@keyframes pet-zzz-sleep {
+  0%   { transform: translate(0, 0) rotate(-8deg) scale(0.6); opacity: 0; }
+  15%  { opacity: 0.9; }
+  40%  { transform: translate(16px, -28px) rotate(6deg) scale(0.95); }
+  70%  { transform: translate(28px, -56px) rotate(-6deg) scale(1.2); opacity: 0.7; }
+  100% { transform: translate(44px, -86px) rotate(4deg) scale(1.45); opacity: 0; }
 }
 
 /* "!" (alarmed: in the aura's color, red when urgent) or "?" (unsure) beside
