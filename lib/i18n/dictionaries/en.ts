@@ -760,6 +760,11 @@ const en: Dictionary = {
       manualDownload: "Download",
       manualLanguage: "Manual language",
       manualMobileHint: "If the manual doesn't show fully here, open it in a new tab.",
+    manualLoading: "Loading manual…",
+    manualError: "The manual couldn't be loaded. Try opening it in a new tab.",
+    manualZoomIn: "Zoom in",
+    manualZoomOut: "Zoom out",
+    manualPage: "Page {current} of {total}",
       manualDisclaimer: "For reference only; follow your care team's guidance.",
       dataTitle: "Pump data",
       dataSoon:

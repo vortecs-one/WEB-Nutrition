@@ -4,13 +4,29 @@
 // viewer (search, zoom, pages, print) so no PDF library is needed. Mounted
 // only when the Manual tab is open, so the large file loads on demand.
 
+import { useEffect, useState } from "react";
 import { BookOpen, Download, ExternalLink } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import type { PumpManual } from "@/lib/pump-manual/manuals";
+import PumpManualPages from "./PumpManualPages";
+
+// Touch devices and browsers without an inline PDF viewer can't show the PDF
+// in an <iframe>, so they get the canvas reader instead.
+const CANVAS_READER_QUERY = "(pointer: coarse), (max-width: 767px)";
 
 export default function PumpManualViewer({ manual }: { manual: PumpManual }) {
   const { dict } = useI18n();
   const t = dict.glucose.pump;
+  const [useCanvasReader, setUseCanvasReader] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const query = window.matchMedia(CANVAS_READER_QUERY);
+    const update = () =>
+      setUseCanvasReader(query.matches || navigator.pdfViewerEnabled === false);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   const action =
     "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight";
@@ -49,11 +65,27 @@ export default function PumpManualViewer({ manual }: { manual: PumpManual }) {
         </div>
       </div>
 
-      <iframe
-        src={`${manual.pdfPath}#view=FitH`}
-        title={manual.title}
-        className="h-[70vh] w-full rounded-2xl border border-sidebar-foreground/10 bg-sidebar-accent"
-      />
+      {useCanvasReader === null ? (
+        <div className="h-[70vh] w-full rounded-2xl border border-sidebar-foreground/10 bg-sidebar-accent" />
+      ) : useCanvasReader ? (
+        <PumpManualPages
+          url={manual.pdfPath}
+          labels={{
+            loading: t.manualLoading,
+            error: t.manualError,
+            zoomIn: t.manualZoomIn,
+            zoomOut: t.manualZoomOut,
+            page: (current, total) =>
+              t.manualPage.replace("{current}", String(current)).replace("{total}", String(total)),
+          }}
+        />
+      ) : (
+        <iframe
+          src={`${manual.pdfPath}#view=FitH`}
+          title={manual.title}
+          className="h-[70vh] w-full rounded-2xl border border-sidebar-foreground/10 bg-sidebar-accent"
+        />
+      )}
 
       <p className="text-xs leading-relaxed text-sidebar-foreground/60 text-pretty">
         {t.manualMobileHint} {t.manualDisclaimer}
