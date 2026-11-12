@@ -1,6 +1,5 @@
 "use client";
 
-import { Handshake } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useH2HTokens } from "@/lib/h2h-tokens/use-h2h-tokens";
 import TokenBadge from "./TokenBadge";
@@ -25,7 +24,7 @@ export default function H2HTokensBadge({ className = "" }: { className?: string 
       hint={dict.h2hTokens.hint}
       value={formatted}
       unavailable={unavailable}
-      icon={<Handshake className="h-4 w-4" aria-hidden="true" />}
+      iconSrc="/tokens/h2h.png"
       className={className}
     />
   );

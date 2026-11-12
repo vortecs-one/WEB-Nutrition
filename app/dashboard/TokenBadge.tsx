@@ -1,24 +1,18 @@
-import type { ReactNode } from "react";
+import Image from "next/image";
 
 interface TokenBadgeProps {
   label: string;
   hint: string;
   value: string;
-  icon: ReactNode;
+  iconSrc: string;
   unavailable?: boolean;
   tone?: "primary" | "accent";
   className?: string;
 }
 
 const TONES = {
-  primary: {
-    pill: "bg-primary/15",
-    icon: "bg-primary text-primary-foreground",
-  },
-  accent: {
-    pill: "bg-accent/15",
-    icon: "bg-accent text-accent-foreground",
-  },
+  primary: "bg-primary/15",
+  accent: "bg-accent/15",
 } as const;
 
 // Presentational pill shared by every token shown at the top of the dashboard.
@@ -26,24 +20,26 @@ export default function TokenBadge({
   label,
   hint,
   value,
-  icon,
+  iconSrc,
   unavailable = false,
   tone = "primary",
   className = "",
 }: TokenBadgeProps) {
-  const styles = TONES[tone];
-
   return (
     <div
       role="status"
       aria-label={`${label}: ${value}`}
       title={hint}
-      className={`inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-3.5 ${styles.pill} ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-3.5 ${TONES[tone]} ${className}`}
     >
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${styles.icon}`}
-      >
-        {icon}
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background">
+        <Image
+          src={iconSrc}
+          alt=""
+          width={20}
+          height={20}
+          className="h-5 w-5 object-contain"
+        />
       </span>
       <span className="flex flex-col leading-none">
         <span className="whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
