@@ -677,9 +677,19 @@ const en: Dictionary = {
     pump: {
       title: "Insulin pump",
       devices: "MiniMed 780G · Guardian 3 sensor · CareLink",
-      back: "Back to dashboard",
       open: "Pump",
-      openPage: "Open the Insulin pump page",
+      deviceStatus: "Device status",
+      statusNeedsGuardian:
+        "Live device status shows here when Guardian 3 is the glucose sensor and CareLink is connected.",
+      sensorLife: "Sensor life",
+      days: "days",
+      hours: "h",
+      minutes: "min",
+      timeInRange: "Time in range",
+      below: "Below {value} {unit}",
+      above: "Above {value} {unit}",
+      average: "Average glucose",
+      noReadings: "No readings in this period yet.",
       useAsSensorPrompt:
         "The glucose card is reading from {sensor}. Show the imported Guardian 3 readings there instead?",
       useAsSensorButton: "Use Guardian 3 as sensor",

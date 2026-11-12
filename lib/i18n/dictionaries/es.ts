@@ -684,9 +684,19 @@ const es = {
     pump: {
       title: "Bomba de insulina",
       devices: "MiniMed 780G · sensor Guardian 3 · CareLink",
-      back: "Volver al panel",
       open: "Bomba",
-      openPage: "Abrir la página Bomba de insulina",
+      deviceStatus: "Estado de los dispositivos",
+      statusNeedsGuardian:
+        "El estado en vivo de los dispositivos aparece aquí cuando el Guardian 3 es el sensor de glucosa y CareLink está conectado.",
+      sensorLife: "Vida del sensor",
+      days: "días",
+      hours: "h",
+      minutes: "min",
+      timeInRange: "Tiempo en rango",
+      below: "Por debajo de {value} {unit}",
+      above: "Por encima de {value} {unit}",
+      average: "Glucosa promedio",
+      noReadings: "Aún no hay lecturas en este periodo.",
       useAsSensorPrompt:
         "La tarjeta de glucosa está leyendo de {sensor}. ¿Mostrar ahí las lecturas importadas del Guardian 3?",
       useAsSensorButton: "Usar Guardian 3 como sensor",
