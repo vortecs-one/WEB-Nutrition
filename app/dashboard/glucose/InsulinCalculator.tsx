@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, Info } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Info, Pencil, RotateCcw } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import {
   type GlucoseSettings,
+  type GlucoseStatus,
   type GlucoseUnit,
   doseParamsFor,
   formatGlucose,
+  glucoseStatus,
   unitLabel,
 } from "@/lib/glucose/types";
 import NumberField from "./NumberField";
@@ -30,6 +32,14 @@ import {
 const parse = (s: string) => {
   const n = Number.parseFloat(s.replace(",", "."));
   return Number.isFinite(n) ? n : NaN;
+};
+
+// Same palette as the glucose pill and the companion card.
+const GLUCOSE_CARD: Record<GlucoseStatus, string> = {
+  "in-range": "bg-lime-400 text-lime-950",
+  high: "bg-amber-500 text-amber-950",
+  low: "bg-amber-500 text-amber-950",
+  urgent: "bg-destructive text-white",
 };
 
 const fromMgdl = (mgdl: number, unit: GlucoseUnit) =>
@@ -61,6 +71,11 @@ export default function InsulinCalculator({
   const [carbs, setCarbs] = useState("0");
   const [iob, setIob] = useState("0");
   const [manualGlucose, setManualGlucose] = useState("");
+  // A glucose typed over the sensor reading, used only for this result. It is
+  // never saved and is dropped as soon as the popup closes.
+  const [overrideGlucose, setOverrideGlucose] = useState<string | null>(null);
+  const [editingGlucose, setEditingGlucose] = useState(false);
+  const overrideInputRef = useRef<HTMLInputElement>(null);
 
   if (fieldUnit !== unit) {
     const convert = (s: string) => {
@@ -69,6 +84,12 @@ export default function InsulinCalculator({
     };
     setFieldUnit(unit);
     setManualGlucose(convert(manualGlucose));
+    if (overrideGlucose !== null) setOverrideGlucose(convert(overrideGlucose));
+  }
+
+  if (!isOpen && (overrideGlucose !== null || editingGlucose)) {
+    setOverrideGlucose(null);
+    setEditingGlucose(false);
   }
 
   // Ratio, sensitivity and range are saved per glucose sensor and edited in
@@ -82,17 +103,40 @@ export default function InsulinCalculator({
         ? dict.glucose.careLinkAppName
         : dict.glucose.sourceNightscout;
 
-  const glucoseMgdl = currentMgdl ?? toMgdl(parse(manualGlucose), unit);
+  const overrideMgdl = overrideGlucose !== null ? toMgdl(parse(overrideGlucose), unit) : NaN;
+  const hasOverride = Number.isFinite(overrideMgdl) && overrideMgdl > 0;
+  const glucoseMgdl = hasOverride ? overrideMgdl : (currentMgdl ?? toMgdl(parse(manualGlucose), unit));
   const carbsG = Math.max(0, parse(carbs) || 0);
   const ratioG = saved.ratio;
   const params: SheetParams = { isf: saved.isf, low: saved.low, high: saved.high };
   const iobU = Math.max(0, parse(iob) || 0);
+
+  const startEditingGlucose = () => {
+    if (currentMgdl === null) return;
+    setOverrideGlucose((prev) => prev ?? fromMgdl(currentMgdl, unit));
+    setEditingGlucose(true);
+    requestAnimationFrame(() => overrideInputRef.current?.focus());
+  };
+  const finishEditingGlucose = () => {
+    // An empty or invalid entry falls back to the sensor reading.
+    if (!hasOverride) setOverrideGlucose(null);
+    setEditingGlucose(false);
+  };
+  const resetGlucose = () => {
+    setOverrideGlucose(null);
+    setEditingGlucose(false);
+  };
 
   const paramsValid = ratioG > 0 && params.isf > 0 && params.low > 0 && params.high >= params.low;
   const hasGlucose = Number.isFinite(glucoseMgdl) && glucoseMgdl > 0;
   const ready = paramsValid && hasGlucose;
 
   const isHypo = ready && glucoseMgdl < settings.lowThreshold;
+
+  // Only a sensor reading (or an edit of it) tints the card; a typed value
+  // with no reading keeps the neutral card and its labelled field.
+  const tinted = hasGlucose && (currentMgdl !== null || hasOverride);
+  const status = glucoseStatus(glucoseMgdl, settings);
 
   // Whole-unit dose from the care team's table.
   const carbSteps = ready ? sheetCarbSteps(carbsG, ratioG) : 0;
@@ -128,24 +172,88 @@ export default function InsulinCalculator({
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <section
               aria-labelledby={`${ids}-current`}
-              className="flex min-w-0 flex-col justify-between gap-3 rounded-2xl bg-sidebar-accent p-3 sm:p-4"
+              className={`flex min-w-0 flex-col justify-between gap-3 rounded-2xl p-3 transition-colors sm:p-4 ${
+                tinted ? GLUCOSE_CARD[status] : "bg-sidebar-accent"
+              }`}
             >
-              <h3 id={`${ids}-current`} className={sectionTitle}>
-                {t.currentGlucose}
-              </h3>
+              <div className="flex items-start justify-between gap-2">
+                <h3
+                  id={`${ids}-current`}
+                  className={`${sectionTitle} ${tinted ? "text-current before:bg-current" : ""}`}
+                >
+                  {t.currentGlucose}
+                </h3>
+                {currentMgdl !== null && !editingGlucose && (
+                  <button
+                    type="button"
+                    onClick={startEditingGlucose}
+                    aria-label={t.editGlucose}
+                    title={t.editGlucose}
+                    className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full opacity-70 transition hover:bg-black/10 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
               {currentMgdl !== null ? (
                 <div className="flex flex-col gap-2">
-                  <p className="flex items-baseline gap-1.5 text-3xl font-semibold tabular-nums sm:text-4xl">
-                    {formatGlucose(currentMgdl, unit)}
-                    <span className="text-sm font-normal text-sidebar-foreground/70 sm:text-base">
-                      {glucoseUnit}
-                    </span>
-                  </p>
-                  {isStale && (
-                    <p className="flex items-start gap-1.5 text-xs text-amber-500 sm:text-sm">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                      {t.staleWarning}
+                  {editingGlucose ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        ref={overrideInputRef}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step={glucoseStep}
+                        value={overrideGlucose ?? ""}
+                        onChange={(e) => setOverrideGlucose(e.target.value)}
+                        onFocus={(e) => e.target.select()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") finishEditingGlucose();
+                        }}
+                        aria-label={t.editGlucose}
+                        className="w-full min-w-0 rounded-lg bg-black/10 px-2 py-1 text-3xl font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-current sm:text-4xl"
+                      />
+                      <span className="shrink-0 text-sm opacity-70 sm:text-base">{glucoseUnit}</span>
+                      <button
+                        type="button"
+                        onClick={finishEditingGlucose}
+                        aria-label={t.done}
+                        title={t.done}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+                      >
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="flex items-baseline gap-1.5 text-3xl font-semibold tabular-nums sm:text-4xl">
+                      {formatGlucose(hasOverride ? overrideMgdl : currentMgdl, unit)}
+                      <span className="text-sm font-normal opacity-70 sm:text-base">{glucoseUnit}</span>
                     </p>
+                  )}
+                  {hasOverride && !editingGlucose ? (
+                    <div className="flex flex-col items-start gap-1 text-xs sm:text-sm">
+                      <p className="flex items-start gap-1.5">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                        {t.glucoseEdited}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={resetGlucose}
+                        className="flex items-center gap-1.5 rounded-md font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                        {t.glucoseReset}
+                      </button>
+                    </div>
+                  ) : (
+                    isStale &&
+                    !editingGlucose && (
+                      <p className="flex items-start gap-1.5 text-xs sm:text-sm">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                        {t.staleWarning}
+                      </p>
+                    )
                   )}
                 </div>
               ) : (
@@ -167,26 +275,28 @@ export default function InsulinCalculator({
               <label htmlFor={`${ids}-carbs`} className={sectionTitle}>
                 {t.carbsToEat}
               </label>
-              <div className="flex items-baseline gap-1.5">
-                <input
-                  id={`${ids}-carbs`}
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="1"
-                  value={carbs}
-                  onChange={(e) => setCarbs(e.target.value)}
-                  onFocus={(e) => e.target.select()}
-                  aria-describedby={`${ids}-carbs-hint`}
-                  className="w-full min-w-0 bg-transparent text-3xl font-semibold tabular-nums outline-none sm:text-4xl"
-                />
-                <span className="shrink-0 text-sm text-sidebar-foreground/70 sm:text-base">{t.grams}</span>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline gap-1.5">
+                  <input
+                    id={`${ids}-carbs`}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="1"
+                    value={carbs}
+                    onChange={(e) => setCarbs(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    aria-describedby={`${ids}-carbs-hint`}
+                    className="w-full min-w-0 bg-transparent text-3xl font-semibold tabular-nums outline-none sm:text-4xl"
+                  />
+                  <span className="shrink-0 text-sm text-sidebar-foreground/70 sm:text-base">{t.grams}</span>
+                </div>
+                <p id={`${ids}-carbs-hint`} className="text-xs text-sidebar-foreground/60">
+                  {t.carbsHint}
+                </p>
               </div>
             </div>
           </div>
-          <p id={`${ids}-carbs-hint`} className="px-1 text-xs text-sidebar-foreground/60">
-            {t.carbsHint}
-          </p>
         </div>
 
         <section
@@ -240,27 +350,22 @@ export default function InsulinCalculator({
                     <ResultRow
                       label={t.formulaReference}
                       value={`${reference.theoretical.toFixed(2)} ${t.units}`}
+                      info={
+                        // Worked formula, as on the care team's infographic:
+                        // 40 g ÷ 10 = 4.00 U · (220 − 120) ÷ 80 = 1.25 U
+                        <>
+                          <p className="tabular-nums">
+                            {`${carbsG} ${t.grams} ÷ ${ratioG} = ${reference.carb.toFixed(2)} ${t.units}`}
+                            {" · "}
+                            {`(${formatGlucose(glucoseMgdl, unit)} − ${formatGlucose(params.high, unit)}) ÷ ${formatGlucose(params.isf, unit)} = ${reference.correction.toFixed(2)} ${t.units}`}
+                          </p>
+                          <p>{t.formulaReferenceHint}</p>
+                        </>
+                      }
                     />
                   )}
                 </dl>
               </div>
-
-              {/* Worked formula, as on the care team's infographic:
-                  40 g ÷ 10 = 4.00 U · (220 − 120) ÷ 80 = 1.25 U */}
-              {reference && (
-                <div className="flex flex-col gap-1 px-1">
-                  <p className="text-xs text-sidebar-foreground/70">
-                    <span className="font-semibold">{t.formulaReference}:</span>{" "}
-                    <span className="tabular-nums">{`${reference.theoretical.toFixed(2)} ${t.units}`}</span>
-                  </p>
-                  <p className="text-xs tabular-nums text-sidebar-foreground/60">
-                    {`${carbsG} ${t.grams} ÷ ${ratioG} = ${reference.carb.toFixed(2)} ${t.units}`}
-                    {" · "}
-                    {`(${formatGlucose(glucoseMgdl, unit)} − ${formatGlucose(params.high, unit)}) ÷ ${formatGlucose(params.isf, unit)} = ${reference.correction.toFixed(2)} ${t.units}`}
-                  </p>
-                  <p className="text-xs text-sidebar-foreground/60">{t.formulaReferenceHint}</p>
-                </div>
-              )}
 
               {correction < 0 && (
                 <p className="px-1 text-xs text-sidebar-foreground/70">
@@ -532,11 +637,43 @@ function DoseTable({
   );
 }
 
-function ResultRow({ label, value }: { label: string; value: string }) {
+function ResultRow({
+  label,
+  value,
+  info,
+}: {
+  label: string;
+  value: string;
+  info?: React.ReactNode;
+}) {
+  const [showInfo, setShowInfo] = useState(false);
+  const infoId = useId();
+
   return (
-    <div className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-      <dt className="text-xs text-sidebar-foreground/70 sm:text-sm">{label}</dt>
-      <dd className="text-base font-semibold tabular-nums">{value}</dd>
+    <div className="py-2.5">
+      <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <dt className="flex items-center gap-1 text-xs text-sidebar-foreground/70 sm:text-sm">
+          {label}
+          {info && (
+            <button
+              type="button"
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label={label}
+              aria-expanded={showInfo}
+              aria-controls={infoId}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/60 transition hover:bg-highlight/15 hover:text-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
+            >
+              <Info className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+        </dt>
+        <dd className="text-base font-semibold tabular-nums">{value}</dd>
+      </div>
+      {info && showInfo && (
+        <div id={infoId} className="mt-2 flex flex-col gap-1 text-xs text-sidebar-foreground/60">
+          {info}
+        </div>
+      )}
     </div>
   );
 }
