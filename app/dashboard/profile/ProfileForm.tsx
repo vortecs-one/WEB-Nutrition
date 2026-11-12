@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useSWRConfig } from "swr";
-import { MEASUREMENTS_KEY } from "@/lib/body-measurements/types";
+import { isMeasurementsKey } from "@/lib/body-measurements/types";
 import MeasurementHistory from "./MeasurementHistory";
 import { useI18n } from "@/lib/i18n/provider";
 import type { HumanData } from "@/lib/thruxion-api";
@@ -131,7 +131,7 @@ export default function ProfileForm({
     // A changed weight becomes today's weigh-in (its history lives in the day log).
     if (weightKg !== null && weightKg !== latestKg) await setWeight(localDateKey(new Date()), weightKg);
     setWeightInput(null);
-    await Promise.all([refreshBodyProfile(), globalMutate(MEASUREMENTS_KEY)]);
+    await Promise.all([refreshBodyProfile(), globalMutate(isMeasurementsKey)]);
     setStatus("saved");
   };
 

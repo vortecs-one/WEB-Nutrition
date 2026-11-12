@@ -105,8 +105,14 @@ export async function fetchBodyProfile(): Promise<BodyProfile | null> {
 async function syncHeight(humanId: string, heightCm: number): Promise<void> {
   try {
     const latest = await getLatestBodyMeasurement(humanId);
-    const current = latest?.height_cm != null ? Math.round(latest.height_cm) : null;
-    if (current !== heightCm) await createBodyMeasurement(humanId, { height_cm: heightCm });
+    // Compare at 0.1 cm so a 170.5 cm record isn't rewritten by a 170 cm form value
+    // that the user didn't actually change.
+    const tenth = (v: number) => Math.round(v * 10);
+    const current = latest?.height_cm != null ? latest.height_cm : null;
+    const unchanged =
+      current !== null &&
+      (tenth(current) === tenth(heightCm) || Math.round(current) === heightCm);
+    if (!unchanged) await createBodyMeasurement(humanId, { height_cm: heightCm });
   } catch (err) {
     console.log("[body-profile] height sync failed:", (err as Error).message);
   }

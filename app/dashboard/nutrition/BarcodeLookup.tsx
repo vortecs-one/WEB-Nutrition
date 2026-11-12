@@ -43,6 +43,7 @@ import NutritionFacts from "./NutritionFacts";
 import BarcodeScanner from "./BarcodeScanner";
 import FoodPhotoScanner from "./FoodPhotoScanner";
 import ContributeProduct from "./ContributeProduct";
+import { isValidGtin } from "@/lib/foods/off-images";
 import { photoItemToProduct, type FoodPhotoItem } from "@/lib/foods/photo-types";
 
 type Status = "idle" | "loading" | "not-found" | "error";
@@ -496,7 +497,7 @@ export default function BarcodeLookup({
                 <Barcode className="h-4 w-4" aria-hidden="true" />
                 {t.scanAgain}
               </button>
-              {lastQuery && /^\d{8,14}$/.test(lastQuery) && !contribute && (
+              {lastQuery && isValidGtin(lastQuery) && !contribute && (
                 <button
                   type="button"
                   onClick={() => {

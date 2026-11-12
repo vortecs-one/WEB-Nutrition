@@ -19,7 +19,9 @@ import {
   type FoodMeta,
   type FoodNutrition,
   type FoodPhotoKind,
+  type FoodPhotoUploadResult,
   type FoodProduct,
+  type FoodProductPatch,
   type FoodWriteResult,
   type IngredientsOcrResult,
   type NewFoodProductInput,
@@ -107,7 +109,12 @@ export async function lookupFoodByBarcode(
 
 const BARCODE_RE = /^\d{8,14}$/;
 const LANG_RE = /^[a-z]{2}$/;
-const PHOTO_KINDS: readonly FoodPhotoKind[] = ["front", "ingredients", "nutrition"];
+const PHOTO_KINDS: readonly FoodPhotoKind[] = [
+  "front",
+  "ingredients",
+  "nutrition",
+  "packaging",
+];
 const PHOTO_MIME = new Set(["image/jpeg", "image/png", "image/gif"]);
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
@@ -119,16 +126,59 @@ const optionalText = (max: number) =>
     .optional()
     .transform((v) => (v ? v : undefined));
 
-const newProductSchema = z.object({
-  name: z.string().trim().min(1).max(200),
+const tagList = z
+  .array(z.string().trim().min(1).max(100))
+  .max(20)
+  .optional()
+  .transform((v) => (v && v.length ? v : undefined));
+
+const productFieldsSchema = z.object({
   brand: optionalText(200),
   quantity: optionalText(50),
   servingSize: optionalText(50),
   ingredients: optionalText(5000),
+  categories: tagList,
+  labels: tagList,
+  countries: tagList,
+  nutritionBasis: z.enum(["100g", "serving"]).optional(),
+  // Energy in kJ goes up to ~3800 per 100 g; sodium is entered in mg.
   nutriments: z
-    .partialRecord(z.enum(NUTRIMENT_KEYS), z.number().finite().min(0).max(5000))
+    .partialRecord(z.enum(NUTRIMENT_KEYS), z.number().finite().min(0).max(40000))
     .optional(),
 });
+
+const newProductSchema = productFieldsSchema.extend({
+  name: z.string().trim().min(1).max(200),
+});
+
+const patchSchema = productFieldsSchema.extend({
+  name: optionalText(200),
+});
+
+// The one place that knows the Food API's field names. The API rejects any
+// unknown field with a 400, so app-side names never reach it directly.
+function toOffFields(
+  input: z.infer<typeof patchSchema>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (input.name) out.name = input.name;
+  if (input.brand) out.brand = input.brand;
+  if (input.quantity) out.quantity = input.quantity;
+  if (input.servingSize) out.serving_size = input.servingSize;
+  if (input.ingredients) out.ingredients = input.ingredients;
+  if (input.categories) out.categories = input.categories;
+  if (input.labels) out.labels = input.labels;
+  if (input.countries) out.countries = input.countries;
+
+  const nutriments = input.nutriments ?? {};
+  if (Object.keys(nutriments).length > 0) {
+    const sent: Record<string, number | string> = { ...nutriments };
+    if (nutriments.sodium != null) sent.sodium_unit = "mg";
+    out.nutriments = sent;
+    out.nutrition_data_per = input.nutritionBasis ?? "100g";
+  }
+  return out;
+}
 
 const cleanLang = (lang: string | undefined) =>
   lang && LANG_RE.test(lang) ? lang : "es";
@@ -169,24 +219,46 @@ export async function registerFoodProduct(
     return { ok: false, reason: "invalid" };
   }
 
-  const { name, brand, quantity, servingSize, ingredients, nutriments } =
-    parsed.data;
-  const hasNutriments = nutriments && Object.keys(nutriments).length > 0;
-
   try {
     const res = await createFoodProduct(clean, {
-      name,
+      ...toOffFields(parsed.data),
       lang: cleanLang(lang),
-      ...(brand && { brands: brand }),
-      ...(quantity && { quantity }),
-      ...(servingSize && { serving_size: servingSize }),
-      ...(ingredients && { ingredients }),
-      ...(hasNutriments && { nutrition_data_per: "100g", nutriments }),
       comment: "Added from the V-Healthy app",
     });
     return toWriteResult(res, 201);
   } catch (error) {
     console.error("[v0] registerFoodProduct failed:", (error as Error).message);
+    return { ok: false, reason: "error" };
+  }
+}
+
+// Complete an existing product with the fields the user confirmed. Only the
+// given fields are sent; list fields replace the whole list on Open Food Facts.
+export async function completeFoodProduct(
+  barcode: string,
+  patch: FoodProductPatch,
+  lang?: string,
+): Promise<FoodWriteResult> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, reason: "unauthenticated" };
+
+  const clean = (barcode ?? "").replace(/\D+/g, "");
+  const parsed = patchSchema.safeParse(patch);
+  if (!BARCODE_RE.test(clean) || !parsed.success) {
+    return { ok: false, reason: "invalid" };
+  }
+  const fields = toOffFields(parsed.data);
+  if (Object.keys(fields).length === 0) return { ok: true };
+
+  try {
+    const res = await updateFoodProduct(clean, {
+      ...fields,
+      lang: cleanLang(lang),
+      comment: "Added from the V-Healthy app",
+    });
+    return toWriteResult(res, 200);
+  } catch (error) {
+    console.error("[v0] completeFoodProduct failed:", (error as Error).message);
     return { ok: false, reason: "error" };
   }
 }
@@ -221,7 +293,9 @@ export async function saveFoodIngredients(
 
 // Upload one product photo. Expects FormData with `barcode`, `kind`, `lang`
 // and `image` (a JPEG/PNG/GIF file up to 10 MB).
-export async function uploadFoodPhoto(form: FormData): Promise<FoodWriteResult> {
+export async function uploadFoodPhoto(
+  form: FormData,
+): Promise<FoodPhotoUploadResult> {
   const session = await auth();
   if (!session?.user) return { ok: false, reason: "unauthenticated" };
 
@@ -243,7 +317,10 @@ export async function uploadFoodPhoto(form: FormData): Promise<FoodWriteResult> 
 
   try {
     const res = await uploadFoodImage(barcode, image, kind, lang);
-    return toWriteResult(res, 201);
+    const result = toWriteResult(res, 201);
+    if (!result.ok) return result;
+    const imgid = Number(res.body.imgid);
+    return { ok: true, imgid: Number.isInteger(imgid) && imgid > 0 ? imgid : null };
   } catch (error) {
     console.error("[v0] uploadFoodPhoto failed:", (error as Error).message);
     return { ok: false, reason: "error" };
