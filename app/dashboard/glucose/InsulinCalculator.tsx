@@ -240,27 +240,22 @@ export default function InsulinCalculator({
                     <ResultRow
                       label={t.formulaReference}
                       value={`${reference.theoretical.toFixed(2)} ${t.units}`}
+                      info={
+                        // Worked formula, as on the care team's infographic:
+                        // 40 g ÷ 10 = 4.00 U · (220 − 120) ÷ 80 = 1.25 U
+                        <>
+                          <p className="tabular-nums">
+                            {`${carbsG} ${t.grams} ÷ ${ratioG} = ${reference.carb.toFixed(2)} ${t.units}`}
+                            {" · "}
+                            {`(${formatGlucose(glucoseMgdl, unit)} − ${formatGlucose(params.high, unit)}) ÷ ${formatGlucose(params.isf, unit)} = ${reference.correction.toFixed(2)} ${t.units}`}
+                          </p>
+                          <p>{t.formulaReferenceHint}</p>
+                        </>
+                      }
                     />
                   )}
                 </dl>
               </div>
-
-              {/* Worked formula, as on the care team's infographic:
-                  40 g ÷ 10 = 4.00 U · (220 − 120) ÷ 80 = 1.25 U */}
-              {reference && (
-                <div className="flex flex-col gap-1 px-1">
-                  <p className="text-xs text-sidebar-foreground/70">
-                    <span className="font-semibold">{t.formulaReference}:</span>{" "}
-                    <span className="tabular-nums">{`${reference.theoretical.toFixed(2)} ${t.units}`}</span>
-                  </p>
-                  <p className="text-xs tabular-nums text-sidebar-foreground/60">
-                    {`${carbsG} ${t.grams} ÷ ${ratioG} = ${reference.carb.toFixed(2)} ${t.units}`}
-                    {" · "}
-                    {`(${formatGlucose(glucoseMgdl, unit)} − ${formatGlucose(params.high, unit)}) ÷ ${formatGlucose(params.isf, unit)} = ${reference.correction.toFixed(2)} ${t.units}`}
-                  </p>
-                  <p className="text-xs text-sidebar-foreground/60">{t.formulaReferenceHint}</p>
-                </div>
-              )}
 
               {correction < 0 && (
                 <p className="px-1 text-xs text-sidebar-foreground/70">
@@ -532,11 +527,43 @@ function DoseTable({
   );
 }
 
-function ResultRow({ label, value }: { label: string; value: string }) {
+function ResultRow({
+  label,
+  value,
+  info,
+}: {
+  label: string;
+  value: string;
+  info?: React.ReactNode;
+}) {
+  const [showInfo, setShowInfo] = useState(false);
+  const infoId = useId();
+
   return (
-    <div className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-      <dt className="text-xs text-sidebar-foreground/70 sm:text-sm">{label}</dt>
-      <dd className="text-base font-semibold tabular-nums">{value}</dd>
+    <div className="py-2.5">
+      <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <dt className="flex items-center gap-1 text-xs text-sidebar-foreground/70 sm:text-sm">
+          {label}
+          {info && (
+            <button
+              type="button"
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label={label}
+              aria-expanded={showInfo}
+              aria-controls={infoId}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/60 transition hover:bg-highlight/15 hover:text-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
+            >
+              <Info className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+        </dt>
+        <dd className="text-base font-semibold tabular-nums">{value}</dd>
+      </div>
+      {info && showInfo && (
+        <div id={infoId} className="mt-2 flex flex-col gap-1 text-xs text-sidebar-foreground/60">
+          {info}
+        </div>
+      )}
     </div>
   );
 }
