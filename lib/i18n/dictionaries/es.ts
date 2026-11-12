@@ -884,8 +884,6 @@ const es = {
     },
     poses: {
       standing: "De pie",
-      walking: "Caminar",
-      running: "Correr",
       jumping: "Saltar",
       sitting: "Sentarse",
       "looking-up": "Mirar arriba",

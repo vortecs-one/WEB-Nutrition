@@ -1,6 +1,5 @@
 "use client";
 
-import { Coins } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useVTokens } from "@/lib/vtokens/use-vtokens";
 import TokenBadge from "./TokenBadge";
@@ -24,7 +23,7 @@ export default function VTokensBadge({ className = "" }: { className?: string })
       hint={dict.vtokens.hint}
       value={formatted}
       unavailable={unavailable}
-      icon={<Coins className="h-4 w-4" aria-hidden="true" />}
+      iconSrc="/tokens/v-healthy.png"
       className={className}
     />
   );

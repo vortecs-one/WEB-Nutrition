@@ -887,8 +887,6 @@ const en: Dictionary = {
     },
     poses: {
       standing: "Standing",
-      walking: "Walking",
-      running: "Running",
       jumping: "Jumping",
       sitting: "Sitting",
       "looking-up": "Looking up",
