@@ -12,6 +12,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
+import { shiftDateKey } from "@/lib/day-log/date-key";
 import { DAILY_VALUE, percentOfDailyValue } from "@/lib/health-formulas";
 import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { DailyHealthStats } from "./DailyHealthStats";
@@ -35,17 +36,37 @@ const COLOR_MAP: Record<string, string> = {
   otherSupp: "var(--chart-7)",
 };
 
-function useDailyComposition(dateKey: string) {
+// `days` > 1 sums the window of that many days ending on `dateKey`, with the
+// daily targets scaled to the same length.
+function useDailyComposition(dateKey: string, days = 1) {
   const { dict } = useI18n();
   const t = dict.nutritionUser;
   const { dayData } = useDayLog();
   // Personal macro targets (grams), once the body profile is complete.
-  const { macros } = useEnergyBudget(dateKey);
+  const { macros: dailyMacros } = useEnergyBudget(dateKey);
 
-  const { meals, supplements } = useMemo(
-    () => dayData(dateKey),
-    [dayData, dateKey],
+  const macros = useMemo(
+    () =>
+      dailyMacros
+        ? {
+            protein: dailyMacros.protein * days,
+            carbs: dailyMacros.carbs * days,
+            fat: dailyMacros.fat * days,
+          }
+        : null,
+    [dailyMacros, days],
   );
+
+  const { meals, supplements } = useMemo(() => {
+    if (days === 1 || !dateKey) return dayData(dateKey);
+    const all: ReturnType<typeof dayData> = { ...dayData(""), meals: [], supplements: [] };
+    for (let i = 0; i < days; i++) {
+      const day = dayData(shiftDateKey(dateKey, -i));
+      all.meals.push(...day.meals);
+      all.supplements.push(...day.supplements);
+    }
+    return all;
+  }, [dayData, dateKey, days]);
 
   // Nutrient totals — summed from logged meals.
   const nutrientTotals = useMemo(() => {
@@ -79,13 +100,13 @@ function useDailyComposition(dateKey: string) {
     const fiber = nutrientTotals.fiber ?? 0;
     const sodium = nutrientTotals.sodium ?? 0;
     const rows: ExtraNutrient[] = [
-      { key: "saturatedFat", label: t.satFat, value: saturatedFat, unit: t.unitG, pct: percentOfDailyValue(saturatedFat, DAILY_VALUE.saturatedFat) },
+      { key: "saturatedFat", label: t.satFat, value: saturatedFat, unit: t.unitG, pct: percentOfDailyValue(saturatedFat, DAILY_VALUE.saturatedFat * days) },
       { key: "sugars", label: t.sugars, value: sugars, unit: t.unitG, pct: null },
-      { key: "fiber", label: t.fiber, value: fiber, unit: t.unitG, pct: percentOfDailyValue(fiber, DAILY_VALUE.fiber) },
-      { key: "sodium", label: t.sodium, value: sodium, unit: t.unitMg, pct: percentOfDailyValue(sodium, DAILY_VALUE.sodium) },
+      { key: "fiber", label: t.fiber, value: fiber, unit: t.unitG, pct: percentOfDailyValue(fiber, DAILY_VALUE.fiber * days) },
+      { key: "sodium", label: t.sodium, value: sodium, unit: t.unitMg, pct: percentOfDailyValue(sodium, DAILY_VALUE.sodium * days) },
     ];
     return rows;
-  }, [nutrientTotals, t]);
+  }, [nutrientTotals, t, days]);
 
   const data = useMemo(() => {
     const protein = meals.reduce((s, m) => s + (m.protein ?? 0), 0);
@@ -356,9 +377,9 @@ export function CompositionSummary({ dateKey }: { dateKey: string }) {
 }
 
 /** Donut + every nutrient with grams and percentages. */
-export function CompositionDetails({ dateKey }: { dateKey: string }) {
+export function CompositionDetails({ dateKey, days = 1 }: { dateKey: string; days?: number }) {
   const { dict } = useI18n();
-  const { t, data, total, extraNutrients, gramsFor, targetFor } = useDailyComposition(dateKey);
+  const { t, data, total, extraNutrients, gramsFor, targetFor } = useDailyComposition(dateKey, days);
 
   return (
     // Reversed: the list reads first and the donut sits to its right, also on
@@ -377,6 +398,83 @@ export function CompositionDetails({ dateKey }: { dateKey: string }) {
           <ExtraRow key={n.key} nutrient={n} detailed />
         ))}
       </ul>
+    </div>
+  );
+}
+
+type Period = "day" | "week" | "month";
+const PERIOD_DAYS: Record<Period, number> = { day: 1, week: 7, month: 30 };
+const PERIODS: Period[] = ["day", "week", "month"];
+
+/** Day / Week / Month switch plus the matching composition and day tiles. */
+function CompositionPopupContent({ dateKey, isToday }: { dateKey: string; isToday: boolean }) {
+  const { dict } = useI18n();
+  const t = dict.nutritionUser;
+  const [period, setPeriod] = useState<Period>("day");
+
+  const labels: Record<Period, string> = {
+    day: t.periodDay,
+    week: t.periodWeek,
+    month: t.periodMonth,
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const i = PERIODS.indexOf(period);
+    let next = i;
+    if (e.key === "ArrowRight") next = (i + 1) % PERIODS.length;
+    else if (e.key === "ArrowLeft") next = (i - 1 + PERIODS.length) % PERIODS.length;
+    else return;
+    e.preventDefault();
+    setPeriod(PERIODS[next]);
+    document.getElementById(`composition-tab-${PERIODS[next]}`)?.focus();
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div
+        role="tablist"
+        aria-label={t.periodLabel}
+        className="grid grid-cols-3 gap-1 rounded-full bg-sidebar-accent p-1"
+      >
+        {PERIODS.map((p) => {
+          const selected = p === period;
+          return (
+            <button
+              key={p}
+              id={`composition-tab-${p}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="composition-panel"
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setPeriod(p)}
+              onKeyDown={onKeyDown}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-highlight ${
+                selected
+                  ? "bg-highlight text-highlight-foreground"
+                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              }`}
+            >
+              {labels[p]}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="composition-panel"
+        role="tabpanel"
+        aria-labelledby={`composition-tab-${period}`}
+        className="flex flex-col gap-6"
+      >
+        {period !== "day" && (
+          <p className="-mb-2 text-xs text-sidebar-foreground/60">
+            {period === "week" ? t.rangeWeek : t.rangeMonth}
+          </p>
+        )}
+        <CompositionDetails dateKey={dateKey} days={PERIOD_DAYS[period]} />
+        {period === "day" && dateKey && <DailyHealthStats dateKey={dateKey} isToday={isToday} />}
+      </div>
     </div>
   );
 }
@@ -430,16 +528,13 @@ export default function DailyCompositionCard({
       <Modal
         isOpen={detailOpen}
         onClose={() => setDetailOpen(false)}
-        title={t.composition}
+        title={t.compositionTitle}
         size="md"
       >
         {dateLabel && (
           <p className="-mt-2 mb-4 text-sm text-sidebar-foreground/60">{dateLabel}</p>
         )}
-        <div className="flex flex-col gap-6">
-          <CompositionDetails dateKey={dateKey} />
-          {dateKey && <DailyHealthStats dateKey={dateKey} isToday={!dateLabel} />}
-        </div>
+        <CompositionPopupContent dateKey={dateKey} isToday={!dateLabel} />
       </Modal>
     </section>
   );
