@@ -303,8 +303,8 @@
    above it and drift up-right, a little larger, with a gentle wobble. */
 .pet-anim[data-asleep] .pet-zzz {
   right: auto;
-  left: 52%;
-  top: 38%;
+  left: 50%;
+  top: 46%;
   font-size: 1.35rem;
   font-weight: 700;
   animation-name: pet-zzz-sleep;
