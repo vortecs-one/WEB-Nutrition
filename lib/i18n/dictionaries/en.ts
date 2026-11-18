@@ -505,6 +505,8 @@ const en: Dictionary = {
     stressLevelLabel: "{level}: {label}",
     ofGoal: "of {goal}",
     burnedDetail: "base {base} + workouts {workouts}",
+  netLeft: "{left} kcal left to eat",
+  netOver: "{over} kcal over your food budget",
     periodTitleWeek: "Net balance, last 7 days",
     periodTitleMonth: "Net balance, last 30 days",
     periodAvg: "{avg} kcal per logged day on average",

@@ -164,6 +164,11 @@ export function DailyHealthStats({
             </span>
             <span className="text-xs text-sidebar-foreground/60">kcal</span>
           </p>
+          <p className="text-xs text-sidebar-foreground/60">
+            {budget.left >= 0
+              ? t.netLeft.replace("{left}", budget.left.toLocaleString())
+              : t.netOver.replace("{over}", Math.abs(budget.left).toLocaleString())}
+          </p>
         </Tile>
 
         {/* Alone on its row in the 3-column grid, so it takes the full width there. */}

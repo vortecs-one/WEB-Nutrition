@@ -504,6 +504,8 @@ const es = {
     stressLevelLabel: "{level}: {label}",
     ofGoal: "de {goal}",
     burnedDetail: "base {base} + actividad {workouts}",
+  netLeft: "te quedan {left} kcal por comer",
+  netOver: "{over} kcal por encima de tu presupuesto de comida",
     periodTitleWeek: "Balance neto, últimos 7 días",
     periodTitleMonth: "Balance neto, últimos 30 días",
     periodAvg: "{avg} kcal por día registrado, en promedio",
