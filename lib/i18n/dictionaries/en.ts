@@ -340,6 +340,8 @@ const en: Dictionary = {
     composition: "Daily composition",
     compositionTitle: "Composition",
     pulseScan: {
+      stressLabel: "Self-reported stress", stressNotReported: "Not reported",
+      stressHelp: "Optional. Choose how stressed you feel now. This rating is not measured by the camera and won’t change your daily log.",
       tile: "Pulse", title: "Fingertip pulse check", action: "Measure heart rate", start: "Start camera", retry: "Measure again", stop: "Cancel", close: "Close",
       instructions: "Rest your hand and lightly cover the rear camera lens with your fingertip. Hold still for 16 seconds. The camera light turns on if supported.",
       privacy: "Processed on this device. No video, fingerprints, or readings are saved.",

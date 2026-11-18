@@ -339,6 +339,8 @@ const es = {
     composition: "Composición diaria",
     compositionTitle: "Composición",
     pulseScan: {
+      stressLabel: "Estrés percibido", stressNotReported: "Sin indicar",
+      stressHelp: "Opcional. Indica cuánto estrés sientes ahora. La cámara no mide el estrés y esta valoración no cambia tu registro diario.",
       tile: "Pulso", title: "Medir el pulso con el dedo", action: "Medir frecuencia cardíaca", start: "Activar cámara", retry: "Volver a medir", stop: "Cancelar", close: "Cerrar",
       instructions: "Apoya la mano y cubre suavemente la cámara trasera con la yema del dedo. No te muevas durante 16 segundos. La luz de la cámara se encenderá si está disponible.",
       privacy: "Se procesa en este dispositivo. No se guardan vídeos, huellas ni lecturas.",
