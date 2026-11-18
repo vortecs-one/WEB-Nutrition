@@ -843,18 +843,20 @@ export default function BarcodeScanner({
   return (
     <div className="overflow-hidden rounded-t-none rounded-b-3xl border-2 border-t-0 border-primary bg-black">
       {/* Camera viewport */}
-      {/* h-60 (240px) is sized around the scan rectangle below (h-36 = 144px)
-          plus a 48px vignette strip above and below, rather than an aspect
+      {/* h-66 (264px) is sized around the scan rectangle below (h-36 = 144px)
+          plus a 60px vignette strip above and below, rather than an aspect
           ratio: this box shrinks to w-full on narrow phones, and an aspect
           ratio's height would shrink right along with it, risking clipping the
           fixed-size rectangle. A fixed height doesn't move.
+          Kept in step with the photo tab's viewport (FoodPhotoScanner) so both
+          tabs of the Log food sheet have the same overall height.
           240 rather than the previous 160: a bigger target is much easier to
-          aim one-handed, the 48px strips seat the torch/zoom controls clear of
+          aim one-handed, the 60px strips seat the torch/zoom controls clear of
           the rectangle, and being taller than the camera's 16:9 means
           object-cover crops horizontally instead of vertically — which buys
           standoff distance, letting the user hold the phone far enough away
           for the lens to actually focus. */}
-      <div className="relative h-60 w-full max-w-sm mx-auto">
+      <div className="relative h-66 w-full max-w-sm mx-auto">
 
         {/* Idle state — the whole frame is the tap target to start scanning */}
         {!active && !error && (

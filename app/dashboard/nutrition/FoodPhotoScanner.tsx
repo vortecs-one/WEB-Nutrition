@@ -294,7 +294,7 @@ export default function FoodPhotoScanner({
     return (
       <div className="flex flex-col gap-3">
         {fileInput}
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border-2 border-highlight/40 bg-muted">
+        <div className="relative h-[250px] w-full overflow-hidden rounded-3xl border-2 border-highlight/40 bg-muted">
           {cameraDenied ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
               <Camera className="h-8 w-8 text-highlight" aria-hidden="true" />
