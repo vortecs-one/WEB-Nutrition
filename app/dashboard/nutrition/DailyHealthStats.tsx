@@ -165,6 +165,11 @@ export function DailyHealthStats({
             <span className="text-xs text-sidebar-foreground/60">kcal</span>
           </p>
           <p className="text-xs text-sidebar-foreground/60">
+            {t.netFormula
+              .replace("{eaten}", consumed.toLocaleString())
+              .replace("{burned}", budget.totalBurned.toLocaleString())}
+          </p>
+          <p className="text-xs text-sidebar-foreground/60">
             {budget.left >= 0
               ? t.netLeft.replace("{left}", budget.left.toLocaleString())
               : t.netOver.replace("{over}", Math.abs(budget.left).toLocaleString())}
