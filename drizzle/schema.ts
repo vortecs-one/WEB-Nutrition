@@ -8,7 +8,9 @@ import {
   varchar,
   date,
   integer,
+  numeric,
   boolean,
+  jsonb,
   index,
   primaryKey,
   unique,
@@ -116,7 +118,8 @@ export const dayLogEntries = pgTable(
     userKey: text("user_key").notNull(),
     // Day this entry belongs to (YYYY-MM-DD).
     logDate: date("log_date").notNull(),
-    // "meal" | "activity" | "supplement" | "water" | "sleep" | "stress" | "weight".
+    // "meal" | "activity" | "supplement" | "water" | "sleep" | "stress" |
+    // "weight" | "heart_rate".
     kind: varchar("kind", { length: 20 }).notNull(),
     // Meal/activity/supplement subtype (e.g. "breakfast", "cardio", "protein").
     subtype: varchar("subtype", { length: 20 }).notNull(),
@@ -137,7 +140,7 @@ export const dayLogEntries = pgTable(
     fiber: integer("fiber"),
     sodium: integer("sodium"),
     // Minutes slept for kind="sleep", level 1-5 for kind="stress", grams
-    // for kind="weight".
+    // for kind="weight", beats per minute for kind="heart_rate".
     value: integer("value"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -148,6 +151,41 @@ export const dayLogEntries = pgTable(
     userDayIdx: index("day_log_entries_user_day_idx").on(
       table.userKey,
       table.logDate,
+    ),
+  }),
+);
+
+// === Billetera de tokens v-healthy ===
+// Append-style ledger: a user's balance is the sum of their rows. Workout
+// rewards are one "earn_activity" row per day (ref "activity:YYYY-MM-DD")
+// kept equal to that day's burned kcal; spends and transfers are extra rows
+// with a negative/positive amount and a NULL ref.
+export const vtokenLedger = pgTable(
+  "vtoken_ledger",
+  {
+    id: serial("id").primaryKey(),
+    userKey: text("user_key").notNull(),
+    // Signed token amount as a decimal string (numeric), never zero.
+    amount: numeric("amount", { precision: 24, scale: 8 }).notNull(),
+    // "earn_activity" | "spend" | "transfer_in" | "transfer_out" | "adjustment".
+    kind: varchar("kind", { length: 20 }).notNull(),
+    ref: text("ref"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userRefUnique: unique("vtoken_ledger_user_ref_unique").on(
+      table.userKey,
+      table.ref,
+    ),
+    userCreatedIdx: index("vtoken_ledger_user_created_idx").on(
+      table.userKey,
+      table.createdAt,
     ),
   }),
 );
@@ -195,11 +233,29 @@ export const glucoseSettings = pgTable("glucose_settings", {
   // First + last name from the LibreView user object, used as display label.
   libreDisplayName: text("libre_display_name"),
   // --- CareLink (Medtronic) ---
-  // Reserved for a possible future automated-polling source (not built yet —
-  // see the project plan). CSV import needs no credentials, so these are
-  // unused placeholders today; no password/token column exists until then.
+  // Live connection (see drizzle/0014_add_carelink_live.sql and
+  // lib/glucose/carelink.ts). Username = the signed-in CareLink account;
+  // patientId = the followed patient's username (care partner accounts).
   carelinkUsername: text("carelink_username"),
   carelinkPatientId: text("carelink_patient_id"),
+  // Tokens are AES-GCM encrypted (lib/glucose/secret-box.ts).
+  carelinkAccessToken: text("carelink_access_token"),
+  carelinkRefreshToken: text("carelink_refresh_token"),
+  carelinkTokenExpires: timestamp("carelink_token_expires", { withTimezone: true }),
+  carelinkClientId: text("carelink_client_id"),
+  carelinkRegion: varchar("carelink_region", { length: 10 }),
+  carelinkRole: varchar("carelink_role", { length: 30 }),
+  carelinkPatientName: text("carelink_patient_name"),
+  carelinkPendingState: text("carelink_pending_state"),
+  carelinkPendingVerifier: text("carelink_pending_verifier"),
+  carelinkPendingAt: timestamp("carelink_pending_at", { withTimezone: true }),
+  carelinkRefreshLockUntil: timestamp("carelink_refresh_lock_until", { withTimezone: true }),
+  carelinkLastSyncAt: timestamp("carelink_last_sync_at", { withTimezone: true }),
+  carelinkLastRefreshAt: timestamp("carelink_last_refresh_at", { withTimezone: true }),
+  carelinkNeedsReconnect: boolean("carelink_needs_reconnect").notNull().default(false),
+  carelinkSnapshot: jsonb("carelink_snapshot"),
+  // Insulin dosing parameters per source: { [source]: { ratio, isf, low, high } }.
+  doseParams: jsonb("dose_params"),
   // Cached from carelinkReadings so settings reads stay a synchronous row
   // mapper (see toClientSettings) instead of a second query on every poll.
   // Updated by importCareLinkCsv after each import.
@@ -238,6 +294,8 @@ export const carelinkReadings = pgTable(
     // Sensor glucose value in mg/dL (converted at import time if the export
     // was in mmol/L).
     sgv: integer("sgv").notNull(),
+    // "csv" (manual export) or "live" (CarePartner API sync).
+    origin: varchar("origin", { length: 10 }).notNull().default("csv"),
     importedAt: timestamp("imported_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

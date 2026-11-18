@@ -4,6 +4,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { dayLogEntries } from "@/drizzle/schema";
 import { auth } from "@/auth";
+import { syncDayWeight } from "@/lib/body-measurements/sync";
+import { syncActivityEarnings } from "@/lib/vtokens/ledger";
 import type {
   Meal,
   Activity,
@@ -11,11 +13,18 @@ import type {
   WaterEntry,
   DayData,
   DayLog,
+  HeartRateEntry,
   SleepEntry,
   StressEntry,
   WeightEntry,
 } from "./types";
-import { DATE_KEY_RE, isSleepMinutes, isStressLevel, isWeightGrams } from "./types";
+import {
+  DATE_KEY_RE,
+  isHeartRateBpm,
+  isSleepMinutes,
+  isStressLevel,
+  isWeightGrams,
+} from "./types";
 
 // Resolve a stable per-user key from the session: prefer the Thruxion
 // human_id, fall back to the email. Returns null when unauthenticated so
@@ -26,6 +35,16 @@ async function getUserKey(): Promise<string | null> {
     | { humanId?: string | null; email?: string | null }
     | undefined;
   return user?.humanId ?? user?.email ?? null;
+}
+
+// Credits (or revokes) the day's workout tokens. A wallet hiccup must never
+// fail the workout itself; the next wallet read re-syncs everything.
+async function syncEarningsSafely(userKey: string, dateKey: string) {
+  try {
+    await syncActivityEarnings(userKey, [dateKey]);
+  } catch (err) {
+    console.error("[vtokens] reward sync failed:", err);
+  }
 }
 
 const emptyDay = (): DayData => ({
@@ -93,6 +112,10 @@ export async function fetchUserDayLog(): Promise<DayLog> {
     } else if (row.kind === "stress") {
       if (!day.stress && isStressLevel(row.value)) {
         day.stress = { id: row.id, level: row.value };
+      }
+    } else if (row.kind === "heart_rate") {
+      if (!day.heartRate && isHeartRateBpm(row.value)) {
+        day.heartRate = { id: row.id, bpm: row.value };
       }
     } else if (row.kind === "weight") {
       if (!day.weight && isWeightGrams(row.value)) {
@@ -174,6 +197,7 @@ export async function addActivityEntry(
     })
     .returning({ id: dayLogEntries.id });
 
+  await syncEarningsSafely(userKey, dateKey);
   return { id: row.id, ...activity };
 }
 
@@ -203,6 +227,8 @@ export async function addWaterEntry(
   dateKey: string,
   amountMl: number,
 ): Promise<WaterEntry | null> {
+  if (!Number.isInteger(amountMl) || amountMl < 1 || amountMl > 5000) return null;
+
   const userKey = await getUserKey();
   if (!userKey) return null;
 
@@ -224,7 +250,7 @@ export async function addWaterEntry(
 // Replaces the user's single entry of `kind` for the day. Inputs are
 // re-validated here because server actions are callable from any client.
 async function setDailyValue(
-  kind: "sleep" | "stress" | "weight",
+  kind: "sleep" | "stress" | "weight" | "heart_rate",
   dateKey: string,
   value: number,
 ): Promise<number | null> {
@@ -275,13 +301,25 @@ export async function setStressEntry(
   return id === null ? null : { id, level };
 }
 
+export async function setHeartRateEntry(
+  dateKey: string,
+  bpm: number,
+): Promise<HeartRateEntry | null> {
+  if (!isHeartRateBpm(bpm)) return null;
+  const id = await setDailyValue("heart_rate", dateKey, bpm);
+  return id === null ? null : { id, bpm };
+}
+
 export async function setWeightEntry(
   dateKey: string,
   grams: number,
 ): Promise<WeightEntry | null> {
   if (!isWeightGrams(grams)) return null;
   const id = await setDailyValue("weight", dateKey, grams);
-  return id === null ? null : { id, grams };
+  if (id === null) return null;
+  // Mirror the weigh-in into the human's Thruxion measurement history.
+  await syncDayWeight(dateKey, grams / 1000);
+  return { id, grams };
 }
 
 // Deletes one entry, always scoped to the signed-in user so a user can never
@@ -290,7 +328,12 @@ export async function removeEntry(id: number): Promise<void> {
   const userKey = await getUserKey();
   if (!userKey) return;
 
-  await db
+  const [removed] = await db
     .delete(dayLogEntries)
-    .where(and(eq(dayLogEntries.id, id), eq(dayLogEntries.userKey, userKey)));
+    .where(and(eq(dayLogEntries.id, id), eq(dayLogEntries.userKey, userKey)))
+    .returning({ kind: dayLogEntries.kind, logDate: dayLogEntries.logDate });
+
+  if (removed?.kind === "activity") {
+    await syncEarningsSafely(userKey, removed.logDate);
+  }
 }

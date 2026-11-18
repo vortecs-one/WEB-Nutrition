@@ -55,8 +55,6 @@ export type CharacterMood =
 /** Full-body pose shown in the popup by companions with pose art. */
 export type PetPose =
   | "standing"
-  | "walking"
-  | "running"
   | "jumping"
   | "sitting"
   | "looking-up"

@@ -5,8 +5,8 @@
 // goal, one nitro-bottle icon per completed liter, quick-add buttons and the
 // day's entry list. Rendered inside the dashboard's water popup.
 
-import { useMemo } from "react";
-import { GlassWater, Milk, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { GlassWater, Milk, PencilLine, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { useDayLog } from "@/lib/day-log/provider";
 import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
@@ -299,10 +299,27 @@ function WaterGauge({
 // === WaterLog — popup body: gauge + bottles + quick add + entry list ===
 
 const QUICK_ADD_ML = [250, 500, 1000] as const;
+const MAX_CUSTOM_ML = 5000;
 
 export default function WaterLog({ todayKey }: { todayKey: string }) {
   const { dict, locale } = useI18n();
   const t = dict.hydration;
+
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customValue, setCustomValue] = useState("");
+  const [customError, setCustomError] = useState(false);
+
+  const submitCustom = () => {
+    const ml = Number(customValue);
+    if (!Number.isInteger(ml) || ml < 1 || ml > MAX_CUSTOM_ML) {
+      setCustomError(true);
+      return;
+    }
+    addWater(todayKey, ml);
+    setCustomValue("");
+    setCustomError(false);
+    setCustomOpen(false);
+  };
 
   const { dayData, waterFor, addWater, removeWater } = useDayLog();
 
@@ -361,7 +378,7 @@ export default function WaterLog({ todayKey }: { todayKey: string }) {
       </div>
 
       {/* Quick add */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {QUICK_ADD_ML.map((ml) => (
           <button
             key={ml}
@@ -375,7 +392,75 @@ export default function WaterLog({ todayKey }: { todayKey: string }) {
             </span>
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => {
+            setCustomOpen((open) => !open);
+            setCustomError(false);
+          }}
+          aria-expanded={customOpen}
+          aria-controls="water-custom-form"
+          className={`flex flex-col items-center gap-1.5 rounded-2xl p-3 active:scale-[0.97] transition ${
+            customOpen
+              ? "bg-sidebar-accent ring-2 ring-sidebar-ring"
+              : "bg-sidebar-accent hover:bg-sidebar-accent/80"
+          }`}
+        >
+          <PencilLine className="h-6 w-6" aria-hidden="true" />
+          <span className="text-sm font-semibold">{t.custom}</span>
+        </button>
       </div>
+
+      {customOpen && (
+        <form
+          id="water-custom-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitCustom();
+          }}
+          className="space-y-1.5"
+        >
+          <div className="flex items-center gap-2">
+            <label htmlFor="water-custom-ml" className="sr-only">
+              {t.customAmount}
+            </label>
+            <div className="relative flex-1">
+              <input
+                id="water-custom-ml"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_CUSTOM_ML}
+                step={1}
+                autoFocus
+                value={customValue}
+                onChange={(e) => {
+                  setCustomValue(e.target.value);
+                  setCustomError(false);
+                }}
+                placeholder={t.customAmount}
+                aria-invalid={customError}
+                aria-describedby={customError ? "water-custom-error" : undefined}
+                className="h-11 w-full rounded-xl bg-sidebar-accent pl-3 pr-10 text-sm font-semibold tabular-nums outline-none ring-1 ring-transparent focus:ring-sidebar-ring aria-invalid:ring-destructive"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-sidebar-foreground/60">
+                {t.ml}
+              </span>
+            </div>
+            <button
+              type="submit"
+              className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 active:scale-[0.97] transition"
+            >
+              {t.customAdd}
+            </button>
+          </div>
+          {customError && (
+            <p id="water-custom-error" role="alert" className="text-xs text-destructive">
+              {t.customInvalid}
+            </p>
+          )}
+        </form>
+      )}
 
       {/* Today's entries (newest first) — deleting the top one is the undo */}
       {entries.length === 0 ? (

@@ -9,8 +9,7 @@
 // stored.
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
-import { CheckCircle2, ChevronRight, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
   saveGlucoseSettings,
@@ -18,6 +17,7 @@ import {
   testNightscoutConnection,
 } from "@/lib/glucose/actions";
 import { type GlucoseSettings, type GlucoseSource } from "@/lib/glucose/types";
+import CareLinkConnect from "./CareLinkConnect";
 
 type TestState =
   | { kind: "idle" }
@@ -184,7 +184,7 @@ export default function GlucoseSettingsForm({
         <fieldset>
           <legend className={labelClass}>{t.sourceLabel}</legend>
           <div className={pillGroupClass}>
-            {(["librelinkup", "nightscout", "carelink"] as const).map((s) => (
+            {(["carelink", "librelinkup", "nightscout"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -253,24 +253,16 @@ export default function GlucoseSettingsForm({
           </>
         ) : source === "carelink" ? (
           <>
-            {/* Guardian 3: no credentials. Readings come from CareLink CSV
-                imports, done on the Insulin pump page. */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-sidebar-foreground/60 text-pretty">
-                {careLinkLastImportAt
-                  ? t.careLinkLastImport
-                      .replace("{time}", new Date(careLinkLastImportAt).toLocaleString(locale))
-                      .replace("{count}", careLinkReadingCount.toLocaleString(locale))
-                  : t.careLinkNoImportYet}
-              </p>
-              <Link
-                href="/dashboard/pump"
-                className="flex items-center gap-1 rounded-full bg-sidebar-accent px-3 py-1.5 text-xs font-medium hover:text-sidebar-foreground active:scale-95 transition"
-              >
-                {t.pump.openPage}
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
-            </div>
+            {/* Guardian 3: live CarePartner connection, plus CSV imports on
+                the Pump popup as a backfill. */}
+            <CareLinkConnect settings={settings} onChanged={onSaved} />
+            <p className="text-xs text-sidebar-foreground/60 text-pretty">
+              {careLinkLastImportAt
+                ? t.careLinkLastImport
+                    .replace("{time}", new Date(careLinkLastImportAt).toLocaleString(locale))
+                    .replace("{count}", careLinkReadingCount.toLocaleString(locale))
+                : t.careLinkNoImportYet}
+            </p>
           </>
         ) : (
           <>

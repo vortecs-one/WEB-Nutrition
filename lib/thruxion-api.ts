@@ -63,6 +63,35 @@ export type HumanData = {
   facial_recognitions?: unknown[];
   cards?: unknown[];
   space_time?: unknown[];
+  /** The 50 most recent body measurements. */
+  body_measurements?: BodyMeasurement[];
+};
+
+// One height/weight record (either value can be null). Dates are ISO UTC.
+export type BodyMeasurement = {
+  id: number;
+  human_id?: number;
+  height_cm: number | null;
+  weight_kg: number | null;
+  measured_at: string;
+  created_at?: string;
+};
+
+// GET /human/<id>/measurements/latest: the newest height and newest weight,
+// possibly from different records.
+export type LatestBodyMeasurement = {
+  human_id: number;
+  height_cm: number | null;
+  height_measured_at: string | null;
+  weight_kg: number | null;
+  weight_measured_at: string | null;
+};
+
+export type BodyMeasurementFields = {
+  height_cm?: number;
+  weight_kg?: number;
+  /** "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"; cannot be in the future. */
+  measured_at?: string;
 };
 
 /**
@@ -84,7 +113,8 @@ export async function thruxionFetch(
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("Content-Type")) {
+  // FormData must keep fetch's generated multipart boundary header.
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -299,6 +329,200 @@ export async function getFoodByBarcode(
       ingredients: asString(data.ingredients),
     },
   };
+}
+
+// Raw outcome of a Food API write call: the HTTP status plus the parsed JSON
+// body (the API answers every error as `{ message, details?, available? }`).
+export type FoodApiResponse = {
+  status: number;
+  body: {
+    message?: string;
+    details?: string;
+    available?: string[];
+    [key: string]: unknown;
+  };
+};
+
+async function foodApiCall(
+  path: string,
+  init: RequestInit,
+): Promise<FoodApiResponse> {
+  let res = await thruxionFetch(path, init);
+  // The Food API answers a rejected token with 403 (not 401), so give the
+  // shared token one refresh here too.
+  if (res.status === 403) {
+    invalidateSystemToken();
+    res = await thruxionFetch(path, init, true);
+  }
+  const body = (await res.json().catch(() => ({}))) as FoodApiResponse["body"];
+  return { status: res.status, body: body ?? {} };
+}
+
+const barcodePath = (barcode: string) =>
+  `/api/foods/barcode/${encodeURIComponent(barcode)}`;
+
+/** POST /api/foods/barcode/<barcode> — 201 created, 409 already exists. */
+export function createFoodProduct(
+  barcode: string,
+  fields: Record<string, unknown>,
+): Promise<FoodApiResponse> {
+  return foodApiCall(barcodePath(barcode), {
+    method: "POST",
+    body: JSON.stringify(fields),
+  });
+}
+
+/** PATCH /api/foods/barcode/<barcode> — 200 updated, 404 not in Open Food Facts. */
+export function updateFoodProduct(
+  barcode: string,
+  fields: Record<string, unknown>,
+): Promise<FoodApiResponse> {
+  return foodApiCall(barcodePath(barcode), {
+    method: "PATCH",
+    body: JSON.stringify(fields),
+  });
+}
+
+export type FoodImageType =
+  | "front"
+  | "ingredients"
+  | "nutrition"
+  | "packaging"
+  | "other";
+
+/** POST /api/foods/barcode/<barcode>/images (multipart) — 201 uploaded. */
+export function uploadFoodImage(
+  barcode: string,
+  image: Blob,
+  type: FoodImageType,
+  lang: string,
+): Promise<FoodApiResponse> {
+  const form = new FormData();
+  form.append("type", type);
+  form.append("lang", lang);
+  form.append("image", image, `${type}.jpg`);
+  return foodApiCall(`${barcodePath(barcode)}/images`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+/** GET /api/foods/barcode/<barcode>/ingredients-from-photo — OCR, saves nothing. */
+export function readFoodIngredientsFromPhoto(
+  barcode: string,
+  lang?: string,
+): Promise<FoodApiResponse> {
+  const query = lang ? `?lang=${encodeURIComponent(lang)}` : "";
+  return foodApiCall(`${barcodePath(barcode)}/ingredients-from-photo${query}`, {
+    method: "GET",
+  });
+}
+
+// === Body measurements (height / weight over time) ===
+
+// The Humans API answers an expired token with 403, so retry once on it too.
+async function humansCall(path: string, init: RequestInit): Promise<Response> {
+  const res = await thruxionFetch(path, init);
+  if (res.status !== 403) return res;
+  invalidateSystemToken();
+  return thruxionFetch(path, init, true);
+}
+
+async function humansJson<T>(res: Response, what: string): Promise<T> {
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "<no body>");
+    throw new Error(`${what} failed (${res.status} ${res.statusText}): ${detail}`);
+  }
+  return (await res.json().catch(() => ({}))) as T;
+}
+
+// Height and weight can arrive as numeric strings (DECIMAL columns).
+function toMeasurement(raw: Record<string, unknown>): BodyMeasurement {
+  return {
+    id: Number(raw.id),
+    human_id: raw.human_id != null ? Number(raw.human_id) : undefined,
+    height_cm: asNumber(raw.height_cm),
+    weight_kg: asNumber(raw.weight_kg),
+    measured_at: String(raw.measured_at ?? ""),
+    created_at: typeof raw.created_at === "string" ? raw.created_at : undefined,
+  };
+}
+
+const humanMeasurementsPath = (humanId: string | number) =>
+  `/api/humans/human/${encodeURIComponent(String(humanId))}/measurements`;
+const measurementPath = (id: number) =>
+  `/api/humans/measurements/${encodeURIComponent(String(id))}`;
+
+/** POST /human/<id>/measurements — returns the new record id. */
+export async function createBodyMeasurement(
+  humanId: string | number,
+  fields: BodyMeasurementFields,
+): Promise<number> {
+  const res = await humansCall(humanMeasurementsPath(humanId), {
+    method: "POST",
+    body: JSON.stringify(fields),
+  });
+  const json = await humansJson<{ id?: number }>(res, "create measurement");
+  return Number(json.id);
+}
+
+/** GET /human/<id>/measurements — newest first. `from`/`to` accept YYYY-MM-DD. */
+export async function listBodyMeasurements(
+  humanId: string | number,
+  opts: { from?: string; to?: string; page?: number; limit?: number } = {},
+): Promise<BodyMeasurement[]> {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(opts)) if (v != null) params.set(k, String(v));
+  const query = params.size ? `?${params}` : "";
+  const res = await humansCall(`${humanMeasurementsPath(humanId)}${query}`, { method: "GET" });
+  if (res.status === 404) return [];
+  const json = await humansJson<{ data?: Record<string, unknown>[] }>(res, "list measurements");
+  return (json.data ?? []).map(toMeasurement);
+}
+
+/** GET /human/<id>/measurements/latest — null when the human doesn't exist. */
+export async function getLatestBodyMeasurement(
+  humanId: string | number,
+): Promise<LatestBodyMeasurement | null> {
+  const res = await humansCall(`${humanMeasurementsPath(humanId)}/latest`, { method: "GET" });
+  if (res.status === 404) return null;
+  const json = await humansJson<{ data?: Record<string, unknown> }>(res, "latest measurement");
+  const d = json.data;
+  if (!d) return null;
+  return {
+    human_id: Number(d.human_id),
+    height_cm: asNumber(d.height_cm),
+    height_measured_at: asString(d.height_measured_at),
+    weight_kg: asNumber(d.weight_kg),
+    weight_measured_at: asString(d.weight_measured_at),
+  };
+}
+
+/** GET /measurements/<id> — null when not found. */
+export async function getBodyMeasurement(id: number): Promise<BodyMeasurement | null> {
+  const res = await humansCall(measurementPath(id), { method: "GET" });
+  if (res.status === 404) return null;
+  const json = await humansJson<{ data?: Record<string, unknown> }>(res, "get measurement");
+  return json.data ? toMeasurement(json.data) : null;
+}
+
+/** PUT /measurements/<id> — only the given fields change; values can't be cleared. */
+export async function updateBodyMeasurement(
+  id: number,
+  fields: BodyMeasurementFields,
+): Promise<void> {
+  const res = await humansCall(measurementPath(id), {
+    method: "PUT",
+    body: JSON.stringify(fields),
+  });
+  await humansJson(res, "update measurement");
+}
+
+/** DELETE /measurements/<id>. */
+export async function deleteBodyMeasurement(id: number): Promise<void> {
+  const res = await humansCall(measurementPath(id), { method: "DELETE" });
+  if (res.status === 404) return;
+  await humansJson(res, "delete measurement");
 }
 
 // Re-export the token accessor for callers that need the raw bearer token.

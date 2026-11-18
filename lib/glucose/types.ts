@@ -36,12 +36,40 @@ export type GlucoseUnit = "mgdl" | "mmol";
 //   LibreLink / LibreLinkUp apps show, main sensor + followed patients)
 // - "carelink": the Guardian 3 sensor (shown under that name), worn with a
 //   MiniMed 780G pump; the MiniMed app uploads its readings to Medtronic
-//   CareLink Personal. No API exists, so this is CSV-import based — see
-//   lib/glucose/carelink-csv.ts and the Insulin pump page
-//   (app/dashboard/pump) — and, unlike the other two sources, readings are
-//   persisted (carelinkReadings in drizzle/schema.ts) rather than fetched
-//   live on every poll.
+//   CareLink. Two feeds land in carelinkReadings: the live CarePartner API
+//   (lib/glucose/carelink.ts, synced at most every few minutes) and CSV
+//   imports on the Insulin pump page (lib/glucose/carelink-csv.ts).
 export type GlucoseSource = "nightscout" | "librelinkup" | "carelink";
+
+/**
+ * Insulin dosing parameters of one sensor setup. `ratio` is grams of carbs
+ * covered by 1 U; `isf` (sensitivity) and the target range are mg/dL.
+ */
+export type DoseParams = {
+  ratio: number;
+  isf: number;
+  low: number;
+  high: number;
+};
+
+// Defaults taken from the patient's dosing sheet (RATIO / SENSIBILIDAD /
+// RANGO MENOR / RANGO MAYOR).
+export const DEFAULT_DOSE_PARAMS: DoseParams = { ratio: 7, isf: 35, low: 100, high: 120 };
+
+export function isValidDoseParams(p: DoseParams): boolean {
+  return (
+    [p.ratio, p.isf, p.low, p.high].every((n) => Number.isFinite(n) && n > 0 && n < 1000) &&
+    p.high >= p.low
+  );
+}
+
+/** Parameters saved for the settings' active source, or the defaults. */
+export function doseParamsFor(
+  settings: Pick<GlucoseSettings, "source" | "doseParams">,
+  source: GlucoseSource = settings.source,
+): DoseParams {
+  return settings.doseParams[source] ?? DEFAULT_DOSE_PARAMS;
+}
 
 // A patient connection visible to the LibreLinkUp account (client-safe).
 export type LibrePatientInfo = {
@@ -62,6 +90,10 @@ export type SensorInfo = {
   warmUpMinutes: number;
   /** Abbott's undocumented per-model code (`pt` in the API), if reported. */
   productType: number | null;
+  /** Known wear duration (Guardian 3: 7 days); overrides the Libre inference. */
+  lifetimeMs?: number;
+  /** True when the start was inferred from reading gaps, not reported by the device. */
+  estimated?: boolean;
 };
 
 // A single glucose alarm as configured in the patient's LibreLink app.
@@ -104,6 +136,16 @@ export type GlucoseSettings = {
   careLinkLastImportAt: number | null;
   /** Total readings currently stored from CareLink imports. */
   careLinkReadingCount: number;
+  /** Live CareLink (CarePartner API) connection is active. */
+  careLinkConnected: boolean;
+  /** Medtronic rejected the stored session — the owner must sign in again. */
+  careLinkNeedsReconnect: boolean;
+  /** Name of the followed patient (care partner accounts) or the account owner. */
+  careLinkPatientName: string | null;
+  /** Epoch ms of the last successful live sync. */
+  careLinkLastSyncAt: number | null;
+  /** Saved insulin dosing parameters per source; missing sources use the defaults. */
+  doseParams: Partial<Record<GlucoseSource, DoseParams>>;
   unit: GlucoseUnit;
   lowThreshold: number;
   highThreshold: number;
@@ -128,6 +170,24 @@ export type GlucoseData = {
   sensor: SensorInfo | null;
   /** Target range + alarms from the patient's LibreLink app (LibreLinkUp only). */
   libreThresholds: LibreThresholds | null;
+  /** Pump + sensor status from the live CareLink connection (Guardian 3 only). */
+  careLinkStatus: CareLinkStatus | null;
+};
+
+export type CareLinkStatus = {
+  sensorHoursLeft: number | null;
+  sensorState: string | null;
+  activeInsulin: number | null;
+  reservoirUnits: number | null;
+  pumpBatteryPercent: number | null;
+  lowLimit: number | null;
+  highLimit: number | null;
+  sensorMinutesLeft: number | null;
+  transmitterBatteryPercent: number | null;
+  calibrationMinutesLeft: number | null;
+  reservoirPercent: number | null;
+  autoMode: string | null;
+  fetchedAt: number;
 };
 
 export type GlucoseFetchError =
@@ -196,6 +256,19 @@ export function minutesAgo(dateMs: number): number {
   return Math.max(0, Math.round((Date.now() - dateMs) / 60000));
 }
 
+/** Elapsed span as "12 min", "3 h 20 min" or "2 d 4 h". The "ago" wording lives in the dictionary string. */
+export function formatElapsed(totalMinutes: number, justNow: string): string {
+  const mins = Math.max(0, Math.floor(totalMinutes));
+  if (mins < 1) return justNow;
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours < 24) return rest ? `${hours} h ${rest} min` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  const hoursLeft = hours % 24;
+  return hoursLeft ? `${days} d ${hoursLeft} h` : `${days} d`;
+}
+
 /** A reading older than this is considered stale (sensor/upload gap). */
 export const STALE_MINUTES = 15;
 
@@ -239,6 +312,7 @@ export const SENSOR_LIFETIME_PROMOTION_GRACE_MS = 60 * 60_000;
  * reporting.
  */
 export function sensorLifetimeMs(sensor: SensorInfo, lastReadingAt: number | null = null): number {
+  if (sensor.lifetimeMs) return sensor.lifetimeMs;
   if (sensor.productType !== null && sensor.productType in SENSOR_LIFETIME_BY_PRODUCT_TYPE) {
     return SENSOR_LIFETIME_BY_PRODUCT_TYPE[sensor.productType];
   }

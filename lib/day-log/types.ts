@@ -70,6 +70,12 @@ export type StressEntry = {
   level: StressLevel;
 };
 
+// Heart rate typed in by the user, one per day (beats per minute).
+export type HeartRateEntry = {
+  id: number;
+  bpm: number;
+};
+
 // Per-day data structure.
 export type DayData = {
   meals: Meal[];
@@ -78,6 +84,7 @@ export type DayData = {
   water: WaterEntry[];
   sleep?: SleepEntry;
   stress?: StressEntry;
+  heartRate?: HeartRateEntry;
   weight?: WeightEntry;
 };
 
@@ -103,6 +110,18 @@ export const MAX_WEIGHT_G = 400_000;
 
 export function isWeightGrams(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= MIN_WEIGHT_G && (value as number) <= MAX_WEIGHT_G;
+}
+
+// Heart rates between 30 and 250 bpm (same range as the database CHECK).
+export const MIN_HEART_RATE_BPM = 30;
+export const MAX_HEART_RATE_BPM = 250;
+
+export function isHeartRateBpm(value: unknown): value is number {
+  return (
+    Number.isInteger(value) &&
+    (value as number) >= MIN_HEART_RATE_BPM &&
+    (value as number) <= MAX_HEART_RATE_BPM
+  );
 }
 
 export function isSleepMinutes(value: unknown): value is number {

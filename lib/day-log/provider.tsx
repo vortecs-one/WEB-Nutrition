@@ -7,7 +7,8 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
+import { VTOKENS_WALLET_KEY } from "@/lib/vtokens/types";
 import {
   fetchUserDayLog,
   addMealEntry,
@@ -16,6 +17,7 @@ import {
   addSupplementEntry,
   addWaterEntry,
   removeEntry,
+  setHeartRateEntry,
   setSleepEntry,
   setStressEntry,
   setWeightEntry,
@@ -40,6 +42,10 @@ export * from "./types";
 // are restored on the next login. SWR caches the user's log on the client and
 // mutations update optimistically, then reconcile with the authoritative
 // server state (which carries the real row ids).
+
+// Workout rewards live in the token wallet, so re-read it once a workout has
+// been saved or removed.
+const refreshWallet = () => globalMutate(VTOKENS_WALLET_KEY);
 
 const emptyDay = (): DayData => ({
   meals: [],
@@ -66,11 +72,14 @@ type DayLogValue = {
   setSleep: (dateKey: string, minutes: number) => void;
   stressFor: (dateKey: string) => StressLevel | null;
   setStress: (dateKey: string, level: StressLevel) => void;
+  heartRateFor: (dateKey: string) => number | null;
+  setHeartRate: (dateKey: string, bpm: number) => void;
   /** Every weigh-in, oldest first (kg). */
   weighIns: { dateKey: string; kg: number }[];
   /** The latest weigh-in on or before a day, or null. */
   weightOn: (dateKey: string) => { dateKey: string; kg: number } | null;
-  setWeight: (dateKey: string, kg: number) => void;
+  /** Resolves once saved (and mirrored to the Thruxion history). */
+  setWeight: (dateKey: string, kg: number) => Promise<void>;
 };
 
 const DayLogContext = createContext<DayLogValue | null>(null);
@@ -122,8 +131,8 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
   // cache with fresh server state (so temporary ids become real row ids).
   // Rolls the optimistic change back if the server write fails.
   const runMutation = useCallback(
-    (optimistic: (log: DayLog) => DayLog, action: () => Promise<unknown>) => {
-      void mutate(
+    (optimistic: (log: DayLog) => DayLog, action: () => Promise<unknown>) =>
+      mutate(
         async () => {
           await action();
           return fetchUserDayLog();
@@ -134,8 +143,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
           revalidate: false,
           populateCache: true,
         },
-      );
-    },
+      ).then(() => undefined),
     [mutate],
   );
 
@@ -198,7 +206,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
             activities: [optimisticActivity, ...d.activities],
           })),
         () => addActivityEntry(dateKey, activity),
-      );
+      ).then(refreshWallet);
     },
     [runMutation],
   );
@@ -212,7 +220,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
             activities: d.activities.filter((a) => a.id !== id),
           })),
         () => removeEntry(id),
-      );
+      ).then(refreshWallet);
     },
     [runMutation],
   );
@@ -308,7 +316,7 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
   const setWeight = useCallback(
     (dateKey: string, kg: number) => {
       const grams = Math.round(kg * 1000);
-      runMutation(
+      return runMutation(
         (l) =>
           patchDay(l, dateKey, (d) => ({
             ...d,
@@ -348,6 +356,25 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [runMutation],
   );
 
+  const heartRateFor = useCallback(
+    (dateKey: string) => log[dateKey]?.heartRate?.bpm ?? null,
+    [log],
+  );
+
+  const setHeartRate = useCallback(
+    (dateKey: string, bpm: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            heartRate: { id: d.heartRate?.id ?? -Date.now(), bpm },
+          })),
+        () => setHeartRateEntry(dateKey, bpm),
+      );
+    },
+    [runMutation],
+  );
+
   const value = useMemo<DayLogValue>(
     () => ({
       dayData,
@@ -367,11 +394,15 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       setSleep,
       stressFor,
       setStress,
+      heartRateFor,
+      setHeartRate,
       weighIns,
       weightOn,
       setWeight,
     }),
     [
+      heartRateFor,
+      setHeartRate,
       weighIns,
       weightOn,
       setWeight,
