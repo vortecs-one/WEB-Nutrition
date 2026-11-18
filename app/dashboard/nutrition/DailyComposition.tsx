@@ -16,6 +16,7 @@ import { shiftDateKey } from "@/lib/day-log/date-key";
 import { DAILY_VALUE, percentOfDailyValue } from "@/lib/health-formulas";
 import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { DailyHealthStats } from "./DailyHealthStats";
+import { PeriodBalance } from "./PeriodBalance";
 
 // Daily nutrient composition for one date key (the day selected in the
 // Calories view's navigator). Two views of the same data:
@@ -474,6 +475,9 @@ function CompositionPopupContent({ dateKey, isToday }: { dateKey: string; isToda
         )}
         <CompositionDetails dateKey={dateKey} days={PERIOD_DAYS[period]} />
         {period === "day" && dateKey && <DailyHealthStats dateKey={dateKey} isToday={isToday} />}
+        {period !== "day" && dateKey && (
+          <PeriodBalance dateKey={dateKey} days={period === "week" ? 7 : 30} />
+        )}
       </div>
     </div>
   );

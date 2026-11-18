@@ -9,6 +9,7 @@ import useSWR from "swr";
 import { fetchBodyProfile } from "@/lib/body-profile/actions";
 import type { BodyProfile } from "@/lib/body-profile/types";
 import { CONSUMED_GOAL, WATER_GOAL_ML, useDayLog } from "@/lib/day-log/provider";
+import { shiftDateKey } from "@/lib/day-log/date-key";
 import {
   ACTIVITY_FACTORS,
   ageOn,
@@ -70,14 +71,19 @@ export type EnergyBudget = {
   waterGoalMl: number;
 };
 
-export function useEnergyBudget(dateKey: string): EnergyBudget {
-  const { consumedFor, burnedFor, weighIns, weightOn } = useDayLog();
-  const { profile } = useBodyProfile();
+type DayLogApi = ReturnType<typeof useDayLog>;
 
-  const eaten = dateKey ? consumedFor(dateKey) : 0;
-  const workouts = dateKey ? burnedFor(dateKey) : 0;
-
-  return useMemo(() => {
+// Pure version of the day's budget, shared by the single-day hook and the
+// week/month totals so both always use the same formulas.
+function buildEnergyBudget(
+  dateKey: string,
+  eaten: number,
+  workouts: number,
+  profile: BodyProfile | null,
+  weighIns: DayLogApi["weighIns"],
+  weightOn: DayLogApi["weightOn"],
+): EnergyBudget {
+  {
     const local = (dateKey ? weightOn(dateKey) : null) ?? weighIns[0] ?? null;
     // A newer weight in the Thruxion history (e.g. another platform) wins.
     const remote = profile?.latestWeight ?? null;
@@ -140,5 +146,66 @@ export function useEnergyBudget(dateKey: string): EnergyBudget {
       macros,
       waterGoalMl: weightKg !== null ? waterGoalMl(weightKg) : WATER_GOAL_ML,
     };
-  }, [dateKey, eaten, workouts, profile, weighIns, weightOn]);
+  }
+}
+
+export function useEnergyBudget(dateKey: string): EnergyBudget {
+  const { consumedFor, burnedFor, weighIns, weightOn } = useDayLog();
+  const { profile } = useBodyProfile();
+
+  const eaten = dateKey ? consumedFor(dateKey) : 0;
+  const workouts = dateKey ? burnedFor(dateKey) : 0;
+
+  return useMemo(
+    () => buildEnergyBudget(dateKey, eaten, workouts, profile, weighIns, weightOn),
+    [dateKey, eaten, workouts, profile, weighIns, weightOn],
+  );
+}
+
+export type EnergyPeriod = {
+  /** Window length in days. */
+  days: number;
+  /** Days with food or workouts logged: only these count towards the balance. */
+  loggedDays: number;
+  eaten: number;
+  burned: number;
+  /** Sum of the logged days' net balance (kcal). */
+  net: number;
+  /** Net balance per logged day, null when nothing is logged. */
+  avgNet: number | null;
+};
+
+/** Net balance over the `days` ending on `dateKey` (week = 7, month = 30). */
+export function useEnergyPeriod(dateKey: string, days: number): EnergyPeriod {
+  const { consumedFor, burnedFor, weighIns, weightOn } = useDayLog();
+  const { profile } = useBodyProfile();
+
+  return useMemo(() => {
+    let loggedDays = 0;
+    let eaten = 0;
+    let burned = 0;
+    let net = 0;
+    if (dateKey) {
+      for (let i = 0; i < days; i++) {
+        const key = shiftDateKey(dateKey, -i);
+        const dayEaten = consumedFor(key);
+        const dayWorkouts = burnedFor(key);
+        // An empty day is "not logged", not a full-deficit day.
+        if (dayEaten <= 0 && dayWorkouts <= 0) continue;
+        const day = buildEnergyBudget(key, dayEaten, dayWorkouts, profile, weighIns, weightOn);
+        loggedDays += 1;
+        eaten += day.eaten;
+        burned += day.totalBurned;
+        net += day.net;
+      }
+    }
+    return {
+      days,
+      loggedDays,
+      eaten,
+      burned,
+      net,
+      avgNet: loggedDays > 0 ? Math.round(net / loggedDays) : null,
+    };
+  }, [dateKey, days, consumedFor, burnedFor, profile, weighIns, weightOn]);
 }
