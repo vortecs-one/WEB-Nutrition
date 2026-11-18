@@ -17,6 +17,7 @@ import { DAILY_VALUE, percentOfDailyValue } from "@/lib/health-formulas";
 import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { DailyHealthStats } from "./DailyHealthStats";
 import { PeriodBalance } from "./PeriodBalance";
+import { PulseShortcut } from "./PulseShortcut";
 
 // Daily nutrient composition for one date key (the day selected in the
 // Calories view's navigator). Two views of the same data:
@@ -527,6 +528,7 @@ export default function DailyCompositionCard({
           <ChevronRight className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
         </div>
         <CompositionSummary dateKey={dateKey} />
+        <PulseShortcut />
       </div>
 
       <Modal
