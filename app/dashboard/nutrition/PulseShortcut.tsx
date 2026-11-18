@@ -62,7 +62,7 @@ export function PulseShortcut() {
         setStress(stressFor(localDateKey(new Date())));
         dialog.current?.showModal();
       }}
-      className="pointer-events-auto flex size-16 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-2xl bg-highlight font-bold text-highlight-foreground transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight active:scale-[0.98] sm:size-[4.5rem]">
+      className="pointer-events-auto flex size-16 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-2xl bg-highlight font-bold text-highlight-foreground transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight active:scale-[0.98] sm:size-[4.5rem] sm:self-center">
       <Fingerprint aria-hidden="true" className="size-7 sm:size-8" />
       <span className="text-xs leading-none">{t.tile}</span>
     </button>
