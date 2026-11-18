@@ -11,12 +11,14 @@ import {
   Minus,
   Plus,
   RotateCcw,
+  ScanText,
   Sparkles,
   TriangleAlert,
   Check,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import { analyzeFoodPhotoLocally, preloadLocalFoodModel } from "@/lib/foods/local-vision";
+import { analyzeMenuLocally } from "@/lib/foods/menu-ocr";
 import {
   LOW_CONFIDENCE,
   REFERENCE_MIN_CONFIDENCE,
@@ -34,12 +36,17 @@ const isPreselected = (item: FoodPhotoItem) =>
 
 type Phase = "camera" | "analyzing" | "review" | "failed";
 type FailReason = "not-food" | "rate-limited" | "quota" | "error";
+type ScanMode = "plate" | "menu";
 
 const MAX_DIMENSION = 768;
+// OCR needs more pixels than the food model to read small menu print.
+const MENU_MAX_DIMENSION = 1600;
 const JPEG_QUALITY = 0.8;
 
-function drawToDataUrl(source: CanvasImageSource, width: number, height: number) {
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+const maxDimensionFor = (mode: ScanMode) => (mode === "menu" ? MENU_MAX_DIMENSION : MAX_DIMENSION);
+
+function drawToDataUrl(source: CanvasImageSource, width: number, height: number, maxDimension = MAX_DIMENSION) {
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
@@ -49,12 +56,12 @@ function drawToDataUrl(source: CanvasImageSource, width: number, height: number)
   return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
 }
 
-function fileToDataUrl(file: File): Promise<string | null> {
+function fileToDataUrl(file: File, maxDimension = MAX_DIMENSION): Promise<string | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      resolve(drawToDataUrl(img, img.naturalWidth, img.naturalHeight));
+      resolve(drawToDataUrl(img, img.naturalWidth, img.naturalHeight, maxDimension));
       URL.revokeObjectURL(url);
     };
   img.onerror = () => {
@@ -62,7 +69,7 @@ function fileToDataUrl(file: File): Promise<string | null> {
   if (typeof createImageBitmap !== "function") return resolve(null);
   createImageBitmap(file)
     .then((bitmap) => {
-      resolve(drawToDataUrl(bitmap, bitmap.width, bitmap.height));
+      resolve(drawToDataUrl(bitmap, bitmap.width, bitmap.height, maxDimension));
       bitmap.close();
     })
     .catch(() => resolve(null));
@@ -105,7 +112,8 @@ export default function FoodPhotoScanner({
   const [photo, setPhoto] = useState<string | null>(null);
   const [items, setItems] = useState<FoodPhotoItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const lastResultRef = useRef<{ dataUrl: string; result: FoodPhotoResult } | null>(null);
+  const [scanMode, setScanMode] = useState<ScanMode>("plate");
+  const lastResultRef = useRef<{ dataUrl: string; mode: ScanMode; result: FoodPhotoResult } | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -147,17 +155,21 @@ export default function FoodPhotoScanner({
     };
   }, [phase, stopCamera]);
 
-  const analyze = async (dataUrl: string) => {
+  const analyze = async (dataUrl: string, mode: ScanMode) => {
     setPhoto(dataUrl);
+    setScanMode(mode);
     setPhase("analyzing");
     stopCamera();
     try {
       const cached = lastResultRef.current;
+      const resultLocale = locale === "en" ? "en" : "es";
       const result =
-        cached && cached.dataUrl === dataUrl
+        cached && cached.dataUrl === dataUrl && cached.mode === mode
           ? cached.result
-          : await analyzeFoodPhotoLocally(dataUrl, locale === "en" ? "en" : "es", { recentIds });
-      if (result.ok) lastResultRef.current = { dataUrl, result };
+          : mode === "menu"
+            ? await analyzeMenuLocally(dataUrl, resultLocale)
+            : await analyzeFoodPhotoLocally(dataUrl, resultLocale, { recentIds });
+      if (result.ok) lastResultRef.current = { dataUrl, mode, result };
       if (result.ok) {
         setItems(result.items);
         setSelected(new Set(result.items.filter(isPreselected).map((i) => i.id)));
@@ -177,20 +189,21 @@ export default function FoodPhotoScanner({
     setPhase("failed");
   };
 
-  const capture = () => {
+  const capture = (mode: ScanMode) => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
-    const dataUrl = drawToDataUrl(video, video.videoWidth, video.videoHeight);
-    if (dataUrl) void analyze(dataUrl);
+    const dataUrl = drawToDataUrl(video, video.videoWidth, video.videoHeight, maxDimensionFor(mode));
+    if (dataUrl) void analyze(dataUrl, mode);
   };
 
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>, mode: ScanMode) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const dataUrl = file.type.startsWith("image/") || file.type === "" ? await fileToDataUrl(file) : null;
+    const dataUrl =
+      file.type.startsWith("image/") || file.type === "" ? await fileToDataUrl(file, maxDimensionFor(mode)) : null;
     if (dataUrl) {
-      void analyze(dataUrl);
+      void analyze(dataUrl, mode);
       return;
     }
     stopCamera();
@@ -286,7 +299,7 @@ export default function FoodPhotoScanner({
       className="sr-only"
       tabIndex={-1}
       aria-hidden="true"
-      onChange={onFile}
+      onChange={(e) => handleFile(e, scanMode)}
     />
   );
 
@@ -330,19 +343,41 @@ export default function FoodPhotoScanner({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={capture}
+            onClick={() => capture("plate")}
             disabled={!cameraReady}
-            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-highlight px-5 text-sm font-semibold text-highlight-foreground transition hover:bg-highlight/90 active:scale-[0.98] disabled:opacity-50"
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-highlight px-4 text-sm font-semibold text-highlight-foreground transition hover:bg-highlight/90 active:scale-[0.98] disabled:opacity-50"
           >
             <Camera className="h-5 w-5" aria-hidden="true" />
             {t.photoTake}
           </button>
+          {cameraDenied ? (
+            <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-highlight/40 px-4 text-sm font-semibold text-foreground transition hover:bg-accent focus-within:ring-2 focus-within:ring-highlight active:scale-95">
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => handleFile(e, "menu")}
+              />
+              <ScanText className="h-5 w-5 text-highlight" aria-hidden="true" />
+              {t.photoScanMenu}
+            </label>
+          ) : (
+            <button
+              type="button"
+              onClick={() => capture("menu")}
+              disabled={!cameraReady}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-highlight/40 px-4 text-sm font-semibold text-foreground transition hover:bg-accent active:scale-95 disabled:opacity-50"
+            >
+              <ScanText className="h-5 w-5 text-highlight" aria-hidden="true" />
+              {t.photoScanMenu}
+            </button>
+          )}
           <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-muted px-4 text-sm font-semibold text-foreground transition hover:bg-accent focus-within:ring-2 focus-within:ring-highlight active:scale-95">
             <input
               type="file"
               accept="image/*"
               className="sr-only"
-              onChange={onFile}
+              onChange={(e) => handleFile(e, "plate")}
             />
             <ImageUp className="h-5 w-5 text-highlight" aria-hidden="true" />
             <span className={cameraDenied ? "" : "sr-only sm:not-sr-only"}>{t.photoUpload}</span>
@@ -373,7 +408,7 @@ export default function FoodPhotoScanner({
             <div className="flex flex-col gap-2">
               <p className="flex items-center gap-2 text-sm font-semibold">
                 <Loader2 className="h-4 w-4 animate-spin text-highlight" aria-hidden="true" />
-                {t.photoAnalyzing}
+                {scanMode === "menu" ? t.photoMenuReading : t.photoAnalyzing}
               </p>
               <div className="flex flex-col gap-2" aria-hidden="true">
                 <div className="h-14 animate-pulse rounded-xl bg-muted" />
@@ -386,7 +421,9 @@ export default function FoodPhotoScanner({
             <div className="flex flex-col items-start gap-3 rounded-2xl border border-border p-4">
               <p className="text-sm text-pretty">
                 {failReason === "not-food"
-                  ? t.photoNotFood
+                  ? scanMode === "menu"
+                    ? t.photoMenuNoFood
+                    : t.photoNotFood
                   : failReason === "rate-limited"
                     ? t.photoRateLimited
                     : failReason === "quota"
