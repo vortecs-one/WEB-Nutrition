@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Droplet, Flame, Gauge, Moon, Scale, Utensils } from "lucide-react";
+import { Droplet, Flame, Gauge, HeartPulse, Moon, Scale, Utensils } from "lucide-react";
 import { useI18n } from "@/lib/i18n/provider";
 import {
+  MAX_HEART_RATE_BPM,
   MAX_SLEEP_MIN,
+  MIN_HEART_RATE_BPM,
   SLEEP_GOAL_MIN,
+  isHeartRateBpm,
   useDayLog,
   type StressLevel,
 } from "@/lib/day-log/provider";
@@ -96,15 +99,17 @@ export function DailyHealthStats({
 }) {
   const { dict } = useI18n();
   const t = dict.healthStats;
-  const { waterFor, sleepFor, setSleep, stressFor, setStress } = useDayLog();
+  const { waterFor, sleepFor, setSleep, stressFor, setStress, heartRateFor, setHeartRate } = useDayLog();
   // Targets from the body profile: food budget = target + workouts.
   const budget = useEnergyBudget(key);
   const [editingSleep, setEditingSleep] = useState(false);
+  const [editingHeartRate, setEditingHeartRate] = useState(false);
 
   const consumed = budget.eaten;
   const water = waterFor(key);
   const sleep = sleepFor(key);
   const stress = stressFor(key);
+  const heartRate = heartRateFor(key);
 
   const net = budget.net;
   const stressHint = isToday ? t.stressHint : t.stressHintDay;
@@ -118,6 +123,14 @@ export function DailyHealthStats({
     if (!Number.isFinite(total) || total < 0 || total > MAX_SLEEP_MIN) return;
     setSleep(key, total);
     setEditingSleep(false);
+  }
+
+  function handleHeartRateSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const bpm = Math.round(Number(new FormData(event.currentTarget).get("bpm")));
+    if (!isHeartRateBpm(bpm)) return;
+    setHeartRate(key, bpm);
+    setEditingHeartRate(false);
   }
 
   return (
@@ -153,12 +166,107 @@ export function DailyHealthStats({
           </p>
         </Tile>
 
-        <Tile icon={<Droplet className="h-4 w-4" />} label={t.hydration}>
+        {/* Alone on its row in the 3-column grid, so it takes the full width there. */}
+        <Tile icon={<Droplet className="h-4 w-4" />} label={t.hydration} className="sm:col-span-2">
           <GoalStat value={water} goal={budget.waterGoalMl} unit="ml" label={t.hydration} ofGoal={t.ofGoal} />
         </Tile>
 
-        {/* Spans two columns so the five tiles fill both the 2- and 3-column grids. */}
-        <Tile icon={<Moon className="h-4 w-4" />} label={t.sleep} className="col-span-2">
+        <div className="col-span-2 grid grid-cols-[9rem_1fr] gap-2 sm:col-span-3">
+          <Tile icon={<HeartPulse className="h-4 w-4" />} label={t.heartRate}>
+            {editingHeartRate ? (
+              <form onSubmit={handleHeartRateSubmit} className="flex flex-col gap-2">
+                <label className="sr-only" htmlFor="heart-rate-input">
+                  {t.heartRate} ({t.bpm})
+                </label>
+                <div className="flex items-baseline gap-1">
+                  <input
+                    id="heart-rate-input"
+                    name="bpm"
+                    type="number"
+                    inputMode="numeric"
+                    min={MIN_HEART_RATE_BPM}
+                    max={MAX_HEART_RATE_BPM}
+                    step={1}
+                    required
+                    autoFocus
+                    defaultValue={heartRate ?? undefined}
+                    title={t.heartRateInvalid}
+                    className="w-full min-w-0 rounded-lg border border-sidebar-foreground/15 bg-transparent px-2 py-1 text-sm tabular-nums text-sidebar-foreground outline-none focus:border-highlight"
+                  />
+                  <span className="text-xs text-sidebar-foreground/60">{t.bpm}</span>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="submit"
+                    className="flex-1 rounded-lg bg-highlight px-2 py-1 text-xs font-medium text-highlight-foreground hover:opacity-90"
+                  >
+                    {t.save}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingHeartRate(false)}
+                    className="flex-1 rounded-lg px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-foreground/10"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <p className="flex items-baseline gap-1">
+                  {heartRate !== null ? (
+                    <>
+                      <span className="text-xl font-semibold tabular-nums">{heartRate}</span>
+                      <span className="text-xs text-sidebar-foreground/60">{t.bpm}</span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-sidebar-foreground/60">{t.empty}</span>
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEditingHeartRate(true)}
+                  className="self-start text-xs font-medium text-highlight underline-offset-4 hover:underline"
+                >
+                  {t.edit}
+                </button>
+              </>
+            )}
+          </Tile>
+
+          <Tile icon={<Gauge className="h-4 w-4" />} label={t.stress}>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="sr-only">{stressHint}</legend>
+              <p className="text-xs text-sidebar-foreground/60" aria-hidden="true">
+                {stress !== null ? t.stressLevels[stress - 1] : stressHint}
+              </p>
+              <div className="grid grid-cols-5 gap-1">
+                {t.stressLevels.map((label, index) => {
+                  const level = (index + 1) as StressLevel;
+                  const selected = stress === level;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      aria-pressed={selected}
+                      aria-label={t.stressLevelLabel.replace("{level}", String(level)).replace("{label}", label)}
+                      onClick={() => setStress(key, level)}
+                      className={`rounded-lg py-1.5 text-sm tabular-nums transition ${
+                        selected
+                          ? "bg-highlight font-medium text-highlight-foreground"
+                          : "bg-sidebar-foreground/5 text-sidebar-foreground/70 hover:bg-sidebar-foreground/10"
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </Tile>
+        </div>
+
+        <Tile icon={<Moon className="h-4 w-4" />} label={t.sleep} className="col-span-2 sm:col-span-3">
           {editingSleep ? (
             <form onSubmit={handleSleepSubmit} className="flex flex-col gap-2">
               <div className="flex gap-2">
@@ -224,37 +332,6 @@ export function DailyHealthStats({
               <Progress value={sleep ?? 0} goal={SLEEP_GOAL_MIN} label={t.sleep} />
             </>
           )}
-        </Tile>
-
-        <Tile icon={<Gauge className="h-4 w-4" />} label={t.stress} className="col-span-2 sm:col-span-3">
-          <fieldset className="flex flex-col gap-2">
-            <legend className="sr-only">{stressHint}</legend>
-            <p className="text-xs text-sidebar-foreground/60" aria-hidden="true">
-              {stressHint}
-            </p>
-            <div className="grid grid-cols-5 gap-1">
-              {t.stressLevels.map((label, index) => {
-                const level = (index + 1) as StressLevel;
-                const selected = stress === level;
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setStress(key, level)}
-                    className={`flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-xs transition ${
-                      selected
-                        ? "bg-highlight font-medium text-highlight-foreground"
-                        : "bg-sidebar-foreground/5 text-sidebar-foreground/70 hover:bg-sidebar-foreground/10"
-                    }`}
-                  >
-                    <span className="tabular-nums">{level}</span>
-                    <span className="truncate">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
         </Tile>
       </div>
 

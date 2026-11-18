@@ -17,6 +17,7 @@ import {
   addSupplementEntry,
   addWaterEntry,
   removeEntry,
+  setHeartRateEntry,
   setSleepEntry,
   setStressEntry,
   setWeightEntry,
@@ -71,6 +72,8 @@ type DayLogValue = {
   setSleep: (dateKey: string, minutes: number) => void;
   stressFor: (dateKey: string) => StressLevel | null;
   setStress: (dateKey: string, level: StressLevel) => void;
+  heartRateFor: (dateKey: string) => number | null;
+  setHeartRate: (dateKey: string, bpm: number) => void;
   /** Every weigh-in, oldest first (kg). */
   weighIns: { dateKey: string; kg: number }[];
   /** The latest weigh-in on or before a day, or null. */
@@ -353,6 +356,25 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
     [runMutation],
   );
 
+  const heartRateFor = useCallback(
+    (dateKey: string) => log[dateKey]?.heartRate?.bpm ?? null,
+    [log],
+  );
+
+  const setHeartRate = useCallback(
+    (dateKey: string, bpm: number) => {
+      runMutation(
+        (l) =>
+          patchDay(l, dateKey, (d) => ({
+            ...d,
+            heartRate: { id: d.heartRate?.id ?? -Date.now(), bpm },
+          })),
+        () => setHeartRateEntry(dateKey, bpm),
+      );
+    },
+    [runMutation],
+  );
+
   const value = useMemo<DayLogValue>(
     () => ({
       dayData,
@@ -372,11 +394,15 @@ export function DayLogProvider({ children }: { children: ReactNode }) {
       setSleep,
       stressFor,
       setStress,
+      heartRateFor,
+      setHeartRate,
       weighIns,
       weightOn,
       setWeight,
     }),
     [
+      heartRateFor,
+      setHeartRate,
       weighIns,
       weightOn,
       setWeight,

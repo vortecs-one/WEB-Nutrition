@@ -13,11 +13,18 @@ import type {
   WaterEntry,
   DayData,
   DayLog,
+  HeartRateEntry,
   SleepEntry,
   StressEntry,
   WeightEntry,
 } from "./types";
-import { DATE_KEY_RE, isSleepMinutes, isStressLevel, isWeightGrams } from "./types";
+import {
+  DATE_KEY_RE,
+  isHeartRateBpm,
+  isSleepMinutes,
+  isStressLevel,
+  isWeightGrams,
+} from "./types";
 
 // Resolve a stable per-user key from the session: prefer the Thruxion
 // human_id, fall back to the email. Returns null when unauthenticated so
@@ -105,6 +112,10 @@ export async function fetchUserDayLog(): Promise<DayLog> {
     } else if (row.kind === "stress") {
       if (!day.stress && isStressLevel(row.value)) {
         day.stress = { id: row.id, level: row.value };
+      }
+    } else if (row.kind === "heart_rate") {
+      if (!day.heartRate && isHeartRateBpm(row.value)) {
+        day.heartRate = { id: row.id, bpm: row.value };
       }
     } else if (row.kind === "weight") {
       if (!day.weight && isWeightGrams(row.value)) {
@@ -239,7 +250,7 @@ export async function addWaterEntry(
 // Replaces the user's single entry of `kind` for the day. Inputs are
 // re-validated here because server actions are callable from any client.
 async function setDailyValue(
-  kind: "sleep" | "stress" | "weight",
+  kind: "sleep" | "stress" | "weight" | "heart_rate",
   dateKey: string,
   value: number,
 ): Promise<number | null> {
@@ -288,6 +299,15 @@ export async function setStressEntry(
   if (!isStressLevel(level)) return null;
   const id = await setDailyValue("stress", dateKey, level);
   return id === null ? null : { id, level };
+}
+
+export async function setHeartRateEntry(
+  dateKey: string,
+  bpm: number,
+): Promise<HeartRateEntry | null> {
+  if (!isHeartRateBpm(bpm)) return null;
+  const id = await setDailyValue("heart_rate", dateKey, bpm);
+  return id === null ? null : { id, bpm };
 }
 
 export async function setWeightEntry(

@@ -118,7 +118,8 @@ export const dayLogEntries = pgTable(
     userKey: text("user_key").notNull(),
     // Day this entry belongs to (YYYY-MM-DD).
     logDate: date("log_date").notNull(),
-    // "meal" | "activity" | "supplement" | "water" | "sleep" | "stress" | "weight".
+    // "meal" | "activity" | "supplement" | "water" | "sleep" | "stress" |
+    // "weight" | "heart_rate".
     kind: varchar("kind", { length: 20 }).notNull(),
     // Meal/activity/supplement subtype (e.g. "breakfast", "cardio", "protein").
     subtype: varchar("subtype", { length: 20 }).notNull(),
@@ -139,7 +140,7 @@ export const dayLogEntries = pgTable(
     fiber: integer("fiber"),
     sodium: integer("sodium"),
     // Minutes slept for kind="sleep", level 1-5 for kind="stress", grams
-    // for kind="weight".
+    // for kind="weight", beats per minute for kind="heart_rate".
     value: integer("value"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
