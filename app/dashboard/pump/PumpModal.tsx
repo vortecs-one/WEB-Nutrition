@@ -346,7 +346,11 @@ export default function PumpModal({
                         value={
                           sensorLeftMin <= 0
                             ? "0"
-                            : String(sensorInDays ? sensorLeft.days : sensorLeft.hours)
+                            : String(
+                                sensorInDays
+                                  ? Math.round(sensorLeftMin / (24 * 60))
+                                  : Math.round(sensorLeftMin / 60),
+                              )
                         }
                         unit={sensorInDays ? t.pump.days : t.pump.hours}
                         pct={sensorPct}
@@ -361,7 +365,7 @@ export default function PumpModal({
                         }
                         value={
                           calibrationInHours
-                            ? String(Math.floor(calibrationMin / 60))
+                            ? String(Math.round(calibrationMin / 60))
                             : String(Math.round(calibrationMin))
                         }
                         unit={calibrationInHours ? t.pump.hours : t.pump.minutes}
