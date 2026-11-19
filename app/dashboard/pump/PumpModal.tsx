@@ -138,12 +138,10 @@ export default function PumpModal({
           ? t.careLinkAutoModeOff
           : mode.replace(/_/g, " ").toLowerCase();
 
-  const updatedAt = careLink
-    ? new Date(careLink.fetchedAt).toLocaleTimeString(locale, {
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : null;
+  const formatClock = (ms: number) =>
+    new Date(ms).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+  const updatedAt = careLink ? formatClock(careLink.fetchedAt) : null;
+  const readingAt = careLink?.lastSgAt ? formatClock(careLink.lastSgAt) : null;
 
   const panel = "rounded-2xl bg-sidebar-accent p-4 sm:p-5";
   const panelTitle = "text-sm font-semibold";
@@ -194,6 +192,7 @@ export default function PumpModal({
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-sidebar-foreground/60">
                 <span className="h-1.5 w-1.5 rounded-full bg-lime-400" aria-hidden="true" />
                 {t.careLinkUpdatedAt.replace("{time}", updatedAt)}
+                {readingAt && ` · ${t.careLinkReadingAt.replace("{time}", readingAt)}`}
               </p>
             )}
           </div>

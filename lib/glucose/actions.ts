@@ -875,6 +875,7 @@ async function fetchFromCareLinkImport(
             calibrationMinutesLeft: snapshot.calibrationMinutesLeft ?? null,
             reservoirPercent: snapshot.reservoirPercent ?? null,
             autoMode: snapshot.autoMode ?? null,
+            lastSgAt: snapshot.lastSgAt ?? null,
             fetchedAt: snapshot.fetchedAt,
           }
         : null,

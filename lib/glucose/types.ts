@@ -187,6 +187,9 @@ export type CareLinkStatus = {
   calibrationMinutesLeft: number | null;
   reservoirPercent: number | null;
   autoMode: string | null;
+  /** When the pump last reported a glucose value (ms epoch); null if unknown. */
+  lastSgAt: number | null;
+  /** When Medtronic was last synced into the app (ms epoch). */
   fetchedAt: number;
 };
 
