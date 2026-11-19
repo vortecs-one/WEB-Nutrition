@@ -305,7 +305,7 @@ export default function PumpModal({
                       <DeviceGauge
                         icon={Droplet}
                         label={t.careLinkReservoir}
-                        value={careLink.reservoirUnits.toFixed(0)}
+                        value={careLink.reservoirUnits.toFixed(1)}
                         unit="U"
                         pct={reservoirPct}
                         tone={toneForPercent(reservoirPct)}
