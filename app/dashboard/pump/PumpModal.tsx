@@ -365,7 +365,7 @@ export default function PumpModal({
                         }
                         value={
                           calibrationInHours
-                            ? String(Math.round(calibrationMin / 60))
+                            ? String(Math.ceil(calibrationMin / 60))
                             : String(Math.round(calibrationMin))
                         }
                         unit={calibrationInHours ? t.pump.hours : t.pump.minutes}
