@@ -966,7 +966,10 @@ export default function GlucoseTracker({
           </button>
           <button
             type="button"
-            onClick={() => setShowPump(true)}
+            onClick={() => {
+                  setShowPump(true);
+                  void load(rangeRef.current);
+                }}
             aria-label={t.pump.title}
             aria-haspopup="dialog"
             className="flex min-w-0 flex-[3] items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-amber-950 transition hover:bg-amber-400 active:scale-[0.99]"

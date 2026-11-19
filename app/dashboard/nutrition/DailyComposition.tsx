@@ -17,6 +17,7 @@ import { DAILY_VALUE, percentOfDailyValue } from "@/lib/health-formulas";
 import { useEnergyBudget } from "@/lib/energy/use-energy-budget";
 import { DailyHealthStats } from "./DailyHealthStats";
 import { PeriodBalance } from "./PeriodBalance";
+import { PulseShortcut } from "./PulseShortcut";
 
 // Daily nutrient composition for one date key (the day selected in the
 // Calories view's navigator). Two views of the same data:
@@ -372,7 +373,7 @@ export function CompositionSummary({ dateKey }: { dateKey: string }) {
         ))}
       </ul>
 
-      <CompositionDonut data={data} total={total} t={t} compact className="h-28 w-28 sm:h-32 sm:w-32" />
+      <CompositionDonut data={data} total={total} t={t} compact className="h-20 w-20 sm:h-32 sm:w-32" />
     </div>
   );
 }
@@ -526,7 +527,12 @@ export default function DailyCompositionCard({
           </h2>
           <ChevronRight className="h-4 w-4 shrink-0 text-sidebar-foreground/60" aria-hidden="true" />
         </div>
-        <CompositionSummary dateKey={dateKey} />
+        <div className="flex min-w-0 items-center gap-2 sm:flex-col sm:items-stretch">
+          <PulseShortcut />
+          <div className="min-w-0 flex-1">
+            <CompositionSummary dateKey={dateKey} />
+          </div>
+        </div>
       </div>
 
       <Modal
