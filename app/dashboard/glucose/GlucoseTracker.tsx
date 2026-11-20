@@ -203,6 +203,24 @@ export default function GlucoseTracker({
     [savingUnit, isOwner],
   );
 
+  // Keep the pump popup current while it is open. CareLink sync itself is
+  // throttled by careLinkSyncDue, so this refreshes promptly without polling
+  // Medtronic more often than the configured sync cadence.
+  useEffect(() => {
+    if (!showPump || !settings) return;
+
+    const refreshPump = () => {
+      if (document.visibilityState === "visible") load(rangeRef.current);
+    };
+    const interval = setInterval(refreshPump, REFRESH_MS);
+    document.addEventListener("visibilitychange", refreshPump);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshPump);
+    };
+  }, [showPump, settings, load]);
+
   // Initial load + polling (only while the tab is visible).
   useEffect(() => {
     if (!settings) return;
